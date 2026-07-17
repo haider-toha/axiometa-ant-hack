@@ -1,0 +1,177 @@
+{
+  "slug": "axiometa-genesis-mini",
+  "title": "Axiometa Genesis Mini",
+  "url": "https://www.axiometa.io/products/axiometa-genesis-mini",
+  "role": "kit_module",
+  "sku": "AXMT-MTX0013",
+  "price": "$19.99",
+  "description": "Genesis Mini is a modular, Wi-Fi-enabled prototyping system built around a standardized AX22 connector. The ESP32-S3 powered board provides four AX22 ports that modules plug into directly. This platform eliminates breadboard wiring for common tasks like sensor reading, display control, and motor driving. Modules lock securely in place and provide reliable electrical connections.",
+  "technical_details": [
+    "MCU: ESP32-S3-Mini-1",
+    "Flash: 4MB",
+    "PSRAM: 2MB",
+    "3x AA/AAA Battery Connector",
+    "User buttons & LEDs",
+    "Integrated Neopixel",
+    "55 mm × 55 mm square 4-layer PCB",
+    "4× ⌀2.7 mm Mounting Holes",
+    "1× STEMMA QT connectors",
+    "Arduino IDE Compatible",
+    "MicroPython Compatible",
+    "MicroBlocks Compatible"
+  ],
+  "arduino_examples": [
+    "#include <Adafruit_NeoPixel.h>\n#define LED_PIN     21\n#define BTN_PIN     45\n#define ACT_LED     37\n\nAdafruit_NeoPixel px(1, LED_PIN, NEO_GRB + NEO_KHZ800);\n#define BRIGHTNESS  20\n\nuint32_t colors[] = {\n  px.Color(0, 180, 255),    // ice blue\n  px.Color(0, 255, 180),    // aqua mint\n  px.Color(80, 0, 255),     // deep violet\n  px.Color(180, 0, 255),    // electric purple\n  px.Color(0, 255, 100),    // neon green\n  px.Color(0, 120, 255),    // ocean\n  px.Color(255, 0, 180),    // hot magenta\n  px.Color(0, 220, 220),    // cyan\n  px.Color(140, 0, 255),    // ultraviolet\n  px.Color(0, 255, 60),     // matrix green\n};\nint colorIdx = 0;\nbool prev = HIGH;\n\nvoid setup() {\n  px.begin();\n  px.setBrightness(BRIGHTNESS);\n  px.setPixelColor(0, colors[0]);\n  px.show();\n  pinMode(BTN_PIN, INPUT_PULLUP);\n  pinMode(ACT_LED, OUTPUT);\n}\n\nvoid loop() {\n  bool btn = digitalRead(BTN_PIN) == LOW;\n  if (btn && !prev) {\n    colorIdx = (colorIdx + 1) % 10;\n    px.setPixelColor(0, colors[colorIdx]);\n    px.show();\n  }\n  prev = btn;\n\n  uint32_t t = millis() % 1000;\n  digitalWrite(ACT_LED, t < 200 ? HIGH : LOW);\n\n  delay(10);\n}"
+  ],
+  "links": [
+    {
+      "label": "MCU Datasheet",
+      "url": "https://documentation.espressif.com/esp32-s3-mini-1_mini-1u_datasheet_en.pdf",
+      "kind": "datasheet"
+    },
+    {
+      "label": "Getting Started Guide",
+      "url": "https://www.axiometa.io/pages/genesis-getting-started-arduino",
+      "kind": "guide"
+    },
+    {
+      "label": "Circuit Schematic",
+      "url": "https://cdn.shopify.com/s/files/1/0966/7756/0659/files/SCH_MTX0013.pdf?v=1773849466",
+      "kind": "schematic"
+    },
+    {
+      "label": "3D Model (STEP)",
+      "url": "https://cdn.shopify.com/s/files/1/0966/7756/0659/files/STP_MTX0013.zip?v=1773849541",
+      "kind": "model_step"
+    },
+    {
+      "label": "3D Model (GLB)",
+      "url": "https://cdn.shopify.com/3d/models/bcde7ad0cc082c1e/GLB_MTX0013.glb",
+      "kind": "model_glb"
+    }
+  ],
+  "files": [
+    {
+      "kind": "datasheet",
+      "label": "MCU Datasheet",
+      "source_url": "https://documentation.espressif.com/esp32-s3-mini-1_mini-1u_datasheet_en.pdf",
+      "local_path": "parts/axiometa-genesis-mini/files/AXMT-MTX0013-datasheet.pdf",
+      "sha256": "4d4b7f1c17b484c627aaa0f806566c48a6124a8e466c6d21d99210e6eacdef04",
+      "bytes": 1338916
+    },
+    {
+      "kind": "guide",
+      "label": "Getting Started Guide",
+      "source_url": "https://www.axiometa.io/pages/genesis-getting-started-arduino",
+      "local_path": "parts/axiometa-genesis-mini/guides/getting-started-guide.md"
+    },
+    {
+      "kind": "schematic",
+      "label": "Circuit Schematic",
+      "source_url": "https://cdn.shopify.com/s/files/1/0966/7756/0659/files/SCH_MTX0013.pdf?v=1773849466",
+      "local_path": "parts/axiometa-genesis-mini/files/SCH_MTX0013.pdf",
+      "sha256": "3ecdb22206d7bccf3079b4284cd893f17e9f6d192a5ccbfa8c2a4f76dff8d80f",
+      "bytes": 135794
+    },
+    {
+      "kind": "model_step",
+      "label": "3D Model (STEP)",
+      "source_url": "https://cdn.shopify.com/s/files/1/0966/7756/0659/files/STP_MTX0013.zip?v=1773849541",
+      "local_path": "parts/axiometa-genesis-mini/files/STP_MTX0013.zip",
+      "sha256": "c5f17558ae0f23b30f5e8476b19e16f5b470c2027db7d96005287743090cdc59",
+      "bytes": 4005661
+    },
+    {
+      "kind": "model_glb",
+      "label": "3D Model (GLB)",
+      "source_url": "https://cdn.shopify.com/3d/models/bcde7ad0cc082c1e/GLB_MTX0013.glb",
+      "local_path": "parts/axiometa-genesis-mini/files/GLB_MTX0013.glb",
+      "sha256": "80d14a8ee164b0e4ba78c2584954dabcf87770b6cc8dc04e7185500a48134717",
+      "bytes": 2184500
+    }
+  ],
+  "images": {
+    "pinout": [],
+    "pcb": [
+      {
+        "kind": "pcb",
+        "label": "PCB FRONT",
+        "source_url": "https://www.axiometa.io/cdn/shop/files/TOP_MTX0013.png?v=1773849474&width=2000",
+        "local_path": "parts/axiometa-genesis-mini/images/pcb/TOP_MTX0013.png",
+        "sha256": "a95f60d8a0d917c6c0ec7359e6fef8b38d8f963f74bc0d3020e96f8a183cbaa2",
+        "bytes": 770522
+      },
+      {
+        "kind": "pcb",
+        "label": "PCB BACK",
+        "source_url": "https://www.axiometa.io/cdn/shop/files/BOT_MTX0013.png?v=1773849475&width=2000",
+        "local_path": "parts/axiometa-genesis-mini/images/pcb/BOT_MTX0013.png",
+        "sha256": "b5cc2f0fc8024bd2efba01e530f3e11748fb42dfdf4596715faff9a439dd3c11",
+        "bytes": 853720
+      }
+    ],
+    "gallery": [
+      {
+        "kind": "gallery",
+        "label": "gallery-1",
+        "source_url": "https://cdn.shopify.com/s/files/1/0966/7756/0659/files/IMG_6063_84b4db7d-d486-4010-b9aa-524bee6d4290.png?v=1773844340",
+        "local_path": "parts/axiometa-genesis-mini/images/gallery/IMG_6063_84b4db7d-d486-4010-b9aa-524bee6d4290.png",
+        "sha256": "606443b6a1145580b6d919c5af856ba7ff97dc5d1ed1e2a5530ce8668c0a2df9",
+        "bytes": 6245922
+      },
+      {
+        "kind": "gallery",
+        "label": "gallery-2",
+        "source_url": "https://cdn.shopify.com/s/files/1/0966/7756/0659/files/BUN0001-HERO-5.png?v=1774102783",
+        "local_path": "parts/axiometa-genesis-mini/images/gallery/BUN0001-HERO-5.png",
+        "sha256": "a4117cbe5d8e06f98d8fdfc623e62a2235cbde8a14fc4efad592c66c69fcf762",
+        "bytes": 4791314
+      },
+      {
+        "kind": "gallery",
+        "label": "gallery-3",
+        "source_url": "https://cdn.shopify.com/s/files/1/0966/7756/0659/files/BUN0001-HERO.png?v=1773844340",
+        "local_path": "parts/axiometa-genesis-mini/images/gallery/BUN0001-HERO.png",
+        "sha256": "5b4befb8ea4a336a0bac5a995b3f0bf1998cec0930ee2815c71c1ab77199d197",
+        "bytes": 5564665
+      },
+      {
+        "kind": "gallery",
+        "label": "gallery-4",
+        "source_url": "https://cdn.shopify.com/s/files/1/0966/7756/0659/files/2BACK_MTX0013.png?v=1773854734",
+        "local_path": "parts/axiometa-genesis-mini/images/gallery/2BACK_MTX0013.png",
+        "sha256": "56e38c47f72c06cb561a8f15ee505c84427e16aafa323b853031b7875797795d",
+        "bytes": 3724743
+      }
+    ],
+    "other": []
+  },
+  "shopify": {
+    "id": 10493343334739,
+    "handle": "axiometa-genesis-mini",
+    "title": "Axiometa Genesis Mini",
+    "vendor": "Axiometa",
+    "type": "",
+    "tags": [
+      "MTX0013"
+    ],
+    "price": 1999,
+    "sku": "AXMT-MTX0013",
+    "description_text": "Genesis Mini\nis a modular, Wi-Fi-enabled prototyping system built around a standardized AX22 connector. The ESP32-S3 powered board provides four AX22 ports that modules plug into directly. This platform eliminates breadboard wiring for common tasks like sensor reading, display control, and motor driving. Modules lock securely in place and provide reliable electrical connections.",
+    "images": [
+      "//cdn.shopify.com/s/files/1/0966/7756/0659/files/IMG_6063_84b4db7d-d486-4010-b9aa-524bee6d4290.png?v=1773844340",
+      "//cdn.shopify.com/s/files/1/0966/7756/0659/files/BUN0001-HERO-5.png?v=1774102783",
+      "//cdn.shopify.com/s/files/1/0966/7756/0659/files/BUN0001-HERO.png?v=1773844340",
+      "//cdn.shopify.com/s/files/1/0966/7756/0659/files/2BACK_MTX0013.png?v=1773854734"
+    ],
+    "featured_image": "//cdn.shopify.com/s/files/1/0966/7756/0659/files/IMG_6063_84b4db7d-d486-4010-b9aa-524bee6d4290.png?v=1773844340",
+    "url": "https://www.axiometa.io/products/axiometa-genesis-mini"
+  },
+  "notes": [],
+  "scraped_at": "2026-07-17T15:06:48.771535+00:00",
+  "cad": {
+    "step": "parts/axiometa-genesis-mini/files/STP_MTX0013.zip",
+    "glb": "parts/axiometa-genesis-mini/files/GLB_MTX0013.glb",
+    "schematic": "parts/axiometa-genesis-mini/files/SCH_MTX0013.pdf"
+  }
+}

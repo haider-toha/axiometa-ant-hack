@@ -1,0 +1,174 @@
+{
+  "slug": "tactile-led-button",
+  "title": "Tactile Led Button",
+  "url": "https://www.axiometa.io/products/tactile-led-button",
+  "role": "kit_module",
+  "sku": "AX22-0050",
+  "price": "$5.49",
+  "description": "Add a clicky button with built-in LED feedback to your projects. This tactile switch module features a large 12mm button with a crisp mechanical feel, hardware debouncing for clean signal readings, and an integrated white LED for visual confirmation. Perfect for user interfaces, control panels, or any application where you need reliable button input with illumination. The onboard RC filter eliminates bounce, so you get clean press detection without extra code. The LED can be controlled independently, letting you indicate status, provide feedback, or create attention-grabbing effects. The button comes in different cap colors to match your project's aesthetic, while the white LED stays consistent across all variants.",
+  "technical_details": [
+    "22 mm × 22 mm square",
+    "4× ⌀2.7 mm Mounting Holes",
+    "12mm tactile switch with LED",
+    "Integrated hardware debounce",
+    "3.3 V, 5.0 V",
+    "Arduino IDE Compatible",
+    "MicroPython Compatible",
+    "MicroBlocks Compatible"
+  ],
+  "arduino_examples": [
+    "#define BUTTON_PIN 14\n#define LED_PIN 41\n\nvoid setup() {\n  Serial.begin(9600);\n  pinMode(BUTTON_PIN, INPUT);\n  pinMode(LED_PIN, OUTPUT);\n}\n\nvoid loop() {\n  int buttonValue = digitalRead(BUTTON_PIN);\n\n  Serial.print(\"Button Value: \");\n  Serial.println(buttonValue);\n\n  if (buttonValue == LOW) {\n    digitalWrite(LED_PIN, HIGH);\n  } else {\n    digitalWrite(LED_PIN, LOW);\n  }\n\n  delay(10);\n}"
+  ],
+  "links": [
+    {
+      "label": "Material Datasheet",
+      "url": "https://www.lcsc.com/datasheet/C18185600.pdf",
+      "kind": "datasheet"
+    },
+    {
+      "label": "Circuit Schematic",
+      "url": "https://www.axiometa.io/cdn/shop/files/SCH_AX22-0050.pdf?v=8768136489227045019",
+      "kind": "schematic"
+    },
+    {
+      "label": "3D Model",
+      "url": "https://www.axiometa.io/cdn/shop/files/AX22-0050.step?v=2148638634877737802",
+      "kind": "model_step"
+    },
+    {
+      "label": "3D Model (GLB)",
+      "url": "https://cdn.shopify.com/3d/models/65cbcf25f47f58b2/AX22-0050.glb",
+      "kind": "model_glb"
+    }
+  ],
+  "files": [
+    {
+      "kind": "datasheet",
+      "label": "Material Datasheet",
+      "source_url": "https://www.lcsc.com/datasheet/C18185600.pdf",
+      "local_path": "parts/tactile-led-button/files/AX22-0050-datasheet.pdf",
+      "sha256": "863dcdbf9f6048a8d24b53b6e9d79e006236122d39406c558eb3f8c9a28ea301",
+      "bytes": 44490
+    },
+    {
+      "kind": "schematic",
+      "label": "Circuit Schematic",
+      "source_url": "https://www.axiometa.io/cdn/shop/files/SCH_AX22-0050.pdf?v=8768136489227045019",
+      "local_path": "parts/tactile-led-button/files/SCH_AX22-0050.pdf",
+      "sha256": "1221ae4ccd00e348156198cf0ad825d43fc69c2959523d5e16dc008c7f144482",
+      "bytes": 64675
+    },
+    {
+      "kind": "model_step",
+      "label": "3D Model",
+      "source_url": "https://www.axiometa.io/cdn/shop/files/AX22-0050.step?v=2148638634877737802",
+      "local_path": "parts/tactile-led-button/files/AX22-0050.step",
+      "sha256": "eee627a50f69a952f50aa2a52758e3c5a667ac0f9c821175ba4865c6790f0788",
+      "bytes": 1091312
+    },
+    {
+      "kind": "model_glb",
+      "label": "3D Model (GLB)",
+      "source_url": "https://cdn.shopify.com/3d/models/65cbcf25f47f58b2/AX22-0050.glb",
+      "local_path": "parts/tactile-led-button/files/AX22-0050.glb",
+      "sha256": "f567781536a865ebe4a25d5e8368c11abef8449f85a1ef74e65640b4f1cc590b",
+      "bytes": 435684
+    }
+  ],
+  "images": {
+    "pinout": [
+      {
+        "kind": "pinout",
+        "label": "pinout-1",
+        "source_url": "https://www.axiometa.io/cdn/shop/files/Pins-00050.png?v=1765364017&width=2000",
+        "local_path": "parts/tactile-led-button/images/pinout/Pins-00050.png",
+        "sha256": "3873ba50d672e8a3fc6d14ef17aab12cfa90d1c2aa6b290e5ab036f152a74ef1",
+        "bytes": 655685
+      }
+    ],
+    "pcb": [
+      {
+        "kind": "pcb",
+        "label": "PCB FRONT",
+        "source_url": "https://www.axiometa.io/cdn/shop/files/T_0050.png?v=1765364017&width=2000",
+        "local_path": "parts/tactile-led-button/images/pcb/T_0050.png",
+        "sha256": "90374b9d153b772b54f92cdeda9be47935ca37c7ee32eb1fec2d27327fb328da",
+        "bytes": 165091
+      },
+      {
+        "kind": "pcb",
+        "label": "PCB BACK",
+        "source_url": "https://www.axiometa.io/cdn/shop/files/B_0050.png?v=1765364017&width=2000",
+        "local_path": "parts/tactile-led-button/images/pcb/B_0050.png",
+        "sha256": "2b3fe437ddf1112b39c9acd97970156ca7b634301846bc4d417163aa6c4fe2cb",
+        "bytes": 165707
+      }
+    ],
+    "gallery": [
+      {
+        "kind": "gallery",
+        "label": "gallery-1",
+        "source_url": "https://cdn.shopify.com/s/files/1/0966/7756/0659/files/88_caf0cd14-a709-4280-84b9-672b1a13c0c9.png?v=1767480239",
+        "local_path": "parts/tactile-led-button/images/gallery/88_caf0cd14-a709-4280-84b9-672b1a13c0c9.png",
+        "sha256": "e608572bcb28e20535ed66709d32602b0f4ebda71fc4da160434c3d7e9df250a",
+        "bytes": 391194
+      },
+      {
+        "kind": "gallery",
+        "label": "gallery-2",
+        "source_url": "https://cdn.shopify.com/s/files/1/0966/7756/0659/files/Untitleddesigncopy2_97e58372-b489-4f4a-97c4-1d17300eadcb.png?v=1767823835",
+        "local_path": "parts/tactile-led-button/images/gallery/Untitleddesigncopy2_97e58372-b489-4f4a-97c4-1d17300eadcb.png",
+        "sha256": "e072ca71282d0b5aed9ddd46c5382b56fe860f3ffa3c2c8732bd6eace1aca02d",
+        "bytes": 718590
+      },
+      {
+        "kind": "gallery",
+        "label": "gallery-3",
+        "source_url": "https://cdn.shopify.com/s/files/1/0966/7756/0659/files/89_9063580d-b893-4061-b175-c47be5ddda38.png?v=1767823835",
+        "local_path": "parts/tactile-led-button/images/gallery/89_9063580d-b893-4061-b175-c47be5ddda38.png",
+        "sha256": "502a264f514e6d7d46e382c60e8ec50cdc1548e22a97b479994146e3fcd2e211",
+        "bytes": 420954
+      },
+      {
+        "kind": "gallery",
+        "label": "gallery-4",
+        "source_url": "https://cdn.shopify.com/s/files/1/0966/7756/0659/files/90_297a31bb-4fbc-44df-b91c-f2b238524205.png?v=1767823835",
+        "local_path": "parts/tactile-led-button/images/gallery/90_297a31bb-4fbc-44df-b91c-f2b238524205.png",
+        "sha256": "02f767df989a097239a01eea740eef418f1732a918ba7798ad0ece3a7373ba57",
+        "bytes": 1197907
+      }
+    ],
+    "other": []
+  },
+  "shopify": {
+    "id": 10307914203475,
+    "handle": "tactile-led-button",
+    "title": "Tactile Led Button",
+    "vendor": "Axiometa",
+    "type": "",
+    "tags": [
+      "AX22-0050"
+    ],
+    "price": 549,
+    "sku": "AX22-0050",
+    "description_text": "Add a clicky button with built-in LED feedback to your projects. This tactile switch module features a large 12mm button with a crisp mechanical feel, hardware debouncing for clean signal readings, and an integrated white LED for visual confirmation. Perfect for user interfaces, control panels, or any application where you need reliable button input with illumination. The onboard RC filter eliminates bounce, so you get clean press detection without extra code. The LED can be controlled independently, letting you indicate status, provide feedback, or create attention-grabbing effects. The button comes in different cap colors to match your project's aesthetic, while the white LED stays consistent across all variants.",
+    "images": [
+      "//cdn.shopify.com/s/files/1/0966/7756/0659/files/88_caf0cd14-a709-4280-84b9-672b1a13c0c9.png?v=1767480239",
+      "//cdn.shopify.com/s/files/1/0966/7756/0659/files/Untitleddesigncopy2_97e58372-b489-4f4a-97c4-1d17300eadcb.png?v=1767823835",
+      "//cdn.shopify.com/s/files/1/0966/7756/0659/files/89_9063580d-b893-4061-b175-c47be5ddda38.png?v=1767823835",
+      "//cdn.shopify.com/s/files/1/0966/7756/0659/files/90_297a31bb-4fbc-44df-b91c-f2b238524205.png?v=1767823835"
+    ],
+    "featured_image": "//cdn.shopify.com/s/files/1/0966/7756/0659/files/88_caf0cd14-a709-4280-84b9-672b1a13c0c9.png?v=1767480239",
+    "url": "https://www.axiometa.io/products/tactile-led-button"
+  },
+  "notes": [
+    "Kit label: LED Button"
+  ],
+  "scraped_at": "2026-07-17T15:07:40.096503+00:00",
+  "kit_label": "LED Button",
+  "cad": {
+    "step": "parts/tactile-led-button/files/AX22-0050.step",
+    "glb": "parts/tactile-led-button/files/AX22-0050.glb",
+    "schematic": "parts/tactile-led-button/files/SCH_AX22-0050.pdf"
+  }
+}

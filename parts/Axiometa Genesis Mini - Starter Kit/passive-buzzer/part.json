@@ -1,0 +1,170 @@
+{
+  "slug": "passive-buzzer",
+  "title": "Passive Buzzer",
+  "url": "https://www.axiometa.io/products/passive-buzzer",
+  "role": "kit_module",
+  "sku": "AX22-0018",
+  "price": "$3.99",
+  "description": "⏳ This item is currently sold out — a new batch is on its way and will be available soon! Add audio feedback to your projects with this compact passive buzzer module. Built around the MLT-8530 electromagnetic buzzer, it generates tones when driven with a PWM signal at 2.7 kHz, making it perfect for alerts, alarms, or simple melodies. Unlike active buzzers that only produce one tone, this passive design lets you control pitch and create different sounds by varying the frequency. At 80dB output, it's loud enough for notifications without being overbearing.",
+  "technical_details": [
+    "22 mm × 22 mm square",
+    "4× ⌀2.7 mm Mounting Holes",
+    "MLT-8530 electromagnetic buzzer",
+    "80dB sound output",
+    "2.7 kHz resonant frequency",
+    "3.3 V, 5.0 V",
+    "Arduino IDE Compatible",
+    "MicroPython Compatible",
+    "MicroBlocks Compatible"
+  ],
+  "arduino_examples": [],
+  "links": [
+    {
+      "label": "Material Datasheet",
+      "url": "https://www.lcsc.com/datasheet/C94599.pdf",
+      "kind": "datasheet"
+    },
+    {
+      "label": "Circuit Schematic",
+      "url": "https://www.axiometa.io/cdn/shop/files/SCH_AX22-0018.pdf?v=13841236281498665762",
+      "kind": "schematic"
+    },
+    {
+      "label": "3D Model",
+      "url": "https://www.axiometa.io/cdn/shop/files/AX22-0018.step?v=17561148524110466897",
+      "kind": "model_step"
+    },
+    {
+      "label": "3D Model (GLB)",
+      "url": "https://cdn.shopify.com/3d/models/54cec1305461d0f4/AX22-0018.glb",
+      "kind": "model_glb"
+    }
+  ],
+  "files": [
+    {
+      "kind": "datasheet",
+      "label": "Material Datasheet",
+      "source_url": "https://www.lcsc.com/datasheet/C94599.pdf",
+      "local_path": "parts/passive-buzzer/files/AX22-0018-datasheet.pdf",
+      "sha256": "b8f194c9fdd765179e19c1923299de345b44369c04138f607717c96e59b102c4",
+      "bytes": 42941
+    },
+    {
+      "kind": "schematic",
+      "label": "Circuit Schematic",
+      "source_url": "https://www.axiometa.io/cdn/shop/files/SCH_AX22-0018.pdf?v=13841236281498665762",
+      "local_path": "parts/passive-buzzer/files/SCH_AX22-0018.pdf",
+      "sha256": "ca81e3d4e253d9d71b1cf3af689e52a8ca4ef7fb84120e4ec80e5f8b256318a5",
+      "bytes": 66069
+    },
+    {
+      "kind": "model_step",
+      "label": "3D Model",
+      "source_url": "https://www.axiometa.io/cdn/shop/files/AX22-0018.step?v=17561148524110466897",
+      "local_path": "parts/passive-buzzer/files/AX22-0018.step",
+      "sha256": "a661b076c850a424c68fd873360db329b3d29fd86dd62721adbd2e3b6c0ef6f9",
+      "bytes": 1203163
+    },
+    {
+      "kind": "model_glb",
+      "label": "3D Model (GLB)",
+      "source_url": "https://cdn.shopify.com/3d/models/54cec1305461d0f4/AX22-0018.glb",
+      "local_path": "parts/passive-buzzer/files/AX22-0018.glb",
+      "sha256": "ba03a0bcfbe8b17e002580b82d84a8b05341655f804ed08abb6761c63d85932f",
+      "bytes": 272188
+    }
+  ],
+  "images": {
+    "pinout": [
+      {
+        "kind": "pinout",
+        "label": "pinout-1",
+        "source_url": "https://www.axiometa.io/cdn/shop/files/Pins-0018.png?v=1765358711&width=2000",
+        "local_path": "parts/passive-buzzer/images/pinout/Pins-0018.png",
+        "sha256": "787ce1ee87ca23d1b0dda42d3868ed09864a18d5d5ba7ac2dc523f3da4773487",
+        "bytes": 682319
+      }
+    ],
+    "pcb": [
+      {
+        "kind": "pcb",
+        "label": "PCB FRONT",
+        "source_url": "https://www.axiometa.io/cdn/shop/files/T_0018.png?v=1765358709&width=2000",
+        "local_path": "parts/passive-buzzer/images/pcb/T_0018.png",
+        "sha256": "ed8f138bd8f37e4d44840c63e2e18557e9e450dbb9d9e28fc22d364cede3df51",
+        "bytes": 154969
+      },
+      {
+        "kind": "pcb",
+        "label": "PCB BACK",
+        "source_url": "https://www.axiometa.io/cdn/shop/files/B_0018.png?v=1765358709&width=2000",
+        "local_path": "parts/passive-buzzer/images/pcb/B_0018.png",
+        "sha256": "d4674a467c20f2321ada0ace1a569554f21f47b6aaaf2009ecc11dce7832b569",
+        "bytes": 135624
+      }
+    ],
+    "gallery": [
+      {
+        "kind": "gallery",
+        "label": "gallery-1",
+        "source_url": "https://cdn.shopify.com/s/files/1/0966/7756/0659/files/160.png?v=1771863378",
+        "local_path": "parts/passive-buzzer/images/gallery/160.png",
+        "sha256": "e6e570e0157145b52edee9bf50fcd167a47a7a1e115f7953bd5c031328c8d273",
+        "bytes": 470503
+      },
+      {
+        "kind": "gallery",
+        "label": "gallery-2",
+        "source_url": "https://cdn.shopify.com/s/files/1/0966/7756/0659/files/161.png?v=1771863378",
+        "local_path": "parts/passive-buzzer/images/gallery/161.png",
+        "sha256": "70ddd44abeeba803b7a575c6bdb394c0980d329c52f10efa6cbe81010a22c3fa",
+        "bytes": 506735
+      },
+      {
+        "kind": "gallery",
+        "label": "gallery-3",
+        "source_url": "https://cdn.shopify.com/s/files/1/0966/7756/0659/files/162.png?v=1771863378",
+        "local_path": "parts/passive-buzzer/images/gallery/162.png",
+        "sha256": "72e4d5462c4dfb5d47c73f890999e5c5a4411ffdd3849414edbe092f5327cc6d",
+        "bytes": 936581
+      },
+      {
+        "kind": "gallery",
+        "label": "gallery-4",
+        "source_url": "https://cdn.shopify.com/s/files/1/0966/7756/0659/files/163.png?v=1771863378",
+        "local_path": "parts/passive-buzzer/images/gallery/163.png",
+        "sha256": "b11054a6c15f7fe5a92ad77e87d4aafe1150d8dab70753e624526414195298a3",
+        "bytes": 1219300
+      }
+    ],
+    "other": []
+  },
+  "shopify": {
+    "id": 10307775267155,
+    "handle": "passive-buzzer",
+    "title": "Passive Buzzer",
+    "vendor": "Axiometa",
+    "type": "",
+    "tags": [
+      "AX22-0018"
+    ],
+    "price": 399,
+    "sku": "AX22-0018",
+    "description_text": "⏳ This item is currently sold out — a new batch is on its way and will be available soon!\nAdd audio feedback to your projects with this compact passive buzzer module. Built around the MLT-8530 electromagnetic buzzer, it generates tones when driven with a PWM signal at 2.7 kHz, making it perfect for alerts, alarms, or simple melodies. Unlike active buzzers that only produce one tone, this passive design lets you control pitch and create different sounds by varying the frequency. At 80dB output, it's loud enough for notifications without being overbearing.",
+    "images": [
+      "//cdn.shopify.com/s/files/1/0966/7756/0659/files/160.png?v=1771863378",
+      "//cdn.shopify.com/s/files/1/0966/7756/0659/files/161.png?v=1771863378",
+      "//cdn.shopify.com/s/files/1/0966/7756/0659/files/162.png?v=1771863378",
+      "//cdn.shopify.com/s/files/1/0966/7756/0659/files/163.png?v=1771863378"
+    ],
+    "featured_image": "//cdn.shopify.com/s/files/1/0966/7756/0659/files/160.png?v=1771863378",
+    "url": "https://www.axiometa.io/products/passive-buzzer"
+  },
+  "notes": [],
+  "scraped_at": "2026-07-17T15:07:44.073524+00:00",
+  "cad": {
+    "step": "parts/passive-buzzer/files/AX22-0018.step",
+    "glb": "parts/passive-buzzer/files/AX22-0018.glb",
+    "schematic": "parts/passive-buzzer/files/SCH_AX22-0018.pdf"
+  }
+}

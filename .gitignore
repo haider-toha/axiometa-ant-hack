@@ -1,0 +1,46 @@
+# Secrets
+.env
+.env.*
+!.env.example
+**/secrets.h
+**/secrets.cpp
+
+# OS / editor
+.DS_Store
+Thumbs.db
+.idea/
+*.swp
+*.swo
+
+# Python
+.venv/
+venv/
+__pycache__/
+*.py[cod]
+*.egg-info/
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+
+# Node / Next.js
+node_modules/
+.next/
+out/
+dist/
+build/
+.vercel/
+npm-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+
+# PlatformIO / firmware build
+.pio/
+.vscode/.browse.c_cpp.db*
+*.elf
+*.bin
+*.hex
+*.map
+
+# Local CAD / temp artifacts
+*.stl.tmp
+*.step.tmp

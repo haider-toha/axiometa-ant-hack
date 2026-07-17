@@ -1,0 +1,180 @@
+{
+  "slug": "vibration-motor-erm",
+  "title": "Vibration Motor (ERM)",
+  "url": "https://www.axiometa.io/products/vibration-motor-erm",
+  "role": "extra_module",
+  "sku": "AX22-0013",
+  "price": "$3.99",
+  "description": "This AX22-sized board seats a 12000rpm flat eccentric-rotating-mass (ERM) motor on a 22 × 22 mm PCB and adds a low-R MOSFET driver, so you can trigger crisp haptic feedback with a single active-high GPIO pin. A fly-back diode and bulk capacitor tame startup surges, while the driver lets even 1.8 V logic pull the 90 mA load safely. Snap it into any AX22 backplane to give wearables, control panels, or notification gadgets a silent buzz or rhythmic pulse in just a few lines of code Arduino, MicroPython, or MicroBlocks.",
+  "technical_details": [
+    "22 mm × 22 mm square",
+    "4× ⌀2.7 mm Mounting Holes",
+    "3 V nominal, 90 mA, ≈ 12000 rpm",
+    "−20 °C … +60 °C operating range",
+    "On-board N-channel MOSFET driver & fly-back diode",
+    "3.3 V, 5.0 V",
+    "Arduino IDE Compatible",
+    "MicroPython Compatible",
+    "MicroBlocks Compatible"
+  ],
+  "arduino_examples": [
+    "#define MOTOR_PIN 14\n\nvoid setup() {\n  pinMode(MOTOR_PIN, OUTPUT);\n}\n\nvoid loop() {\n\n  // Set the motor pin to the new state\n  digitalWrite(MOTOR_PIN, HIGH);\n  delay(100);\n  digitalWrite(MOTOR_PIN, LOW);\n  delay(1000);\n}"
+  ],
+  "links": [
+    {
+      "label": "Material Datasheet",
+      "url": "https://www.lcsc.com/datasheet/C2759984.pdf",
+      "kind": "datasheet"
+    },
+    {
+      "label": "Circuit Schematic",
+      "url": "https://www.axiometa.io/cdn/shop/files/SCH_AX22-0013.pdf?v=10094957708111866119",
+      "kind": "schematic"
+    },
+    {
+      "label": "3D Model",
+      "url": "https://www.axiometa.io/cdn/shop/files/AX22-0013.step?v=7433936064696912177",
+      "kind": "model_step"
+    },
+    {
+      "label": "3D Model (GLB)",
+      "url": "https://cdn.shopify.com/3d/models/f5ce94663cc645fe/AX22-0013.glb",
+      "kind": "model_glb"
+    }
+  ],
+  "files": [
+    {
+      "kind": "datasheet",
+      "label": "Material Datasheet",
+      "source_url": "https://www.lcsc.com/datasheet/C2759984.pdf",
+      "local_path": "parts/vibration-motor-erm/files/AX22-0013-datasheet.pdf",
+      "sha256": "bf7b84a185dbb917377f2e1f807ae23aeaeed180ee963e968fe8b0bb82f60caa",
+      "bytes": 773563
+    },
+    {
+      "kind": "schematic",
+      "label": "Circuit Schematic",
+      "source_url": "https://www.axiometa.io/cdn/shop/files/SCH_AX22-0013.pdf?v=10094957708111866119",
+      "local_path": "parts/vibration-motor-erm/files/SCH_AX22-0013.pdf",
+      "sha256": "37d20c15822ab4208a44aeaa5f091c1e07b765ba85259498c851b368120bce23",
+      "bytes": 68121
+    },
+    {
+      "kind": "model_step",
+      "label": "3D Model",
+      "source_url": "https://www.axiometa.io/cdn/shop/files/AX22-0013.step?v=7433936064696912177",
+      "local_path": "parts/vibration-motor-erm/files/AX22-0013.step",
+      "sha256": "1fc859e1e1f205c9fe24ac5cab3507b6bac3ca4165d471f303617b0eadc4c9eb",
+      "bytes": 1406859
+    },
+    {
+      "kind": "model_glb",
+      "label": "3D Model (GLB)",
+      "source_url": "https://cdn.shopify.com/3d/models/f5ce94663cc645fe/AX22-0013.glb",
+      "local_path": "parts/vibration-motor-erm/files/AX22-0013.glb",
+      "sha256": "73ff4c14faaa700b501fd4040de3bf27139993329ed3442006afb50b838d782b",
+      "bytes": 750544
+    }
+  ],
+  "images": {
+    "pinout": [
+      {
+        "kind": "pinout",
+        "label": "pinout-1",
+        "source_url": "https://www.axiometa.io/cdn/shop/files/Pins-0013.png?v=1765355365&width=2000",
+        "local_path": "parts/vibration-motor-erm/images/pinout/Pins-0013.png",
+        "sha256": "c95614d3eb6e0b8426ea4cdfa6269a71b2fac62960113c602cbab2b6da483a79",
+        "bytes": 765045
+      },
+      {
+        "kind": "pinout",
+        "label": "pinout-2",
+        "source_url": "https://www.axiometa.io/cdn/shop/files/ERM.gif?v=1755280785&width=2000",
+        "local_path": "parts/vibration-motor-erm/images/pinout/ERM.gif",
+        "sha256": "22ea03170f42b0eddb8a84e9ba1e9cff1a0c93e69a1badae2ab0f71e2f0544fa",
+        "bytes": 11967253
+      }
+    ],
+    "pcb": [
+      {
+        "kind": "pcb",
+        "label": "PCB FRONT",
+        "source_url": "https://www.axiometa.io/cdn/shop/files/T_0013.png?v=1765355364&width=2000",
+        "local_path": "parts/vibration-motor-erm/images/pcb/T_0013.png",
+        "sha256": "7fbcd693c0b93cb66f37e7fca884c31485215c57bb7b58e7faf77dd9bd227452",
+        "bytes": 176375
+      },
+      {
+        "kind": "pcb",
+        "label": "PCB BACK",
+        "source_url": "https://www.axiometa.io/cdn/shop/files/B_0013_dd733bcf-be6e-4a50-a3ef-9464f061a9ef.png?v=1765355363&width=2000",
+        "local_path": "parts/vibration-motor-erm/images/pcb/B_0013_dd733bcf-be6e-4a50-a3ef-9464f061a9ef.png",
+        "sha256": "32202b700605e15df8a69241086e6da922fdcc3b2f19e92f5c8d95e8aa42abab",
+        "bytes": 153033
+      }
+    ],
+    "gallery": [
+      {
+        "kind": "gallery",
+        "label": "gallery-1",
+        "source_url": "https://cdn.shopify.com/s/files/1/0966/7756/0659/files/53_933b61af-df64-4308-8064-40d85c89502f.png?v=1767104233",
+        "local_path": "parts/vibration-motor-erm/images/gallery/53_933b61af-df64-4308-8064-40d85c89502f.png",
+        "sha256": "834892e7edb304e554e1d01d244fdbef08c22ab0641706889be7767e685f6eb7",
+        "bytes": 339389
+      },
+      {
+        "kind": "gallery",
+        "label": "gallery-2",
+        "source_url": "https://cdn.shopify.com/s/files/1/0966/7756/0659/files/55_1075e29c-82ba-4c79-b48c-1f5aaa93412c.png?v=1767104254",
+        "local_path": "parts/vibration-motor-erm/images/gallery/55_1075e29c-82ba-4c79-b48c-1f5aaa93412c.png",
+        "sha256": "18ca3bd9827e97a822da59f5f43b837927c566c968d6302d6a58728c531daab5",
+        "bytes": 720155
+      },
+      {
+        "kind": "gallery",
+        "label": "gallery-3",
+        "source_url": "https://cdn.shopify.com/s/files/1/0966/7756/0659/files/54_24b09d87-0bc0-4d97-bbca-9513bdb3391a.png?v=1767104254",
+        "local_path": "parts/vibration-motor-erm/images/gallery/54_24b09d87-0bc0-4d97-bbca-9513bdb3391a.png",
+        "sha256": "07ce76b386167de163eb72584c6a4ed0d838efd0cba6aa4e85397b612f546eed",
+        "bytes": 347338
+      },
+      {
+        "kind": "gallery",
+        "label": "gallery-4",
+        "source_url": "https://cdn.shopify.com/s/files/1/0966/7756/0659/files/56_785a61de-5e94-4f36-97d6-3c5040ade9c3.png?v=1767104238",
+        "local_path": "parts/vibration-motor-erm/images/gallery/56_785a61de-5e94-4f36-97d6-3c5040ade9c3.png",
+        "sha256": "dc3fa4747311be165e86f3591b3815fb80f6991d0973bc8b92e3bf746e59a3f3",
+        "bytes": 1138471
+      }
+    ],
+    "other": []
+  },
+  "shopify": {
+    "id": 9997718258003,
+    "handle": "vibration-motor-erm",
+    "title": "Vibration Motor (ERM)",
+    "vendor": "Axiometa",
+    "type": "",
+    "tags": [
+      "AX22-0013"
+    ],
+    "price": 399,
+    "sku": "AX22-0013",
+    "description_text": "This AX22-sized board seats a 12000rpm flat eccentric-rotating-mass (ERM) motor on a 22 × 22 mm PCB and adds a low-R MOSFET driver, so you can trigger crisp haptic feedback with a single active-high GPIO pin. A fly-back diode and bulk capacitor tame startup surges, while the driver lets even 1.8 V logic pull the 90 mA load safely. Snap it into any AX22 backplane to give wearables, control panels, or notification gadgets a silent buzz or rhythmic pulse in just a few lines of code Arduino, MicroPython, or MicroBlocks.",
+    "images": [
+      "//cdn.shopify.com/s/files/1/0966/7756/0659/files/53_933b61af-df64-4308-8064-40d85c89502f.png?v=1767104233",
+      "//cdn.shopify.com/s/files/1/0966/7756/0659/files/55_1075e29c-82ba-4c79-b48c-1f5aaa93412c.png?v=1767104254",
+      "//cdn.shopify.com/s/files/1/0966/7756/0659/files/54_24b09d87-0bc0-4d97-bbca-9513bdb3391a.png?v=1767104254",
+      "//cdn.shopify.com/s/files/1/0966/7756/0659/files/56_785a61de-5e94-4f36-97d6-3c5040ade9c3.png?v=1767104238"
+    ],
+    "featured_image": "//cdn.shopify.com/s/files/1/0966/7756/0659/files/53_933b61af-df64-4308-8064-40d85c89502f.png?v=1767104233",
+    "url": "https://www.axiometa.io/products/vibration-motor-erm"
+  },
+  "notes": [],
+  "scraped_at": "2026-07-17T15:07:48.109437+00:00",
+  "cad": {
+    "step": "parts/vibration-motor-erm/files/AX22-0013.step",
+    "glb": "parts/vibration-motor-erm/files/AX22-0013.glb",
+    "schematic": "parts/vibration-motor-erm/files/SCH_AX22-0013.pdf"
+  }
+}

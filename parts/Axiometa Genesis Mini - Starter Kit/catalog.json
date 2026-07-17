@@ -1,0 +1,139 @@
+{
+  "scraped_at": "2026-07-17T15:07:48.596769+00:00",
+  "kit_url": "https://www.axiometa.io/products/axiometa-genesis-mini-starter-kit",
+  "source": "Derived from parts/*/part.json; asset flags also cross-checked with manifest.json.",
+  "parts": [
+    {
+      "slug": "axiometa-genesis-mini-starter-kit",
+      "title": "Axiometa Genesis Mini - Starter Kit",
+      "sku": "AXMT-BUN0001",
+      "role": "kit_bundle",
+      "path": "parts/axiometa-genesis-mini-starter-kit/",
+      "has_step": false,
+      "has_glb": false,
+      "has_schematic": false,
+      "description": "Genesis Mini\nis a modular, Wi-Fi-enabled prototyping system built around a standardized AX22 connector. The ESP32-S3 powered board provides eight AX22 ports that modules plug into directly. The connection standard can be implemented on other microcontroller platforms, making modu"
+    },
+    {
+      "slug": "axiometa-genesis-mini",
+      "title": "Axiometa Genesis Mini",
+      "sku": "AXMT-MTX0013",
+      "role": "kit_module",
+      "path": "parts/axiometa-genesis-mini/",
+      "has_step": true,
+      "has_glb": true,
+      "has_schematic": true,
+      "description": "Genesis Mini\nis a modular, Wi-Fi-enabled prototyping system built around a standardized AX22 connector. The ESP32-S3 powered board provides four AX22 ports that modules plug into directly. This platform eliminates breadboard wiring for common tasks like sensor reading, display co"
+    },
+    {
+      "slug": "dht11",
+      "title": "Temperature & Humidity",
+      "sku": "AX22-0011",
+      "role": "kit_module",
+      "path": "parts/dht11/",
+      "has_step": true,
+      "has_glb": true,
+      "has_schematic": true,
+      "description": "This AX22-sized board drops a trusty DHT11 onto a 22 × 22 mm PCB so you can read ambient temperature and relative humidity with a single-wire digital protocol. A built-in 4.7 kΩ pull-up makes the data line plug-and-play, while the sensor’s 1 Hz refresh rate is perfect for dashboa"
+    },
+    {
+      "slug": "ips-lcd-0-96",
+      "title": "IPS LCD Display (0.96)",
+      "sku": "AX22-0034",
+      "role": "kit_module",
+      "path": "parts/ips-lcd-0-96/",
+      "has_step": true,
+      "has_glb": true,
+      "has_schematic": true,
+      "description": "⏳ This item is currently sold out — a new batch is on its way and will be available soon!\nThis board mounts a Newvisio N096-1608TBBIG11-H13 IPS panel on a 22 × 29 mm PCB, delivering a sharp 160 × 80-pixel canvas driven by the ST7735S controller over 4-wire SPI. Snap it into any A"
+    },
+    {
+      "slug": "tactile-led-button",
+      "title": "Tactile Led Button",
+      "sku": "AX22-0050",
+      "role": "kit_module",
+      "path": "parts/tactile-led-button/",
+      "has_step": true,
+      "has_glb": true,
+      "has_schematic": true,
+      "description": "Add a clicky button with built-in LED feedback to your projects. This tactile switch module features a large 12mm button with a crisp mechanical feel, hardware debouncing for clean signal readings, and an integrated white LED for visual confirmation. Perfect for user interfaces, "
+    },
+    {
+      "slug": "rotary-encoder",
+      "title": "Rotary Encoder",
+      "sku": "AX22-0003",
+      "role": "kit_module",
+      "path": "parts/rotary-encoder/",
+      "has_step": true,
+      "has_glb": true,
+      "has_schematic": true,
+      "description": "This AX22-sized module integrates an ALPS Alpine incremental rotary encoder on a compact 22 × 22 mm PCB. The encoder outputs clean two-channel quadrature signals plus an optional push-switch, making it straightforward for any microcontroller to read direction, step count, and cli"
+    },
+    {
+      "slug": "neopixel-matrix-5x5",
+      "title": "NeoPixel Matrix (5x5)",
+      "sku": "AX22-0028",
+      "role": "kit_module",
+      "path": "parts/neopixel-matrix-5x5/",
+      "has_step": true,
+      "has_glb": true,
+      "has_schematic": true,
+      "description": "Turn the entire 22 × 22 mm AX22 footprint into a vivid 25-pixel canvas. This daisy chainable board packs a 5 × 5 grid of WS2812 Mini addressable RGB LEDs perfect for scrolling text, icons, bar-graphs, or attention grabbing status lights. Drop it into any AX22 backplane and animat"
+    },
+    {
+      "slug": "passive-buzzer",
+      "title": "Passive Buzzer",
+      "sku": "AX22-0018",
+      "role": "kit_module",
+      "path": "parts/passive-buzzer/",
+      "has_step": true,
+      "has_glb": true,
+      "has_schematic": true,
+      "description": "⏳ This item is currently sold out — a new batch is on its way and will be available soon!\nAdd audio feedback to your projects with this compact passive buzzer module. Built around the MLT-8530 electromagnetic buzzer, it generates tones when driven with a PWM signal at 2.7 kHz, ma"
+    },
+    {
+      "slug": "light-dependent-resistor",
+      "title": "Light Dependent Resistor",
+      "sku": "AX22-0005",
+      "role": "kit_module",
+      "path": "parts/light-dependent-resistor/",
+      "has_step": true,
+      "has_glb": true,
+      "has_schematic": true,
+      "description": "This AX22-sized module houses a light-dependent resistor with a dark resistance of 100 kΩ – 200 kΩ on a 22 × 22 mm PCB, yielding an analog voltage that smoothly follows ambient brightness and is effortless for any microcontroller’s ADC to read. It slots straight into AX22 systems"
+    },
+    {
+      "slug": "ir-transceiver",
+      "title": "IR Transceiver",
+      "sku": "AX22-0040",
+      "role": "kit_module",
+      "path": "parts/ir-transceiver/",
+      "has_step": true,
+      "has_glb": true,
+      "has_schematic": true,
+      "description": "This AX22 module combines both IR transmission and reception on a single compact 22 × 22 mm board, enabling full two-way infrared communication. It features the IR26-61C/L302/TR8 SMD infrared LED for reliable 940 nm signal transmission and the IRM-V538M3/TR1 38 kHz IR receiver fo"
+    },
+    {
+      "slug": "genesis-studio",
+      "title": "Axiometa Studio",
+      "sku": "",
+      "role": "kit_software",
+      "path": "parts/genesis-studio/",
+      "has_step": false,
+      "has_glb": false,
+      "has_schematic": false,
+      "description": "Axiometa Studio (also called Genesis Studio) is the prompt-to-firmware web IDE included with the Genesis Mini Starter Kit. Describe a project in natural language and it generates Arduino-oriented firmware (and optional dashboard UI) for the ESP32-S3 Genesis Mini and AX22 modules."
+    },
+    {
+      "slug": "vibration-motor-erm",
+      "title": "Vibration Motor (ERM)",
+      "sku": "AX22-0013",
+      "role": "extra_module",
+      "path": "parts/vibration-motor-erm/",
+      "has_step": true,
+      "has_glb": true,
+      "has_schematic": true,
+      "description": "This AX22-sized board seats a 12000rpm flat eccentric-rotating-mass (ERM) motor on a 22 × 22 mm PCB and adds a low-R MOSFET driver, so you can trigger crisp haptic feedback with a single active-high GPIO pin. A fly-back diode and bulk capacitor tame startup surges, while the driv"
+    }
+  ]
+}

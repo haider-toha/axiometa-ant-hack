@@ -13,6 +13,9 @@ static RelayCommand command(uint32_t seq, CloudCommand pattern,
     RelayCommand result{};
     result.seq = seq;
     result.pattern = pattern;
+    result.confidence = pattern == CloudCommand::NUMBER
+        ? RelayConfidence::HIGH_CONFIDENCE
+        : RelayConfidence::NO_CONFIDENCE;
     copyRelayRoute(result.route, route);
     return result;
 }
@@ -52,6 +55,19 @@ void test_activity_parser_is_closed_for_missing_or_invalid_values(void) {
                             static_cast<uint8_t>(parseUserActivity("WAITING")));
     TEST_ASSERT_EQUAL_UINT8(static_cast<uint8_t>(UserActivity::UNKNOWN),
                             static_cast<uint8_t>(parseUserActivity(nullptr)));
+}
+
+void test_confidence_parser_is_exact_and_closed(void) {
+    TEST_ASSERT_EQUAL_UINT8(static_cast<uint8_t>(RelayConfidence::NO_CONFIDENCE),
+                            static_cast<uint8_t>(parseRelayConfidence("")));
+    TEST_ASSERT_EQUAL_UINT8(static_cast<uint8_t>(RelayConfidence::LOW_CONFIDENCE),
+                            static_cast<uint8_t>(parseRelayConfidence("low")));
+    TEST_ASSERT_EQUAL_UINT8(static_cast<uint8_t>(RelayConfidence::HIGH_CONFIDENCE),
+                            static_cast<uint8_t>(parseRelayConfidence("high")));
+    TEST_ASSERT_EQUAL_UINT8(static_cast<uint8_t>(RelayConfidence::INVALID),
+                            static_cast<uint8_t>(parseRelayConfidence("HIGH")));
+    TEST_ASSERT_EQUAL_UINT8(static_cast<uint8_t>(RelayConfidence::INVALID),
+                            static_cast<uint8_t>(parseRelayConfidence(nullptr)));
 }
 
 void test_route_copy_is_bounded_and_only_exact_88_is_expected(void) {
@@ -118,6 +134,19 @@ void test_wrong_route_is_consumed_without_false_route_88_output(void) {
         static_cast<uint8_t>(RelayDisposition::UNCHANGED),
         static_cast<uint8_t>(consumeRelayCommand(
             state, command(21, CloudCommand::NUMBER, "88"), UserActivity::STILL).disposition));
+}
+
+void test_low_confidence_route_88_is_consumed_without_output(void) {
+    RelaySequenceState state{};
+    consumeRelayCommand(state, command(20, CloudCommand::NONE), UserActivity::STILL);
+    RelayCommand low = command(21, CloudCommand::NUMBER, "88");
+    low.confidence = RelayConfidence::LOW_CONFIDENCE;
+
+    const RelayDecision decision =
+        consumeRelayCommand(state, low, UserActivity::STILL);
+    TEST_ASSERT_EQUAL_UINT8(static_cast<uint8_t>(RelayDisposition::LOW_CONFIDENCE),
+                            static_cast<uint8_t>(decision.disposition));
+    TEST_ASSERT_EQUAL_UINT32(21, state.lastSeq);
 }
 
 void test_duplicate_regressed_invalid_and_none_edges_do_not_render(void) {
@@ -202,11 +231,13 @@ int main(int, char**) {
     UNITY_BEGIN();
     RUN_TEST(test_wire_command_parser_accepts_only_six_cloud_patterns);
     RUN_TEST(test_activity_parser_is_closed_for_missing_or_invalid_values);
+    RUN_TEST(test_confidence_parser_is_exact_and_closed);
     RUN_TEST(test_route_copy_is_bounded_and_only_exact_88_is_expected);
     RUN_TEST(test_first_command_is_a_non_rendering_baseline);
     RUN_TEST(test_moving_consumes_bus_information_without_render_or_replay);
     RUN_TEST(test_still_accepts_fresh_bus_information_and_error_is_global);
     RUN_TEST(test_wrong_route_is_consumed_without_false_route_88_output);
+    RUN_TEST(test_low_confidence_route_88_is_consumed_without_output);
     RUN_TEST(test_duplicate_regressed_invalid_and_none_edges_do_not_render);
     RUN_TEST(test_sequence_gap_is_reported_but_new_edge_is_consumed);
     RUN_TEST(test_activity_policy_uses_moving_fallback_and_manual_override);

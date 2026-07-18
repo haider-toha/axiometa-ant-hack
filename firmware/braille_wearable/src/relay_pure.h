@@ -21,6 +21,13 @@ enum class UserActivity : uint8_t {
     STILL,
 };
 
+enum class RelayConfidence : uint8_t {
+    NO_CONFIDENCE = 0,
+    LOW_CONFIDENCE,
+    HIGH_CONFIDENCE,
+    INVALID,
+};
+
 enum class RelayDisposition : uint8_t {
     UNCHANGED = 0,
     BASELINE,
@@ -28,6 +35,7 @@ enum class RelayDisposition : uint8_t {
     SUPPRESS,
     NO_OUTPUT,
     ROUTE_MISMATCH,
+    LOW_CONFIDENCE,
     REJECT,
 };
 
@@ -35,6 +43,7 @@ struct RelayCommand {
     uint32_t seq = 0;
     CloudCommand pattern = CloudCommand::INVALID;
     char route[8] = {};
+    RelayConfidence confidence = RelayConfidence::INVALID;
     uint32_t arrivalId = 0;
     int64_t serverTs = 0;
 };
@@ -73,6 +82,14 @@ inline UserActivity parseUserActivity(const char* value) {
     if (strcmp(value, "MOVING") == 0) return UserActivity::MOVING;
     if (strcmp(value, "STILL") == 0) return UserActivity::STILL;
     return UserActivity::UNKNOWN;
+}
+
+inline RelayConfidence parseRelayConfidence(const char* value) {
+    if (value == nullptr) return RelayConfidence::INVALID;
+    if (strcmp(value, "") == 0) return RelayConfidence::NO_CONFIDENCE;
+    if (strcmp(value, "low") == 0) return RelayConfidence::LOW_CONFIDENCE;
+    if (strcmp(value, "high") == 0) return RelayConfidence::HIGH_CONFIDENCE;
+    return RelayConfidence::INVALID;
 }
 
 template <size_t N>
@@ -149,6 +166,9 @@ inline RelayDecision consumeRelayCommand(RelaySequenceState& state,
     } else if (command.pattern == CloudCommand::NUMBER &&
                !isExpectedRoute(command.route)) {
         decision.disposition = RelayDisposition::ROUTE_MISMATCH;
+    } else if (command.pattern == CloudCommand::NUMBER &&
+               command.confidence != RelayConfidence::HIGH_CONFIDENCE) {
+        decision.disposition = RelayDisposition::LOW_CONFIDENCE;
     } else if (acceptsRelayCommand(activity, command.pattern)) {
         decision.disposition = RelayDisposition::ACCEPT;
     } else {
@@ -220,6 +240,7 @@ inline const char* relayDispositionName(RelayDisposition disposition) {
         case RelayDisposition::SUPPRESS: return "suppressed";
         case RelayDisposition::NO_OUTPUT: return "no_output";
         case RelayDisposition::ROUTE_MISMATCH: return "route_mismatch";
+        case RelayDisposition::LOW_CONFIDENCE: return "low_confidence";
         case RelayDisposition::REJECT: return "rejected";
     }
     return "rejected";

@@ -115,6 +115,8 @@ bool parseResponse(RelayUpdate& update) {
             parseCloudCommand(responseDocument["pattern"].as<const char*>());
         copyRelayRoute(update.command.route,
                        responseDocument["route"] | "");
+        update.command.confidence =
+            parseRelayConfidence(responseDocument["conf"] | "");
         update.command.arrivalId = responseDocument["arrivalId"] | 0U;
         update.command.serverTs = responseDocument["ts"] | 0LL;
         commandObserved = true;

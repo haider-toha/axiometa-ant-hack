@@ -1,4 +1,8 @@
-# Codex Harness
+# Agent Harness
+
+This is the canonical project guidance for both Codex and Claude Code. Codex reads this file directly; the root `CLAUDE.md` imports it. Keep shared rules here so the two harnesses cannot drift.
+
+The checked-in `.claude/skills/` directory contains optional Claude Code helpers from earlier work. It is not authoritative project scope, and Codex does not need that entire 22 MB tree copied into its skill search path. Put cross-agent decisions, commands, and constraints in this file or the current plan; use skills only as optional workflow support.
 
 This repo has pivoted. Start every implementation pass from:
 

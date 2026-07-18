@@ -35,7 +35,9 @@ The board owns two runtime modes. It boots in `WAITING`.
 | `n` | `MOVING` | Enter `NAVIGATION`; accept LEFT, RIGHT, and AHEAD |
 | `l` / `r` / `a` | Direction command | Play P1 low, P3 high, or both proxy tones |
 | `b` / `w` | Waiting scenario | Play BUS or WAIT pattern |
-| `x` | Stop cloud output | Stop the current cloud cue; local ToF remains active |
+| `8` / `u` / `e` | Waiting scenario | Play route 88, UNKNOWN, or ERROR pattern |
+| `x` | Service emergency stop | Stop all output immediately; sensing remains active |
+| `o` | Service resume | Re-enable output after `x` |
 | `h` | Service only | Print controls |
 
 The serial commands are temporary substitutes for the future relay parser. The
@@ -49,7 +51,7 @@ sample, and clears active proximity after three invalid samples.
 
 1. Replace the serial phone stub with the fixed-size Vercel relay command parser
    while preserving outbound-only polling.
-2. Verify the AX22-0044 PDM CLK/DATA silk in P4, then add I2S0 capture and the
-   local siren classifier.
+2. Verify the AX22-0044 PDM CLK/DATA silk in P4, then connect I2S0 capture to
+   the host-tested local siren classifier.
 3. Complete the remaining output vocabulary and severity arbitration before
    making `board_firmware` the default PlatformIO environment.

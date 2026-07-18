@@ -1,0 +1,13 @@
+# Dependencies for `python vision/client.py`, the local test client.
+#
+# Separate from requirements.txt on purpose: that file is scoped to the machine
+# that runs `modal deploy` and lists only what service.py imports at module
+# level. A camera/GUI dependency does not belong there.
+#
+#   pip install -r vision/requirements-client.txt
+#
+# vision/webapp/index.html needs nothing installed — open it over HTTPS.
+
+# The only non-stdlib import in client.py. HTTP goes through urllib.request,
+# so there is no `requests` dependency to pin.
+opencv-python

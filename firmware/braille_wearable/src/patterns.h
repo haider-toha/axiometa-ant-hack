@@ -7,6 +7,9 @@ inline constexpr uint16_t AUDIO_PROXY_LEFT_HZ = 2350;
 inline constexpr uint16_t AUDIO_PROXY_RIGHT_HZ = 3050;
 
 enum class PatternId : uint8_t {
+    DANGER,
+    SIREN_WARNING,
+    ATTENTION,
     READY,
     BUS,
     NUMBER,
@@ -34,6 +37,45 @@ inline constexpr OutputStep READY_STEPS[] = {
     {2100, 3300, 100},
     {2250, 3150, 100},
     {AUDIO_PROXY_LEFT_HZ, AUDIO_PROXY_RIGHT_HZ, 200},
+};
+
+inline constexpr OutputStep ATTENTION_STEPS[] = {
+    {AUDIO_PROXY_LEFT_HZ, AUDIO_PROXY_RIGHT_HZ, 250},
+};
+
+inline constexpr OutputStep SIREN_WARNING_STEPS[] = {
+    {AUDIO_PROXY_LEFT_HZ, AUDIO_PROXY_RIGHT_HZ, 400}, {0, 0, 300},
+    {AUDIO_PROXY_LEFT_HZ, AUDIO_PROXY_RIGHT_HZ, 400}, {0, 0, 300},
+};
+
+inline constexpr OutputStep DANGER_STEPS[] = {
+    {AUDIO_PROXY_LEFT_HZ, AUDIO_PROXY_RIGHT_HZ, 200}, {0, 0, 150},
+    {AUDIO_PROXY_LEFT_HZ, AUDIO_PROXY_RIGHT_HZ, 200}, {0, 0, 150},
+    {AUDIO_PROXY_LEFT_HZ, AUDIO_PROXY_RIGHT_HZ, 200}, {0, 0, 150},
+    {AUDIO_PROXY_LEFT_HZ, AUDIO_PROXY_RIGHT_HZ, 200}, {0, 0, 150},
+    {AUDIO_PROXY_LEFT_HZ, AUDIO_PROXY_RIGHT_HZ, 200}, {0, 0, 150},
+    {AUDIO_PROXY_LEFT_HZ, AUDIO_PROXY_RIGHT_HZ, 500}, {0, 0, 750},
+
+    {AUDIO_PROXY_LEFT_HZ, AUDIO_PROXY_RIGHT_HZ, 200}, {0, 0, 150},
+    {AUDIO_PROXY_LEFT_HZ, AUDIO_PROXY_RIGHT_HZ, 200}, {0, 0, 150},
+    {AUDIO_PROXY_LEFT_HZ, AUDIO_PROXY_RIGHT_HZ, 200}, {0, 0, 150},
+    {AUDIO_PROXY_LEFT_HZ, AUDIO_PROXY_RIGHT_HZ, 200}, {0, 0, 150},
+    {AUDIO_PROXY_LEFT_HZ, AUDIO_PROXY_RIGHT_HZ, 200}, {0, 0, 150},
+    {AUDIO_PROXY_LEFT_HZ, AUDIO_PROXY_RIGHT_HZ, 500}, {0, 0, 750},
+
+    {AUDIO_PROXY_LEFT_HZ, AUDIO_PROXY_RIGHT_HZ, 200}, {0, 0, 150},
+    {AUDIO_PROXY_LEFT_HZ, AUDIO_PROXY_RIGHT_HZ, 200}, {0, 0, 150},
+    {AUDIO_PROXY_LEFT_HZ, AUDIO_PROXY_RIGHT_HZ, 200}, {0, 0, 150},
+    {AUDIO_PROXY_LEFT_HZ, AUDIO_PROXY_RIGHT_HZ, 200}, {0, 0, 150},
+    {AUDIO_PROXY_LEFT_HZ, AUDIO_PROXY_RIGHT_HZ, 200}, {0, 0, 150},
+    {AUDIO_PROXY_LEFT_HZ, AUDIO_PROXY_RIGHT_HZ, 500}, {0, 0, 750},
+
+    {AUDIO_PROXY_LEFT_HZ, AUDIO_PROXY_RIGHT_HZ, 200}, {0, 0, 150},
+    {AUDIO_PROXY_LEFT_HZ, AUDIO_PROXY_RIGHT_HZ, 200}, {0, 0, 150},
+    {AUDIO_PROXY_LEFT_HZ, AUDIO_PROXY_RIGHT_HZ, 200}, {0, 0, 150},
+    {AUDIO_PROXY_LEFT_HZ, AUDIO_PROXY_RIGHT_HZ, 200}, {0, 0, 150},
+    {AUDIO_PROXY_LEFT_HZ, AUDIO_PROXY_RIGHT_HZ, 200}, {0, 0, 150},
+    {AUDIO_PROXY_LEFT_HZ, AUDIO_PROXY_RIGHT_HZ, 500},
 };
 
 inline constexpr OutputStep BUS_STEPS[] = {
@@ -112,6 +154,11 @@ constexpr OutputPattern makeOutputPattern(const char* name, const OutputStep (&s
 }
 
 inline constexpr OutputPattern READY_PATTERN = makeOutputPattern("READY", READY_STEPS);
+inline constexpr OutputPattern ATTENTION_PATTERN =
+    makeOutputPattern("ATTENTION", ATTENTION_STEPS);
+inline constexpr OutputPattern SIREN_WARNING_PATTERN =
+    makeOutputPattern("SIREN_WARNING", SIREN_WARNING_STEPS);
+inline constexpr OutputPattern DANGER_PATTERN = makeOutputPattern("DANGER", DANGER_STEPS);
 inline constexpr OutputPattern BUS_PATTERN = makeOutputPattern("BUS", BUS_STEPS);
 inline constexpr OutputPattern NUMBER_PATTERN = makeOutputPattern("NUMBER_88", NUMBER_STEPS);
 inline constexpr OutputPattern WAIT_PATTERN = makeOutputPattern("WAIT", WAIT_STEPS);
@@ -123,6 +170,9 @@ inline constexpr OutputPattern AHEAD_PATTERN = makeOutputPattern("AHEAD", AHEAD_
 
 constexpr const OutputPattern& outputPatternFor(PatternId id) {
     switch (id) {
+        case PatternId::DANGER: return DANGER_PATTERN;
+        case PatternId::SIREN_WARNING: return SIREN_WARNING_PATTERN;
+        case PatternId::ATTENTION: return ATTENTION_PATTERN;
         case PatternId::READY: return READY_PATTERN;
         case PatternId::BUS: return BUS_PATTERN;
         case PatternId::NUMBER: return NUMBER_PATTERN;

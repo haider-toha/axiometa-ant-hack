@@ -93,9 +93,24 @@ bool parseResponse(RelayUpdate& update) {
         return false;
     }
 
+    // Vercel commonly returns this route with Transfer-Encoding: chunked and no
+    // Content-Length. HTTPClient::getStream() exposes the raw chunk framing,
+    // which ArduinoJson quite correctly rejects as non-JSON. getString() goes
+    // through HTTPClient's bounded de-chunking path before we parse it.
+    const String responseBody = httpClient.getString();
+    if (responseBody.isEmpty()) {
+        Serial.println(F("RELAY rejected=empty_response"));
+        return false;
+    }
+    if (responseBody.length() > MAX_RESPONSE_BYTES) {
+        Serial.printf("RELAY rejected=response_oversized bytes=%u\n",
+                      static_cast<unsigned>(responseBody.length()));
+        return false;
+    }
+
     responseDocument.clear();
     const DeserializationError error =
-        deserializeJson(responseDocument, httpClient.getStream());
+        deserializeJson(responseDocument, responseBody);
     if (error) {
         Serial.printf("RELAY rejected=json error=%s\n", error.c_str());
         return false;

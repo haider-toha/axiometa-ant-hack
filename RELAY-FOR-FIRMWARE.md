@@ -113,6 +113,24 @@ A command suppressed while moving advances `lastSeq` immediately. It can never r
 
 ---
 
+## Physical hotspot and relay smoke — 2026-07-18
+
+Tested on the Genesis Mini through an iPhone hotspot with **Maximize Compatibility** enabled. The board joined the 2.4 GHz hotspot, POSTed telemetry to the deployed Vercel route, and established the existing sequence 20 `UNKNOWN` value as a non-rendering baseline. The following live relay edges were then observed over Serial:
+
+| Relay edge | Effective activity | Physical result |
+|---|---|---|
+| sequence 21, `NUMBER`, route `88`, `conf=high` | service `STILL` | accepted; route-88 waveform appeared on both output telemetry channels |
+| sequence 22, same route result | service `MOVING` | consumed and logged as suppressed; both channels remained off |
+| sequence 23, `NONE` | service `MOVING` | consumed with no output; shared relay left neutral |
+
+ToF also entered proximity during both phases: it produced local channel-A pulses while `MOVING`, but was logged as suppressed while `STILL`. Microphone frames stayed `HEALTHY` throughout this smoke. This is a bench integration check, not accessibility or outdoor validation.
+
+### ESP32 HTTP gotcha: Vercel uses chunked responses
+
+The deployed `/api/pull` response can omit `Content-Length` and use `Transfer-Encoding: chunked`. Arduino-ESP32 3.3.9 `HTTPClient::getStream()` exposes the raw chunk framing, so passing that stream directly to ArduinoJson fails with `InvalidInput` even though `curl` shows valid JSON. Firmware must first use `HTTPClient::getString()`, which de-chunks the response, enforce the 768-byte response limit, and only then deserialize. A direct `getStream()` regression reproduces as repeated `RELAY rejected=json error=InvalidInput` followed by capped polling backoff.
+
+---
+
 ## Telemetry — the POST request body
 
 Send this as the `/api/pull` request body each poll so the debug screen can show what the device is doing. All fields best-effort; the server coerces/defaults anything missing.

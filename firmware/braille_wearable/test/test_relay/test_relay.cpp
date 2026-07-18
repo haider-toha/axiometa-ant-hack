@@ -184,6 +184,20 @@ void test_activity_lease_and_tof_policy_are_millis_wrap_safe(void) {
     TEST_ASSERT_FALSE(allowsProximityOutput(UserActivity::UNKNOWN));
 }
 
+void test_entering_still_clears_rendered_proximity_but_moving_does_not(void) {
+    TEST_ASSERT_TRUE(activityTransitionClearsProximity(
+        UserActivity::MOVING, UserActivity::STILL));
+    TEST_ASSERT_FALSE(activityTransitionClearsProximity(
+        UserActivity::STILL, UserActivity::MOVING));
+    TEST_ASSERT_FALSE(activityTransitionClearsProximity(
+        UserActivity::STILL, UserActivity::STILL));
+
+    TEST_ASSERT_TRUE(shouldRenderProximity(UserActivity::MOVING, true, true));
+    TEST_ASSERT_FALSE(shouldRenderProximity(UserActivity::STILL, true, true));
+    TEST_ASSERT_FALSE(shouldRenderProximity(UserActivity::MOVING, false, true));
+    TEST_ASSERT_FALSE(shouldRenderProximity(UserActivity::MOVING, true, false));
+}
+
 int main(int, char**) {
     UNITY_BEGIN();
     RUN_TEST(test_wire_command_parser_accepts_only_six_cloud_patterns);
@@ -197,5 +211,6 @@ int main(int, char**) {
     RUN_TEST(test_sequence_gap_is_reported_but_new_edge_is_consumed);
     RUN_TEST(test_activity_policy_uses_moving_fallback_and_manual_override);
     RUN_TEST(test_activity_lease_and_tof_policy_are_millis_wrap_safe);
+    RUN_TEST(test_entering_still_clears_rendered_proximity_but_moving_does_not);
     return UNITY_END();
 }

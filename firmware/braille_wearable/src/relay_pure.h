@@ -109,6 +109,17 @@ inline bool allowsProximityOutput(UserActivity activity) {
     return activity == UserActivity::MOVING;
 }
 
+inline bool activityTransitionClearsProximity(UserActivity previous,
+                                              UserActivity current) {
+    return allowsProximityOutput(previous) && !allowsProximityOutput(current);
+}
+
+inline bool shouldRenderProximity(UserActivity activity,
+                                  bool sensorActive,
+                                  bool sensorOutputAllowed) {
+    return allowsProximityOutput(activity) && sensorActive && sensorOutputAllowed;
+}
+
 inline void resetRelaySequence(RelaySequenceState& state) {
     state = RelaySequenceState{};
 }

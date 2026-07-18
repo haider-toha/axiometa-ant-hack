@@ -51,7 +51,7 @@ the wrist and the haptics, and changes what they carry.
 | `plan/` | The current plan, plus `archive/` and `transcripts/` |
 | `audit/bus-stop-situational-awareness/` | 🟢 Current evidence base — 5 files |
 | `audit/speech-to-braille-wearable/` | ⛔ Closed historical record — 48 files |
-| `parts/` | Sourced hardware: Genesis Mini starter kit, VL53L0CX ToF, ERM motors. **`parts/` mirrors the vendor catalogue, not the shelf** — a part being absent here does not mean it is absent from the room. The PDM microphone (AX22-0044) is in hand but has no folder, because it is too new to be catalogued. |
+| `parts/` | Sourced hardware: Genesis Mini starter kit, VL53L0CX ToF, and AX22-0018 passive buzzers. **`parts/` mirrors the vendor catalogue, not the shelf** — a part being absent here does not mean it is absent from the room. The PDM microphone (AX22-0044) is in hand but has no folder, because it is too new to be catalogued. |
 | `firmware/` | PlatformIO project (ESP32-S3) |
 | `www/` | 🟢 Active Next.js app (design-studio taste system), deploy target Vercel |
 | `app/` | ⛔ Stale legacy Next.js app — ignore (see `AGENTS.md`) |
@@ -67,7 +67,9 @@ extension kit**, so component placement is fixed by the board.
 
 | Port | Module | Notes |
 |---|---|---|
-| P1 | ERM vibration motor A | Data on **IO1 → GPIO3** (not IO0 — see the plan) |
+| P1 | AX22-0018 passive buzzer A | Signal on **IO1 → GPIO3**, pending schematic/silk confirmation before first drive |
 | P2 | VL53L0CX ToF distance sensor | I²C, shared bus |
-| P3 | ERM vibration motor B | Data on **IO1 → GPIO16**. `{1,3}` is the diagonal — 33.941mm from P1, the maximum separation the board allows |
+| P3 | AX22-0018 passive buzzer B | Signal on **IO1 → GPIO16**, pending confirmation. `{1,3}` is the diagonal — 33.941mm from P1, the maximum separation the board allows |
 | P4 | PDM microphone (AX22-0044) | Must bind to **I2S0** — the PDM-to-PCM converter exists on I2S0 only |
+
+The first hardware experiment is to determine whether the two buzzers produce a usable felt output and whether distinct per-side low-frequency bands can be learned as left versus right. This is frequency discrimination, not spatial localization, and remains in scope until the wear test decides it.

@@ -1,3 +1,29 @@
+> # ⛔ SUPERSEDED — DO NOT BUILD FROM THIS FILE
+>
+> **The speech-to-braille wearable was abandoned on 2026-07-18.** The team pivoted to a situational-
+> awareness device for DeafBlind users (siren detection → haptics; vision → "which bus just arrived?").
+> Vibrotactile braille on a wrist was found to be physically impossible: a braille cell needs 6
+> distinguishable points in ~6mm, while vibrotactile two-point discrimination on the forearm is ~70mm —
+> off by an order of magnitude.
+>
+> ### 👉 The current, authoritative plan is [`plan/2026-07-18-bus-stop-situational-awareness.md`](../2026-07-18-bus-stop-situational-awareness.md)
+>
+> ### Why this file is still worth reading
+>
+> Its **Global Constraints** section (below) is the origin of several physical facts that remain true and
+> load-bearing for the new build: the no-soldering / no-extension-kit rule, the power budget, the
+> outbound-only network architecture, and the `{1,3}`/`{2,4}` port-diagonal correction.
+>
+> ### ⚠ But one "LOCKED" value in it is WRONG
+>
+> Its pin map assigns the ERM motor data line to **IO0 (GPIO4 / GPIO9)**. The AX22-0013 module leaves
+> IO0 *not connected* and drives from **IO1 → GPIO3 / GPIO16**, confirmed against the module schematic
+> and pinout image. The error originated in `audit/speech-to-braille-wearable/03-track-3-parts-truth.md:311`
+> and survived because the firmware was only ever compile-verified, never run against hardware.
+> See `audit/bus-stop-situational-awareness/04-track-4-system-firmware-architecture.md`.
+
+---
+
 # Speech-to-Braille Wearable — Implementation Plan
 
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.

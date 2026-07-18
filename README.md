@@ -11,6 +11,10 @@ proxies for those future vibration channels; it does not demonstrate viable tact
 
 ### [`plan/2026-07-18-bus-stop-situational-awareness.md`](plan/2026-07-18-bus-stop-situational-awareness.md)
 
+Morning setup and the exact rehearsal sequence are in
+[`DEMO-RUNBOOK.md`](DEMO-RUNBOOK.md). Run the read-only deployment gate before
+starting the demo.
+
 That file is the single authoritative source for what is being built. If anything anywhere else in
 this repo contradicts it, **the plan wins** — with one exception noted below.
 

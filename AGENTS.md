@@ -14,7 +14,7 @@ The plan is the authoritative build target. If current code, archived plans, or 
 
 ## Current Target
 
-Build the bus-stop situational-awareness prototype:
+Build the bus-stop navigation and situational-awareness prototype:
 
 - ESP32-S3 Genesis Mini device.
 - Two AX22-0018 passive buzzers on the P1/P3 diagonal, used only as audible proxies for future vibration channels.
@@ -27,6 +27,10 @@ Build the bus-stop situational-awareness prototype:
 Hardcoded route `88` / destination `Clapham Common` is intentional. Do not add generality unless the plan is changed first.
 
 The first-hour experiment is complete. The buzzers were audible but produced virtually no tactile movement, so tactile viability failed. Preserve LEFT/RIGHT only as a demo of two conceptual vibration channels: P1 uses a 700 Hz audio proxy and P3 uses a 1400 Hz audio proxy. This is not haptic or accessibility validation. The intended product assumes purpose-built ERM/LRA actuators and requires later retuning and representative-user testing.
+
+Navigation is first-class scope. The phone owns `STILL` (bus arrival and route reading) versus `MOVING` (LEFT/RIGHT/AHEAD guidance) and sends that state through the existing relay. The board owns command gating, output arbitration, staleness handling, and all local ToF/siren safety behavior. Local safety remains active in both states.
+
+Do not allocate a module slot to a button. P1/P3 are outputs, P2 is ToF, and P4 is the PDM microphone. Full firmware must boot operationally without an arming press. The onboard user button is optional fallback hardware only after its GPIO and polarity are bench-verified; USB Serial remains the bring-up/emergency control path.
 
 ## Web App
 

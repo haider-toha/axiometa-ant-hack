@@ -1,0 +1,21 @@
+{
+  "configVersion": 1,
+  "version": "0.10.1",
+  "installedAt": "2026-07-18T15:28:29.397Z",
+  "stack": "next",
+  "skills": [
+    "cli-craft",
+    "george-stack",
+    "george-taste",
+    "georgedrury-auth",
+    "icon-craft",
+    "mcp-craft"
+  ],
+  "agents": [
+    "design-engineer",
+    "design-researcher",
+    "icon-designer",
+    "interaction-designer",
+    "ui-designer"
+  ]
+}

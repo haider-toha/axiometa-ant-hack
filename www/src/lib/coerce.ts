@@ -37,5 +37,6 @@ export function coerceDetector(
     destination: str(b?.destination),
     readingConf: str(b?.readingConf),
     votes: Array.isArray(b?.votes) ? b.votes.map((v) => str(v)) : [],
+    labels: Array.isArray(b?.labels) ? b.labels.map((v) => str(v)) : [],
   };
 }

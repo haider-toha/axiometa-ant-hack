@@ -373,7 +373,25 @@ class _ExtrudeFeature:
         self.bodies = _BodyList(bodies)
 
 
-def _apply(profile, operation, one_sided=None, symmetric=None):
+def _participant_pool(participants):
+    """The bodies an operation is allowed to touch.
+
+    Mirrors Fusion's ExtrudeFeatureInput.participantBodies: an EMPTY list means
+    "every body in the design participates" (Fusion's default), a non-empty list
+    restricts the operation to exactly those bodies.
+    (help.autodesk.com ExtrudeFeatureInput_participantBodies.htm)
+
+    Without this, JOIN target selection is a pure bounding-box test, and the
+    cage's bbox spans the whole model -- so ANY join placed inside it would
+    silently swallow the cage into the joined body.
+    """
+    if not participants:
+        return list(WORLD.bodies)
+    wanted = {id(p) for p in participants}
+    return [b for b in WORLD.bodies if id(b) in wanted]
+
+
+def _apply(profile, operation, one_sided=None, symmetric=None, participants=None):
     tool = profile.build(one_sided=one_sided, symmetric=symmetric)
 
     if operation == FeatureOperations.NewBodyFeatureOperation:
@@ -381,7 +399,8 @@ def _apply(profile, operation, one_sided=None, symmetric=None):
         return _ExtrudeFeature([body])
 
     if operation == FeatureOperations.JoinFeatureOperation:
-        targets = [b for b in WORLD.bodies if _bbox_touch(b.solid, tool)]
+        pool = _participant_pool(participants)
+        targets = [b for b in pool if _bbox_touch(b.solid, tool)]
         if not targets:
             raise RuntimeError(
                 "3 : Join failed: the new body is disjoint from every "
@@ -395,7 +414,8 @@ def _apply(profile, operation, one_sided=None, symmetric=None):
         return _ExtrudeFeature([primary])
 
     if operation == FeatureOperations.CutFeatureOperation:
-        hit = [b for b in WORLD.bodies if _volume(b.solid.intersect(tool)) > _TOL]
+        pool = _participant_pool(participants)
+        hit = [b for b in pool if _volume(b.solid.intersect(tool)) > _TOL]
         if not hit:
             raise RuntimeError(
                 "3 : No target body found to cut or intersect!")
@@ -411,10 +431,21 @@ class _ExtrudeInput:
         self.profile = profile
         self.operation = operation
         self._symmetric = None
+        self._one_sided = None
+        # Fusion default: empty => every body participates.
+        self.participantBodies = []
 
     def setSymmetricExtent(self, dist_value, is_full_length, taper_value):
         # is_full_length True => dist is the FULL length about the plane
         self._symmetric = dist_value.value        # cm
+
+    def setDistanceExtent(self, is_symmetric, dist_value):
+        # help.autodesk.com ExtrudeFeatureInput_setDistanceExtent.htm --
+        # isSymmetric True => dist is applied to EACH side of the plane.
+        if is_symmetric:
+            self._symmetric = dist_value.value * 2.0
+        else:
+            self._one_sided = dist_value.value
 
 
 class ExtrudeFeatures:
@@ -426,7 +457,9 @@ class ExtrudeFeatures:
 
     def add(self, extrude_input):
         return _apply(extrude_input.profile, extrude_input.operation,
-                     symmetric=extrude_input._symmetric)
+                     one_sided=extrude_input._one_sided,
+                     symmetric=extrude_input._symmetric,
+                     participants=extrude_input.participantBodies)
 
 
 class _ChamferEdgeSets:

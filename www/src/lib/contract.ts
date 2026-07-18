@@ -82,6 +82,9 @@ export interface DetectorState {
   destination: string;
   readingConf: string;
   votes: string[];
+  /** Top labels seen this frame, highest confidence first — so the monitor can
+   *  show what the camera is pointed at without streaming boxes to it. */
+  labels: string[];
 }
 
 /** The /api/state blob the debug screen polls. */
@@ -100,14 +103,48 @@ export interface ModalReading {
   confidence: "high" | "low";
 }
 
+/** The coarse safety class. `null` for the ~1190 labels that aren't a hazard. */
+export type HazardKind = "person" | "vehicle" | "bicycle";
+export type Bearing = "left" | "center" | "right";
+
+/**
+ * One box to outline, and the name of what's inside it.
+ *
+ * `box` is [x1, y1, x2, y2] normalised to 0..1 against the frame the detector
+ * decoded — NOT pixels. The capture resolution a phone actually gives back is
+ * not the one you asked for, so the only safe thing to send over the wire is a
+ * fraction; multiply by the canvas size at draw time.
+ */
+export interface ModalDetection {
+  label: string;
+  box: number[];
+  confidence: number;
+  bearing: Bearing;
+  kind: HazardKind | null;
+  target: boolean;
+}
+
+export interface ModalHazard {
+  kind: HazardKind | "obstacle";
+  bearing: Bearing;
+  confidence: number;
+}
+
 export interface ModalResponse {
-  event: "NONE" | "BUS_ARRIVED" | "BUS_GONE";
+  // The detector's vocabulary is deliberately generic: it says TARGET, not BUS,
+  // because the same service retargets by swapping a label set. Do not rename
+  // these to BUS_* — that mismatch silently disabled arrival detection here for
+  // the entire life of the previous version of this file.
+  event: "NONE" | "TARGET_ARRIVED" | "TARGET_GONE";
   present: boolean;
   confidence: number;
   arrival_id: number;
   reading: ModalReading | null;
   reading_ready: boolean;
   votes: string[];
+  hazards: ModalHazard[];
+  detections: ModalDetection[];
+  session_id: string;
 }
 
 // --- The translator: Modal detector vocabulary → device command --------------
@@ -118,23 +155,29 @@ export interface ModalResponse {
  * and POST /api/event only when the result changes.
  *
  * Follows the locked demo walk in the plan (Contract A/B):
- *   BUS_ARRIVED edge            → BUS
+ *   TARGET_ARRIVED edge         → BUS
  *   arrival latched, reading pending → WAIT
  *   reading_ready + high conf + digit route → NUMBER
- *   reading_ready + low conf / non-digit route → UNKNOWN
+ *   reading_ready + low conf / non-digit / unreadable → UNKNOWN
  *   otherwise                    → NONE
  */
 export function detectorToEvent(m: ModalResponse): EventRequest {
   const arrivalId = m.arrival_id;
   const none: EventRequest = { pattern: "NONE", route: "", dest: "", conf: "", arrivalId };
 
-  if (m.reading_ready && m.reading) {
-    const route = m.reading.route ?? "";
-    if (m.reading.confidence === "high" && ROUTE_RE.test(route)) {
+  // `reading_ready` means the VERDICT is in, not that the reading is good. A
+  // null reading here is the vote gate having refused to agree — the blind was
+  // unreadable — and that is an answer, not a pending state. It must surface as
+  // UNKNOWN: gating this branch on `m.reading` as well left an unreadable bus
+  // falling through to WAIT, so the device sat on "request in flight" forever
+  // for a reading that was never coming.
+  if (m.reading_ready) {
+    const r = m.reading;
+    if (r && r.confidence === "high" && ROUTE_RE.test(r.route ?? "")) {
       return {
         pattern: "NUMBER",
-        route,
-        dest: m.reading.destination ?? "",
+        route: r.route,
+        dest: r.destination ?? "",
         conf: "high",
         arrivalId,
       };
@@ -142,7 +185,7 @@ export function detectorToEvent(m: ModalResponse): EventRequest {
     return { pattern: "UNKNOWN", route: "", dest: "", conf: "low", arrivalId };
   }
 
-  if (m.event === "BUS_ARRIVED") {
+  if (m.event === "TARGET_ARRIVED") {
     return { pattern: "BUS", route: "", dest: "", conf: "", arrivalId };
   }
 

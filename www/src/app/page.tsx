@@ -52,7 +52,7 @@ export default function DebugScreen() {
   const tel = state?.telemetry;
 
   return (
-    <main className="min-h-full flex-1 bg-background px-6 py-8 font-sans text-foreground">
+    <main className="flex-1 bg-background px-6 py-8 font-sans text-foreground">
       <div className="mx-auto flex w-full max-w-3xl flex-col gap-4">
         <header className="flex items-center justify-between gap-4">
           <h1 className="text-xl font-medium tracking-tight">Relay monitor</h1>
@@ -107,6 +107,7 @@ export default function DebugScreen() {
             <Field label="Destination" value={det?.destination || EMPTY} />
             <Field label="Reading conf" value={det?.readingConf || EMPTY} num />
             <Field label="Votes" value={det?.votes?.length ? det.votes.join(", ") : EMPTY} num />
+            <Field label="In view" value={det?.labels?.length ? det.labels.join(", ") : EMPTY} />
           </Panel>
 
           <Panel title="Device telemetry">

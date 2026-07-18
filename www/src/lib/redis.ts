@@ -40,6 +40,7 @@ const EMPTY_DETECTOR: DetectorState = {
   destination: "",
   readingConf: "",
   votes: [],
+  labels: [],
 };
 
 /**
@@ -71,7 +72,10 @@ export async function readCommand(): Promise<DeviceCommand> {
   return {
     seq: seq ?? 0,
     pattern: pattern ?? "NONE",
-    route: route ?? "",
+    // `String(...)`, because Upstash deserialises a stored "88" back to the
+    // number 88 and the device expects a JSON string here. Without this the
+    // wire contract says `"route": 88` while the type says `string`.
+    route: route == null ? "" : String(route),
     dest: dest ?? "",
     conf: conf ?? "",
     arrivalId: arrivalId ?? 0,

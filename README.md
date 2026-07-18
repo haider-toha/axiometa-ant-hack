@@ -74,3 +74,10 @@ extension kit**, so component placement is fixed by the board.
 | P4 | PDM microphone (AX22-0044) | Must bind to **I2S0** — the PDM-to-PCM converter exists on I2S0 only |
 
 The first hardware experiment is complete: the buzzers were audible but produced virtually no tactile movement. They are rejected as haptic actuators. The demo retains them only to simulate two future vibration channels through distinct audible frequencies; see `audit/bus-stop-situational-awareness/05-buzzer-bench-test.md`.
+
+The current combined ESP32 build is `firmware/braille_wearable` environment
+`board_firmware`. It boots in `WAITING`, switches to `NAVIGATION` from a phone
+activity command, gates BUS/WAIT versus LEFT/RIGHT/AHEAD on the board, and keeps
+the local ToF proximity reflex active in both modes. Until relay parsing lands,
+service Serial provides the phone commands as a test stub. See
+[`firmware/braille_wearable/BOARD_FIRMWARE.md`](firmware/braille_wearable/BOARD_FIRMWARE.md).

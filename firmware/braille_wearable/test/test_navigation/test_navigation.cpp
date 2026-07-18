@@ -88,6 +88,18 @@ void test_non_navigation_commands_have_no_audio_pattern(void) {
     TEST_ASSERT_NULL(navigationPattern(CloudCommand::ERROR));
 }
 
+void test_implemented_cloud_commands_map_to_canonical_patterns(void) {
+    TEST_ASSERT_EQUAL_PTR(&BUS_PATTERN, cloudPattern(CloudCommand::BUS));
+    TEST_ASSERT_EQUAL_PTR(&WAIT_PATTERN, cloudPattern(CloudCommand::WAIT));
+    TEST_ASSERT_EQUAL_PTR(&LEFT_PATTERN, cloudPattern(CloudCommand::LEFT));
+    TEST_ASSERT_EQUAL_PTR(&RIGHT_PATTERN, cloudPattern(CloudCommand::RIGHT));
+    TEST_ASSERT_EQUAL_PTR(&AHEAD_PATTERN, cloudPattern(CloudCommand::AHEAD));
+    TEST_ASSERT_NULL(cloudPattern(CloudCommand::NONE));
+    TEST_ASSERT_NULL(cloudPattern(CloudCommand::NUMBER));
+    TEST_ASSERT_NULL(cloudPattern(CloudCommand::UNKNOWN));
+    TEST_ASSERT_NULL(cloudPattern(CloudCommand::ERROR));
+}
+
 int main(int, char**) {
     UNITY_BEGIN();
     RUN_TEST(test_all_board_mode_and_command_combinations);
@@ -96,5 +108,6 @@ int main(int, char**) {
     RUN_TEST(test_right_audio_pattern_is_exact);
     RUN_TEST(test_ahead_audio_pattern_is_exact);
     RUN_TEST(test_non_navigation_commands_have_no_audio_pattern);
+    RUN_TEST(test_implemented_cloud_commands_map_to_canonical_patterns);
     return UNITY_END();
 }

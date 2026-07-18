@@ -85,3 +85,18 @@ constexpr const OutputPattern* navigationPattern(CloudCommand command) {
             return nullptr;
     }
 }
+
+constexpr const OutputPattern* cloudPattern(CloudCommand command) {
+    switch (command) {
+        case CloudCommand::BUS:
+            return &outputPatternFor(PatternId::BUS);
+        case CloudCommand::WAIT:
+            return &outputPatternFor(PatternId::WAIT);
+        case CloudCommand::LEFT:
+        case CloudCommand::RIGHT:
+        case CloudCommand::AHEAD:
+            return navigationPattern(command);
+        default:
+            return nullptr;
+    }
+}

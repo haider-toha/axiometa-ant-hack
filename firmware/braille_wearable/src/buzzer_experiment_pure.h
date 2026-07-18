@@ -3,9 +3,8 @@
 #include <stdint.h>
 
 #include "patterns.h"
+#include "pins.h"
 
-inline constexpr uint8_t BUZZER_LEFT_PIN = 3;             // P1 IO1
-inline constexpr uint8_t BUZZER_RIGHT_PIN = 16;           // P3 IO1
 // These controls belong only to the historical hot-swap bench runner. P2 is
 // occupied by ToF in the production four-slot layout, which boots unarmed.
 inline constexpr uint8_t EXPERIMENT_BUTTON_PIN = 6;          // P2 IO1

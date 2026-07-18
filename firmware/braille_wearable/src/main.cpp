@@ -12,10 +12,13 @@ constexpr uint16_t PROXIMITY_PULSE_ON_MS = 120;
 
 BoardMode boardMode = BoardMode::WAITING;
 PatternPlayer cloudPlayer;
+OutputEnableLatch outputLatch;
 bool proximityActive = false;
 bool proximityOutputAllowed = false;
 bool proximityToneOn = false;
+bool proximityClearing = false;
 uint16_t proximityGapMs = PROXIMITY_SLOW_GAP_MS;
+uint32_t proximityClearingStartedMs = 0;
 uint32_t nextProximityTransitionMs = 0;
 
 const char* modeName(BoardMode mode) {
@@ -40,6 +43,10 @@ void setMode(BoardMode mode) {
 }
 
 void submitCloudCommand(CloudCommand command, const char* name) {
+    if (!outputLatch.enabled) {
+        Serial.printf("COMMAND dropped=%s reason=output_stopped\n", name);
+        return;
+    }
     if (!acceptsCloudCommand(boardMode, command)) {
         Serial.printf("COMMAND dropped=%s mode=%s reason=mode_gate\n", name, modeName(boardMode));
         return;
@@ -64,7 +71,9 @@ void printHelp() {
     Serial.println(F("s  phone STILL stub -> WAITING mode"));
     Serial.println(F("l/r/a  LEFT, RIGHT, or AHEAD navigation command"));
     Serial.println(F("b/w  BUS or WAIT predefined waiting-mode scenario"));
-    Serial.println(F("x  stop cloud output immediately; local ToF remains active"));
+    Serial.println(F("8/u/e  route 88, UNKNOWN, or ERROR waiting-mode scenario"));
+    Serial.println(F("x  emergency stop all output; sensing continues"));
+    Serial.println(F("o  resume board output after an emergency stop"));
     Serial.println(F("h  print this help"));
     Serial.println(F("ToF runs locally in both modes and overrides cloud commands."));
     Serial.println();
@@ -82,9 +91,24 @@ void handleSerial(char command) {
         case 'a': submitCloudCommand(CloudCommand::AHEAD, "AHEAD"); break;
         case 'b': submitCloudCommand(CloudCommand::BUS, "BUS"); break;
         case 'w': submitCloudCommand(CloudCommand::WAIT, "WAIT"); break;
+        case '8': submitCloudCommand(CloudCommand::NUMBER, "NUMBER_88"); break;
+        case 'u': submitCloudCommand(CloudCommand::UNKNOWN, "UNKNOWN"); break;
+        case 'e': submitCloudCommand(CloudCommand::ERROR, "ERROR"); break;
         case 'x':
-            stopCloudPattern();
-            Serial.println(F("COMMAND stopped=cloud_output"));
+            stopPattern(cloudPlayer);
+            stopAllOutput(outputLatch);
+            proximityToneOn = false;
+            hapticStop();
+            Serial.println(F("OUTPUT stopped=all sensing=active"));
+            break;
+        case 'o':
+            resumeOutput(outputLatch);
+            if (proximityActive) {
+                proximityToneOn = false;
+                proximityClearing = true;
+                proximityClearingStartedMs = millis();
+            }
+            Serial.println(F("OUTPUT resumed=all"));
             break;
         case 'h': printHelp(); break;
         case '\r':
@@ -112,13 +136,16 @@ void applyTofUpdate(const TofUpdate& update, uint32_t nowMs) {
     if (update.proximity.entered) {
         stopPattern(cloudPlayer);
         proximityToneOn = false;
-        nextProximityTransitionMs = nowMs;
+        proximityClearing = true;
+        proximityClearingStartedMs = nowMs;
+        hapticStop();
         Serial.printf("PROXIMITY entered mm=%u mode=%s\n",
                       update.distanceMm,
                       modeName(boardMode));
     }
     if (update.proximity.exited) {
         proximityToneOn = false;
+        proximityClearing = false;
         hapticStop();
         Serial.println(F("PROXIMITY exited"));
     }
@@ -132,10 +159,22 @@ void applyTofUpdate(const TofUpdate& update, uint32_t nowMs) {
 }
 
 void serviceOutput(uint32_t nowMs) {
+    if (!outputLatch.enabled) {
+        hapticStop();
+        return;
+    }
     if (proximityActive) {
         if (!proximityOutputAllowed) {
             hapticStop();
             return;
+        }
+        if (proximityClearing) {
+            if (!clearingGapElapsed(nowMs, proximityClearingStartedMs)) {
+                hapticStop();
+                return;
+            }
+            proximityClearing = false;
+            nextProximityTransitionMs = nowMs;
         }
         if (static_cast<int32_t>(nowMs - nextProximityTransitionMs) < 0) {
             return;
@@ -174,6 +213,7 @@ void setup() {
         haltWithError("ERROR component=tof reason=init_failed");
     }
 
+    startPattern(cloudPlayer, READY_PATTERN, millis());
     Serial.println(F("READY mode=WAITING transport=serial_phone_stub tof=local"));
     printHelp();
 }

@@ -66,6 +66,22 @@ void test_stop_immediately_clears_output(void) {
     TEST_ASSERT_EQUAL_UINT16(0, patternOutput(player).p3Hz);
 }
 
+void test_preemption_clearing_gap_is_exact_and_wrap_safe(void) {
+    TEST_ASSERT_FALSE(clearingGapElapsed(1149, 1000));
+    TEST_ASSERT_TRUE(clearingGapElapsed(1150, 1000));
+    TEST_ASSERT_FALSE(clearingGapElapsed(20, UINT32_MAX - 100));
+    TEST_ASSERT_TRUE(clearingGapElapsed(60, UINT32_MAX - 100));
+}
+
+void test_service_stop_latches_output_off_until_explicit_resume(void) {
+    OutputEnableLatch latch{};
+    TEST_ASSERT_TRUE(latch.enabled);
+    stopAllOutput(latch);
+    TEST_ASSERT_FALSE(latch.enabled);
+    resumeOutput(latch);
+    TEST_ASSERT_TRUE(latch.enabled);
+}
+
 int main(int, char**) {
     UNITY_BEGIN();
     RUN_TEST(test_start_exposes_first_step_immediately);
@@ -74,5 +90,7 @@ int main(int, char**) {
     RUN_TEST(test_large_tick_catches_up_without_extending_pattern);
     RUN_TEST(test_timing_is_wrap_safe);
     RUN_TEST(test_stop_immediately_clears_output);
+    RUN_TEST(test_preemption_clearing_gap_is_exact_and_wrap_safe);
+    RUN_TEST(test_service_stop_latches_output_off_until_explicit_resume);
     return UNITY_END();
 }

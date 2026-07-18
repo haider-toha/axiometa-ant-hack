@@ -90,14 +90,52 @@ void test_non_navigation_commands_have_no_audio_pattern(void) {
 
 void test_implemented_cloud_commands_map_to_canonical_patterns(void) {
     TEST_ASSERT_EQUAL_PTR(&BUS_PATTERN, cloudPattern(CloudCommand::BUS));
+    TEST_ASSERT_EQUAL_PTR(&NUMBER_PATTERN, cloudPattern(CloudCommand::NUMBER));
     TEST_ASSERT_EQUAL_PTR(&WAIT_PATTERN, cloudPattern(CloudCommand::WAIT));
+    TEST_ASSERT_EQUAL_PTR(&UNKNOWN_PATTERN, cloudPattern(CloudCommand::UNKNOWN));
+    TEST_ASSERT_EQUAL_PTR(&ERROR_PATTERN, cloudPattern(CloudCommand::ERROR));
     TEST_ASSERT_EQUAL_PTR(&LEFT_PATTERN, cloudPattern(CloudCommand::LEFT));
     TEST_ASSERT_EQUAL_PTR(&RIGHT_PATTERN, cloudPattern(CloudCommand::RIGHT));
     TEST_ASSERT_EQUAL_PTR(&AHEAD_PATTERN, cloudPattern(CloudCommand::AHEAD));
     TEST_ASSERT_NULL(cloudPattern(CloudCommand::NONE));
-    TEST_ASSERT_NULL(cloudPattern(CloudCommand::NUMBER));
-    TEST_ASSERT_NULL(cloudPattern(CloudCommand::UNKNOWN));
-    TEST_ASSERT_NULL(cloudPattern(CloudCommand::ERROR));
+}
+
+void test_wait_and_waiting_mode_payload_durations_match_plan(void) {
+    TEST_ASSERT_EQUAL_UINT16(400, outputPatternDurationMs(READY_PATTERN));
+    TEST_ASSERT_EQUAL_UINT16(1500, outputPatternDurationMs(BUS_PATTERN));
+    TEST_ASSERT_EQUAL_UINT16(6400, outputPatternDurationMs(NUMBER_PATTERN));
+    TEST_ASSERT_EQUAL_UINT16(9500, outputPatternDurationMs(WAIT_PATTERN));
+    TEST_ASSERT_EQUAL_UINT16(900, outputPatternDurationMs(UNKNOWN_PATTERN));
+    TEST_ASSERT_EQUAL_UINT16(1950, outputPatternDurationMs(ERROR_PATTERN));
+}
+
+void test_waiting_mode_waveforms_keep_the_locked_audio_contrasts(void) {
+    TEST_ASSERT_EQUAL_UINT8(3, READY_PATTERN.stepCount);
+    assertStep(READY_PATTERN.steps[0], 2100, 3300, 100);
+    assertStep(READY_PATTERN.steps[1], 2250, 3150, 100);
+    assertStep(READY_PATTERN.steps[2], 2350, 3050, 200);
+
+    TEST_ASSERT_EQUAL_UINT8(6, BUS_PATTERN.stepCount);
+    assertStep(BUS_PATTERN.steps[0], 2050, 3350, 250);
+    assertStep(BUS_PATTERN.steps[2], 2200, 3200, 250);
+    assertStep(BUS_PATTERN.steps[4], 2350, 3050, 250);
+
+    TEST_ASSERT_EQUAL_UINT16(2700, NUMBER_PATTERN.steps[0].p1Hz);
+    TEST_ASSERT_EQUAL_UINT16(2700, NUMBER_PATTERN.steps[0].p3Hz);
+    TEST_ASSERT_EQUAL_UINT16(2350, NUMBER_PATTERN.steps[2].p1Hz);
+    TEST_ASSERT_EQUAL_UINT16(3050, NUMBER_PATTERN.steps[2].p3Hz);
+    TEST_ASSERT_EQUAL_UINT16(2700,
+                             NUMBER_PATTERN.steps[NUMBER_PATTERN.stepCount - 1].p1Hz);
+
+    TEST_ASSERT_EQUAL_UINT8(3, UNKNOWN_PATTERN.stepCount);
+    assertStep(UNKNOWN_PATTERN.steps[0], 2350, 3050, 300);
+    assertStep(UNKNOWN_PATTERN.steps[1], 2050, 3350, 300);
+    assertStep(UNKNOWN_PATTERN.steps[2], 1750, 3650, 300);
+
+    TEST_ASSERT_EQUAL_UINT8(5, ERROR_PATTERN.stepCount);
+    assertStep(ERROR_PATTERN.steps[0], 2350, 0, 600);
+    assertStep(ERROR_PATTERN.steps[2], 2350, 0, 150);
+    assertStep(ERROR_PATTERN.steps[4], 2350, 0, 600);
 }
 
 int main(int, char**) {
@@ -109,5 +147,7 @@ int main(int, char**) {
     RUN_TEST(test_ahead_audio_pattern_is_exact);
     RUN_TEST(test_non_navigation_commands_have_no_audio_pattern);
     RUN_TEST(test_implemented_cloud_commands_map_to_canonical_patterns);
+    RUN_TEST(test_wait_and_waiting_mode_payload_durations_match_plan);
+    RUN_TEST(test_waiting_mode_waveforms_keep_the_locked_audio_contrasts);
     return UNITY_END();
 }

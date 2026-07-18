@@ -7,8 +7,12 @@ inline constexpr uint16_t AUDIO_PROXY_LEFT_HZ = 2350;
 inline constexpr uint16_t AUDIO_PROXY_RIGHT_HZ = 3050;
 
 enum class PatternId : uint8_t {
+    READY,
     BUS,
+    NUMBER,
     WAIT,
+    UNKNOWN,
+    ERROR,
     LEFT,
     RIGHT,
     AHEAD,
@@ -26,10 +30,30 @@ struct OutputPattern {
     uint8_t stepCount;
 };
 
+inline constexpr OutputStep READY_STEPS[] = {
+    {2100, 3300, 100},
+    {2250, 3150, 100},
+    {AUDIO_PROXY_LEFT_HZ, AUDIO_PROXY_RIGHT_HZ, 200},
+};
+
 inline constexpr OutputStep BUS_STEPS[] = {
+    {2050, 3350, 250}, {0, 0, 250},
+    {2200, 3200, 250}, {0, 0, 250},
     {AUDIO_PROXY_LEFT_HZ, AUDIO_PROXY_RIGHT_HZ, 250}, {0, 0, 250},
-    {AUDIO_PROXY_LEFT_HZ, AUDIO_PROXY_RIGHT_HZ, 250}, {0, 0, 250},
-    {AUDIO_PROXY_LEFT_HZ, AUDIO_PROXY_RIGHT_HZ, 250}, {0, 0, 250},
+};
+
+// Hardcoded route 88: preamble, two quinary "8" digits, and terminator.
+inline constexpr OutputStep NUMBER_STEPS[] = {
+    {2700, 2700, 500}, {0, 0, 600},
+    {AUDIO_PROXY_LEFT_HZ, AUDIO_PROXY_RIGHT_HZ, 500}, {0, 0, 250},
+    {AUDIO_PROXY_LEFT_HZ, AUDIO_PROXY_RIGHT_HZ, 150}, {0, 0, 250},
+    {AUDIO_PROXY_LEFT_HZ, AUDIO_PROXY_RIGHT_HZ, 150}, {0, 0, 250},
+    {AUDIO_PROXY_LEFT_HZ, AUDIO_PROXY_RIGHT_HZ, 150}, {0, 0, 800},
+    {AUDIO_PROXY_LEFT_HZ, AUDIO_PROXY_RIGHT_HZ, 500}, {0, 0, 250},
+    {AUDIO_PROXY_LEFT_HZ, AUDIO_PROXY_RIGHT_HZ, 150}, {0, 0, 250},
+    {AUDIO_PROXY_LEFT_HZ, AUDIO_PROXY_RIGHT_HZ, 150}, {0, 0, 250},
+    {AUDIO_PROXY_LEFT_HZ, AUDIO_PROXY_RIGHT_HZ, 150}, {0, 0, 600},
+    {2700, 2700, 500},
 };
 
 inline constexpr OutputStep WAIT_STEPS[] = {
@@ -37,6 +61,33 @@ inline constexpr OutputStep WAIT_STEPS[] = {
     {0, AUDIO_PROXY_RIGHT_HZ, 300}, {0, 0, 200},
     {AUDIO_PROXY_LEFT_HZ, 0, 300}, {0, 0, 200},
     {0, AUDIO_PROXY_RIGHT_HZ, 300}, {0, 0, 200},
+    {0, 0, 500},
+    {AUDIO_PROXY_LEFT_HZ, 0, 300}, {0, 0, 200},
+    {0, AUDIO_PROXY_RIGHT_HZ, 300}, {0, 0, 200},
+    {AUDIO_PROXY_LEFT_HZ, 0, 300}, {0, 0, 200},
+    {0, AUDIO_PROXY_RIGHT_HZ, 300}, {0, 0, 200},
+    {0, 0, 500},
+    {AUDIO_PROXY_LEFT_HZ, 0, 300}, {0, 0, 200},
+    {0, AUDIO_PROXY_RIGHT_HZ, 300}, {0, 0, 200},
+    {AUDIO_PROXY_LEFT_HZ, 0, 300}, {0, 0, 200},
+    {0, AUDIO_PROXY_RIGHT_HZ, 300}, {0, 0, 200},
+    {0, 0, 500},
+    {AUDIO_PROXY_LEFT_HZ, 0, 300}, {0, 0, 200},
+    {0, AUDIO_PROXY_RIGHT_HZ, 300}, {0, 0, 200},
+    {AUDIO_PROXY_LEFT_HZ, 0, 300}, {0, 0, 200},
+    {0, AUDIO_PROXY_RIGHT_HZ, 300}, {0, 0, 200},
+};
+
+inline constexpr OutputStep UNKNOWN_STEPS[] = {
+    {AUDIO_PROXY_LEFT_HZ, AUDIO_PROXY_RIGHT_HZ, 300},
+    {2050, 3350, 300},
+    {1750, 3650, 300},
+};
+
+inline constexpr OutputStep ERROR_STEPS[] = {
+    {AUDIO_PROXY_LEFT_HZ, 0, 600}, {0, 0, 300},
+    {AUDIO_PROXY_LEFT_HZ, 0, 150}, {0, 0, 300},
+    {AUDIO_PROXY_LEFT_HZ, 0, 600},
 };
 
 inline constexpr OutputStep LEFT_STEPS[] = {
@@ -60,16 +111,24 @@ constexpr OutputPattern makeOutputPattern(const char* name, const OutputStep (&s
     return {name, steps, static_cast<uint8_t>(N)};
 }
 
+inline constexpr OutputPattern READY_PATTERN = makeOutputPattern("READY", READY_STEPS);
 inline constexpr OutputPattern BUS_PATTERN = makeOutputPattern("BUS", BUS_STEPS);
+inline constexpr OutputPattern NUMBER_PATTERN = makeOutputPattern("NUMBER_88", NUMBER_STEPS);
 inline constexpr OutputPattern WAIT_PATTERN = makeOutputPattern("WAIT", WAIT_STEPS);
+inline constexpr OutputPattern UNKNOWN_PATTERN = makeOutputPattern("UNKNOWN", UNKNOWN_STEPS);
+inline constexpr OutputPattern ERROR_PATTERN = makeOutputPattern("ERROR", ERROR_STEPS);
 inline constexpr OutputPattern LEFT_PATTERN = makeOutputPattern("LEFT", LEFT_STEPS);
 inline constexpr OutputPattern RIGHT_PATTERN = makeOutputPattern("RIGHT", RIGHT_STEPS);
 inline constexpr OutputPattern AHEAD_PATTERN = makeOutputPattern("AHEAD", AHEAD_STEPS);
 
 constexpr const OutputPattern& outputPatternFor(PatternId id) {
     switch (id) {
+        case PatternId::READY: return READY_PATTERN;
         case PatternId::BUS: return BUS_PATTERN;
+        case PatternId::NUMBER: return NUMBER_PATTERN;
         case PatternId::WAIT: return WAIT_PATTERN;
+        case PatternId::UNKNOWN: return UNKNOWN_PATTERN;
+        case PatternId::ERROR: return ERROR_PATTERN;
         case PatternId::LEFT: return LEFT_PATTERN;
         case PatternId::RIGHT: return RIGHT_PATTERN;
         case PatternId::AHEAD: return AHEAD_PATTERN;

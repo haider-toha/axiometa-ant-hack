@@ -90,8 +90,14 @@ constexpr const OutputPattern* cloudPattern(CloudCommand command) {
     switch (command) {
         case CloudCommand::BUS:
             return &outputPatternFor(PatternId::BUS);
+        case CloudCommand::NUMBER:
+            return &outputPatternFor(PatternId::NUMBER);
         case CloudCommand::WAIT:
             return &outputPatternFor(PatternId::WAIT);
+        case CloudCommand::UNKNOWN:
+            return &outputPatternFor(PatternId::UNKNOWN);
+        case CloudCommand::ERROR:
+            return &outputPatternFor(PatternId::ERROR);
         case CloudCommand::LEFT:
         case CloudCommand::RIGHT:
         case CloudCommand::AHEAD:

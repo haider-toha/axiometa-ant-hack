@@ -49,30 +49,31 @@ void test_navigation_right_is_two_high_pulses_on_port_3_only(void) {
     TEST_ASSERT_EQUAL_UINT16(AUDIO_PROXY_RIGHT_HZ, pattern.steps[2].p3Hz);
 }
 
-void test_bus_event_is_three_pulses_on_both_buzzers(void) {
+void test_bus_event_is_three_ascending_pulses_on_both_buzzers(void) {
     const OutputPattern& pattern = outputPatternFor(PatternId::BUS);
     TEST_ASSERT_EQUAL_STRING("BUS", pattern.name);
     TEST_ASSERT_EQUAL_UINT8(6, pattern.stepCount);
     TEST_ASSERT_EQUAL_UINT32(1500, totalDuration(pattern));
-    for (uint8_t i = 0; i < pattern.stepCount; i += 2) {
-        TEST_ASSERT_EQUAL_UINT16(AUDIO_PROXY_LEFT_HZ, pattern.steps[i].p1Hz);
-        TEST_ASSERT_EQUAL_UINT16(AUDIO_PROXY_RIGHT_HZ, pattern.steps[i].p3Hz);
-    }
+    TEST_ASSERT_EQUAL_UINT16(2050, pattern.steps[0].p1Hz);
+    TEST_ASSERT_EQUAL_UINT16(3350, pattern.steps[0].p3Hz);
+    TEST_ASSERT_EQUAL_UINT16(2200, pattern.steps[2].p1Hz);
+    TEST_ASSERT_EQUAL_UINT16(3200, pattern.steps[2].p3Hz);
+    TEST_ASSERT_EQUAL_UINT16(AUDIO_PROXY_LEFT_HZ, pattern.steps[4].p1Hz);
+    TEST_ASSERT_EQUAL_UINT16(AUDIO_PROXY_RIGHT_HZ, pattern.steps[4].p3Hz);
 }
 
-void test_stationary_wait_alternates_left_then_right_twice(void) {
+void test_wait_repeats_four_alternating_cycles(void) {
     const OutputPattern& pattern = outputPatternFor(PatternId::WAIT);
     TEST_ASSERT_EQUAL_STRING("WAIT", pattern.name);
-    TEST_ASSERT_EQUAL_UINT8(8, pattern.stepCount);
-    TEST_ASSERT_EQUAL_UINT32(2000, totalDuration(pattern));
-    TEST_ASSERT_EQUAL_UINT16(AUDIO_PROXY_LEFT_HZ, pattern.steps[0].p1Hz);
-    TEST_ASSERT_EQUAL_UINT16(0, pattern.steps[0].p3Hz);
-    TEST_ASSERT_EQUAL_UINT16(0, pattern.steps[2].p1Hz);
-    TEST_ASSERT_EQUAL_UINT16(AUDIO_PROXY_RIGHT_HZ, pattern.steps[2].p3Hz);
-    TEST_ASSERT_EQUAL_UINT16(AUDIO_PROXY_LEFT_HZ, pattern.steps[4].p1Hz);
-    TEST_ASSERT_EQUAL_UINT16(0, pattern.steps[4].p3Hz);
-    TEST_ASSERT_EQUAL_UINT16(0, pattern.steps[6].p1Hz);
-    TEST_ASSERT_EQUAL_UINT16(AUDIO_PROXY_RIGHT_HZ, pattern.steps[6].p3Hz);
+    TEST_ASSERT_EQUAL_UINT8(35, pattern.stepCount);
+    TEST_ASSERT_EQUAL_UINT32(9500, totalDuration(pattern));
+    const uint8_t cycleStarts[] = {0, 9, 18, 27};
+    for (uint8_t start : cycleStarts) {
+        TEST_ASSERT_EQUAL_UINT16(AUDIO_PROXY_LEFT_HZ, pattern.steps[start].p1Hz);
+        TEST_ASSERT_EQUAL_UINT16(AUDIO_PROXY_RIGHT_HZ, pattern.steps[start + 2].p3Hz);
+        TEST_ASSERT_EQUAL_UINT16(AUDIO_PROXY_LEFT_HZ, pattern.steps[start + 4].p1Hz);
+        TEST_ASSERT_EQUAL_UINT16(AUDIO_PROXY_RIGHT_HZ, pattern.steps[start + 6].p3Hz);
+    }
 }
 
 int main(int, char**) {
@@ -81,7 +82,7 @@ int main(int, char**) {
     RUN_TEST(test_isolated_hot_swap_runner_ports_match_the_verified_schematics);
     RUN_TEST(test_navigation_left_is_two_low_pulses_on_port_1_only);
     RUN_TEST(test_navigation_right_is_two_high_pulses_on_port_3_only);
-    RUN_TEST(test_bus_event_is_three_pulses_on_both_buzzers);
-    RUN_TEST(test_stationary_wait_alternates_left_then_right_twice);
+    RUN_TEST(test_bus_event_is_three_ascending_pulses_on_both_buzzers);
+    RUN_TEST(test_wait_repeats_four_alternating_cycles);
     return UNITY_END();
 }

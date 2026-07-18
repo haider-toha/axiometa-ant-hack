@@ -8,9 +8,6 @@
 
 namespace {
 
-constexpr uint8_t TOF_SDA_PIN = 10;       // P2 SDA
-constexpr uint8_t TOF_SCL_PIN = 11;       // P2 SCL
-constexpr uint8_t TOF_XSHUT_PIN = 6;      // P2 IO1; module schematic net IO1D
 constexpr uint8_t LEDC_RESOLUTION_BITS = 10;
 constexpr uint16_t RANGE_PERIOD_MS = 50;
 constexpr uint16_t PULSE_ON_MS = 120;

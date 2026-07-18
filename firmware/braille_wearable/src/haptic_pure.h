@@ -4,6 +4,24 @@
 
 #include "patterns.h"
 
+inline constexpr uint16_t HAPTIC_CLEARING_GAP_MS = 150;
+
+inline constexpr bool clearingGapElapsed(uint32_t nowMs, uint32_t startedMs) {
+    return static_cast<uint32_t>(nowMs - startedMs) >= HAPTIC_CLEARING_GAP_MS;
+}
+
+struct OutputEnableLatch {
+    bool enabled = true;
+};
+
+inline void stopAllOutput(OutputEnableLatch& latch) {
+    latch.enabled = false;
+}
+
+inline void resumeOutput(OutputEnableLatch& latch) {
+    latch.enabled = true;
+}
+
 struct PatternPlayer {
     const OutputPattern* pattern = nullptr;
     uint8_t stepIndex = 0;

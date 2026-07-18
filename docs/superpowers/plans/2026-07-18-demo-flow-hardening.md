@@ -161,7 +161,7 @@ git commit -m "docs: add morning demo rehearsal runbook"
 
 **Files:** No new files.
 
-- [ ] **Step 1: Run full verification**
+- [x] **Step 1: Run full verification**
 
 ```bash
 cd www
@@ -174,8 +174,8 @@ pio test -e native
 pio run -e board_firmware
 ```
 
-- [ ] **Step 2: Run `git diff --check` and confirm a clean worktree**
+- [x] **Step 2: Run `git diff --check` and confirm a clean worktree**
 
-- [ ] **Step 3: Push `feat/demo-flow-hardening` and open a draft PR**
+- [x] **Step 3: Push `feat/demo-flow-hardening` and open a draft PR**
 
-- [ ] **Step 4: Wait for GitHub checks and record any external blockers**
+- [x] **Step 4: Wait for GitHub checks and record any external blockers**

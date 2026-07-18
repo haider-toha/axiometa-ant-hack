@@ -1,0 +1,26 @@
+{
+  "version": 1,
+  "syncedAt": "2026-07-18T15:28:29.395Z",
+  "entries": {
+    ".claude/agents/design-engineer.md": "2be48602ec3579cf398316612bffe1a544b0cf7da01caef0f208d8e45fc9f14b",
+    ".claude/agents/design-researcher.md": "80f143e643a07bb9abccd963a86e2fca7a9178b8604bae7bd1b76ddb79d02cb3",
+    ".claude/agents/icon-designer.md": "27ee5db64f8d05a4ddb613acd416650320418afb27fe39ceda962632b1020b0f",
+    ".claude/agents/interaction-designer.md": "8f79dba91a23eef03e93c3a659417a806571ab22ccad9250478d22f2c4c22320",
+    ".claude/agents/ui-designer.md": "d0026e38c3c1217ce2c69f4c448ebf490c4f967a7d6f4040b365e8503fdd1642",
+    ".claude/skills/cli-craft/SKILL.md": "bf48b55de13503e2b25ad52db7c77d7202cdd826a33f642e290fd572903cad5a",
+    ".claude/skills/george-stack/references/commit-conventions.md": "1246ae8feaebc9930e4bea86d83f20f2e106c10557c9b702fb355a4f6573c5b2",
+    ".claude/skills/george-stack/SKILL.md": "6989228f20a8edc3bb93e43cbcdd6b8c0a588ae9bc7d774f8a9d6bb6886909a2",
+    ".claude/skills/george-taste/references/ag-grid-theme.md": "406441068b4a793a13fe8a43cc2610658aacedfd972a1feb5f7ea706d3ca47a6",
+    ".claude/skills/george-taste/references/color-system.md": "c036f4bfa1db14eb4f86deecc5757a51ddc3eb226235bd902f55ec22521fc1c4",
+    ".claude/skills/george-taste/references/copy-voice.md": "8b37460b1fbe173cc74b7ecbd8f75cb59c46703845f77c6bb4aff58fec317b54",
+    ".claude/skills/george-taste/references/density-layout.md": "8d25e31776515b8bae2b40b626832109e6332e5ce9439785df76f07c457ef3a3",
+    ".claude/skills/george-taste/references/patterns.md": "94876f04d80c121d75359f487ae68850fe337f0d4ee60b99ca25626d9b9ff7bc",
+    ".claude/skills/george-taste/references/react-components.md": "7e7a624e52a8ed3d6aae505e28cc9f32160b60646563b8a73a61d007d6a3a3c8",
+    ".claude/skills/george-taste/references/typography.md": "413dee4731160ca4abb292eef73884e64b1d405126c78f8cee10bcc54764d2d7",
+    ".claude/skills/george-taste/SKILL.md": "034648c32273e4744b8532d47a32cfe1a3f1e5415ca39b0ec5542867323c0f55",
+    ".claude/skills/georgedrury-auth/SKILL.md": "0d4d528ca093347c71ae2e5fa56d6665cabba4d2ea27be18833480f5365a030c",
+    ".claude/skills/icon-craft/references/radix-icon-spec.md": "d1c86f889f65dc98347f67d392cc8d578a8bfa189cab769bc8e31982a106955b",
+    ".claude/skills/icon-craft/SKILL.md": "d30f234b213645490bfb9a88151c4a4824a54b86e0c85b4f2e42931789e23965",
+    ".claude/skills/mcp-craft/SKILL.md": "76575eb5f1dc4d18ba636e038bea7b7267b93086b78f9c298e83a071ef7b9567"
+  }
+}

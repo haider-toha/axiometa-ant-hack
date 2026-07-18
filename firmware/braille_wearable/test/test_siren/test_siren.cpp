@@ -12,17 +12,13 @@ static void makeFrame(float magnitudes[SIREN_SPECTRUM_BINS], float bandEnergy,
     for (uint16_t bin = 0; bin < SIREN_SPECTRUM_BINS; ++bin) {
         magnitudes[bin] = 0.0f;
     }
-    constexpr uint8_t BAND_BIN_COUNT =
-        SIREN_ENERGY_LAST_BIN - SIREN_ENERGY_FIRST_BIN + 1;
     const bool peakInsideEnergyBand =
         peakBin >= SIREN_ENERGY_FIRST_BIN && peakBin <= SIREN_ENERGY_LAST_BIN;
-    const float energyUnits = BAND_BIN_COUNT + (peakInsideEnergyBand ? 3.0f : 0.0f);
-    const float backgroundMagnitude = std::sqrt(bandEnergy / energyUnits);
-    for (uint8_t bin = SIREN_ENERGY_FIRST_BIN; bin <= SIREN_ENERGY_LAST_BIN; ++bin) {
-        magnitudes[bin] = backgroundMagnitude;
+    const uint8_t energyPeakBin = peakInsideEnergyBand ? peakBin : SIREN_ENERGY_FIRST_BIN;
+    magnitudes[energyPeakBin] = std::sqrt(bandEnergy);
+    if (!peakInsideEnergyBand) {
+        magnitudes[peakBin] = std::sqrt(bandEnergy) * 2.0f;
     }
-    // Keep a real in-band floor while allowing peak tracking down to bin 13.
-    magnitudes[peakBin] = backgroundMagnitude * 2.0f;
 
     constexpr uint8_t BAND_BIN_COUNT_FOR_NOISE =
         SIREN_ENERGY_LAST_BIN - SIREN_ENERGY_FIRST_BIN + 1;
@@ -62,7 +58,10 @@ void test_plan_constants_are_exact(void) {
     TEST_ASSERT_EQUAL_UINT8(42, SIREN_PEAK_LAST_BIN);
     TEST_ASSERT_EQUAL_UINT8(64, SIREN_HISTORY_FRAMES);
     TEST_ASSERT_EQUAL_UINT8(32, SIREN_BOOTSTRAP_FRAMES);
+    TEST_ASSERT_EQUAL_UINT8(16, SIREN_ATTENTION_FRAMES);
+    TEST_ASSERT_EQUAL_UINT8(2, SIREN_ATTENTION_MIN_SWEEP_BINS);
     TEST_ASSERT_EQUAL_UINT8(8, SIREN_MIN_SWEEP_BINS);
+    TEST_ASSERT_FLOAT_WITHIN(0.0001f, 0.45f, SIREN_MIN_PEAK_ENERGY_RATIO);
     TEST_ASSERT_FLOAT_WITHIN(0.0001f, 1.10f, SIREN_RISING_ENERGY_RATIO);
 }
 
@@ -78,6 +77,7 @@ void test_feature_extraction_uses_exact_energy_and_peak_boundaries(void) {
     const SirenFeatures features = extractSirenFeatures(magnitudes);
     TEST_ASSERT_FLOAT_WITHIN(0.0001f, 38.0f, features.bandEnergy);
     TEST_ASSERT_EQUAL_UINT8(42, features.peakBin);
+    TEST_ASSERT_FLOAT_WITHIN(0.0001f, 25.0f / 38.0f, features.peakEnergyRatio);
 }
 
 void test_noise_floor_extraction_uses_exact_boundaries_and_trimmed_scaling(void) {
@@ -113,21 +113,66 @@ void test_band_gate_is_inclusive_at_twelve_db_and_rejects_below(void) {
     seedNoiseFloor(atState);
     TEST_ASSERT_EQUAL_UINT8(static_cast<uint8_t>(SirenDecision::NONE),
                             static_cast<uint8_t>(feedBandEnergy(atState, atThreshold)));
-    TEST_ASSERT_EQUAL_UINT8(static_cast<uint8_t>(SirenDecision::ATTENTION),
-                            static_cast<uint8_t>(feedBandEnergy(atState, atThreshold)));
+    TEST_ASSERT_EQUAL_UINT8(1, atState.consecutiveElevatedFrames);
 }
 
-void test_below_threshold_frame_resets_the_two_frame_attention_streak(void) {
+void test_below_threshold_frame_resets_the_attention_streak(void) {
     SirenState state{};
     seedNoiseFloor(state);
     const float elevated = SIREN_ENERGY_THRESHOLD_RATIO * 2.0f;
 
     feedBandEnergy(state, elevated);
     feedBandEnergy(state, 1.0f);
+    TEST_ASSERT_EQUAL_UINT8(0, state.consecutiveElevatedFrames);
     TEST_ASSERT_EQUAL_UINT8(static_cast<uint8_t>(SirenDecision::NONE),
                             static_cast<uint8_t>(feedBandEnergy(state, elevated)));
-    TEST_ASSERT_EQUAL_UINT8(static_cast<uint8_t>(SirenDecision::ATTENTION),
-                            static_cast<uint8_t>(feedBandEnergy(state, elevated)));
+    TEST_ASSERT_EQUAL_UINT8(1, state.consecutiveElevatedFrames);
+}
+
+void test_attention_requires_a_short_directional_peak_sweep(void) {
+    SirenState state{};
+    seedNoiseFloor(state);
+    const float elevated = SIREN_ENERGY_THRESHOLD_RATIO * 2.0f;
+
+    for (uint8_t frame = 0; frame < SIREN_ATTENTION_FRAMES; ++frame) {
+        const uint8_t peakBin = static_cast<uint8_t>(
+            20 + frame * SIREN_ATTENTION_MIN_SWEEP_BINS /
+                     (SIREN_ATTENTION_FRAMES - 1));
+        const SirenDecision decision = feedBandEnergy(state, elevated, peakBin);
+        TEST_ASSERT_EQUAL_UINT8(
+            static_cast<uint8_t>(frame + 1 < SIREN_ATTENTION_FRAMES
+                                     ? SirenDecision::NONE
+                                     : SirenDecision::ATTENTION),
+            static_cast<uint8_t>(decision));
+    }
+}
+
+void test_broadband_energy_does_not_emit_attention(void) {
+    SirenState state{};
+    seedNoiseFloor(state);
+    float magnitudes[SIREN_SPECTRUM_BINS] = {};
+    constexpr uint8_t BAND_BIN_COUNT =
+        SIREN_ENERGY_LAST_BIN - SIREN_ENERGY_FIRST_BIN + 1;
+    const float magnitude = std::sqrt(
+        SIREN_ENERGY_THRESHOLD_RATIO * 4.0f / BAND_BIN_COUNT);
+    for (uint8_t bin = SIREN_ENERGY_FIRST_BIN; bin <= SIREN_ENERGY_LAST_BIN; ++bin) {
+        magnitudes[bin] = magnitude;
+    }
+
+    for (uint8_t frame = 0; frame < 8; ++frame) {
+        TEST_ASSERT_EQUAL_UINT8(
+            static_cast<uint8_t>(SirenDecision::NONE),
+            static_cast<uint8_t>(updateSirenFrame(state, magnitudes)));
+    }
+}
+
+void test_adaptive_floor_tracks_reference_energy_not_in_band_sound(void) {
+    SirenState state{};
+    seedNoiseFloor(state, 1.0f);
+
+    updateSiren(state, {100.0f, 2.0f, 20, 0.10f});
+
+    TEST_ASSERT_FLOAT_WITHIN(0.0001f, 1.05f, state.noiseFloorEnergy);
 }
 
 void test_sustained_duration_requires_thirty_two_elevated_frames(void) {
@@ -138,16 +183,13 @@ void test_sustained_duration_requires_thirty_two_elevated_frames(void) {
     SirenDecision finalDecision = SirenDecision::NONE;
     for (uint8_t frame = 0; frame < SIREN_SUSTAINED_FRAMES; ++frame) {
         const SirenDecision decision = feedBandEnergy(state, elevated);
-        if (frame < SIREN_SUSTAINED_FRAMES - 1) {
-            TEST_ASSERT_EQUAL_UINT8(
-                static_cast<uint8_t>(frame == 0 ? SirenDecision::NONE : SirenDecision::ATTENTION),
-                static_cast<uint8_t>(decision));
-        }
+        TEST_ASSERT_EQUAL_UINT8(static_cast<uint8_t>(SirenDecision::NONE),
+                                static_cast<uint8_t>(decision));
         finalDecision = decision;
     }
     TEST_ASSERT_FALSE(hasMonotonicPeakSweep(state));
     TEST_ASSERT_TRUE(sirenModulationIndex(state) <= SIREN_MODULATION_INDEX_THRESHOLD);
-    TEST_ASSERT_EQUAL_UINT8(static_cast<uint8_t>(SirenDecision::ATTENTION),
+    TEST_ASSERT_EQUAL_UINT8(static_cast<uint8_t>(SirenDecision::NONE),
                             static_cast<uint8_t>(finalDecision));
 }
 
@@ -179,6 +221,26 @@ void test_monotonic_peak_sweep_confirms_a_flat_siren_warning(void) {
     }
 
     TEST_ASSERT_TRUE(hasMonotonicPeakSweep(state));
+    TEST_ASSERT_EQUAL_UINT8(static_cast<uint8_t>(SirenDecision::SIREN_WARNING),
+                            static_cast<uint8_t>(decision));
+}
+
+void test_confirmed_sweep_tolerates_one_frame_of_spectral_leakage(void) {
+    SirenState state{};
+    seedNoiseFloor(state);
+    SirenDecision decision = SirenDecision::NONE;
+
+    for (uint8_t frame = 0; frame < SIREN_SUSTAINED_FRAMES; ++frame) {
+        const uint8_t peakBin = static_cast<uint8_t>(
+            SIREN_PEAK_FIRST_BIN +
+            (frame * (SIREN_PEAK_LAST_BIN - SIREN_PEAK_FIRST_BIN)) /
+                (SIREN_SUSTAINED_FRAMES - 1));
+        const float peakRatio = frame == 15 ? 0.30f : 0.70f;
+        decision = updateSiren(state, {32.0f, 1.0f, peakBin, peakRatio});
+    }
+
+    TEST_ASSERT_EQUAL_UINT8(SIREN_SUSTAINED_FRAMES,
+                            state.consecutiveElevatedFrames);
     TEST_ASSERT_EQUAL_UINT8(static_cast<uint8_t>(SirenDecision::SIREN_WARNING),
                             static_cast<uint8_t>(decision));
 }
@@ -284,7 +346,7 @@ void test_one_bin_peak_drift_does_not_count_as_wail_sweep(void) {
     }
 
     TEST_ASSERT_FALSE(hasMonotonicPeakSweep(state));
-    TEST_ASSERT_EQUAL_UINT8(static_cast<uint8_t>(SirenDecision::ATTENTION),
+    TEST_ASSERT_EQUAL_UINT8(static_cast<uint8_t>(SirenDecision::NONE),
                             static_cast<uint8_t>(decision));
 }
 
@@ -367,10 +429,14 @@ int main(int, char**) {
     RUN_TEST(test_feature_extraction_uses_exact_energy_and_peak_boundaries);
     RUN_TEST(test_noise_floor_extraction_uses_exact_boundaries_and_trimmed_scaling);
     RUN_TEST(test_band_gate_is_inclusive_at_twelve_db_and_rejects_below);
-    RUN_TEST(test_below_threshold_frame_resets_the_two_frame_attention_streak);
+    RUN_TEST(test_below_threshold_frame_resets_the_attention_streak);
+    RUN_TEST(test_attention_requires_a_short_directional_peak_sweep);
+    RUN_TEST(test_broadband_energy_does_not_emit_attention);
+    RUN_TEST(test_adaptive_floor_tracks_reference_energy_not_in_band_sound);
     RUN_TEST(test_sustained_duration_requires_thirty_two_elevated_frames);
     RUN_TEST(test_yelp_modulation_confirms_a_flat_siren_warning);
     RUN_TEST(test_monotonic_peak_sweep_confirms_a_flat_siren_warning);
+    RUN_TEST(test_confirmed_sweep_tolerates_one_frame_of_spectral_leakage);
     RUN_TEST(test_rising_siren_amplitude_yields_danger_while_flat_yields_warning);
     RUN_TEST(test_startup_during_yelp_still_confirms_after_full_shape_window);
     RUN_TEST(test_startup_siren_ignores_sparse_out_of_band_harmonics);

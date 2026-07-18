@@ -15,6 +15,10 @@ isolated buzzer and ToF runners for combined testing.
 The firmware boots operationally without a button. The buzzers simulate future
 vibration channels; they are not tactile actuators.
 
+Sensor servicing starts immediately. The READY tone is deferred for about 1.1
+seconds so the microphone can bootstrap its acoustic reference without blocking
+the ToF loop.
+
 ## Build And Upload
 
 ```bash
@@ -47,10 +51,25 @@ The ToF proximity reflex remains active in both modes. It preempts and drops a
 cloud cue while proximity is active, revokes output immediately on an invalid
 sample, and clears active proximity after three invalid samples.
 
+The PDM microphone also remains active in both modes. I2S0 captures 512-sample
+frames at 16 kHz on a Core 1 worker. A Hann FFT supplies local siren features:
+
+- `ATTENTION` requires about 0.5 seconds of elevated, tonal energy with a short
+  directional frequency sweep.
+- `SIREN_WARNING` or `DANGER` requires at least 1.02 seconds of elevated energy
+  plus a yelp-like envelope or a wider monotonic peak sweep.
+- Siren safety output preempts proximity and cloud cues. Proximity outranks the
+  lower-severity confirmed warning and resumes after a safety pattern clears.
+
+Serial telemetry reports capture health, FFT features, and classifier decisions.
+The service stop command `x` silences outputs without stopping either sensor,
+which is useful for environmental false-positive testing. On `o`, a siren that
+is still classified active is eligible to resume immediately.
+
 ## Remaining Board Work
 
 1. Replace the serial phone stub with the fixed-size Vercel relay command parser
    while preserving outbound-only polling.
-2. Connect the now-verified I2S0 PCM capture to the host-tested local siren
-   classifier.
-3. Complete the remaining output vocabulary and severity arbitration.
+2. Validate the local siren classifier against labelled real siren recordings
+   and a longer representative environmental-negative set.
+3. Complete the remaining output vocabulary and general queue arbitration.

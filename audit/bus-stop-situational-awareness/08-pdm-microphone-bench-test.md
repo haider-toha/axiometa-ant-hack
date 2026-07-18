@@ -45,6 +45,5 @@ Repeatable stimulus used macOS `Sosumi.aiff` from the nearby computer speaker:
 **PASS: P4 supplies responsive 16-bit PCM through I2S0.** The signal reacts to
 sound without persistent silence, raw-PDM variance, DMA loss, or clipping.
 
-This gate validates capture only. Environmental-sound and siren discrimination
-still require FFT features, recorded negative examples, threshold calibration,
-and a false-positive test in the intended demo environment.
+This gate validates capture only. FFT integration and the first classifier
+calibration are recorded separately in `09-local-siren-bench-test.md`.

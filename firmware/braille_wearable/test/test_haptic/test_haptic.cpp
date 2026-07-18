@@ -82,6 +82,17 @@ void test_service_stop_latches_output_off_until_explicit_resume(void) {
     TEST_ASSERT_TRUE(latch.enabled);
 }
 
+void test_local_siren_patterns_match_locked_timing_and_channels(void) {
+    TEST_ASSERT_EQUAL_UINT16(250, outputPatternDurationMs(ATTENTION_PATTERN));
+    TEST_ASSERT_EQUAL_UINT16(1400, outputPatternDurationMs(SIREN_WARNING_PATTERN));
+    TEST_ASSERT_EQUAL_UINT16(11250, outputPatternDurationMs(DANGER_PATTERN));
+
+    TEST_ASSERT_EQUAL_UINT16(AUDIO_PROXY_LEFT_HZ, ATTENTION_STEPS[0].p1Hz);
+    TEST_ASSERT_EQUAL_UINT16(AUDIO_PROXY_RIGHT_HZ, ATTENTION_STEPS[0].p3Hz);
+    TEST_ASSERT_EQUAL_UINT16(AUDIO_PROXY_LEFT_HZ, DANGER_STEPS[0].p1Hz);
+    TEST_ASSERT_EQUAL_UINT16(AUDIO_PROXY_RIGHT_HZ, DANGER_STEPS[0].p3Hz);
+}
+
 int main(int, char**) {
     UNITY_BEGIN();
     RUN_TEST(test_start_exposes_first_step_immediately);
@@ -92,5 +103,6 @@ int main(int, char**) {
     RUN_TEST(test_stop_immediately_clears_output);
     RUN_TEST(test_preemption_clearing_gap_is_exact_and_wrap_safe);
     RUN_TEST(test_service_stop_latches_output_off_until_explicit_resume);
+    RUN_TEST(test_local_siren_patterns_match_locked_timing_and_channels);
     return UNITY_END();
 }

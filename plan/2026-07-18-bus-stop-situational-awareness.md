@@ -4,7 +4,7 @@
 
 **Goal:** Build the sensing, classification, navigation, relay, and output-pattern prototype for a wrist-worn DeafBlind navigation and situational-awareness product. The intended product uses purpose-built vibration motors; the hack hardware uses two passive buzzers only as audible proxies for those future vibration channels.
 
-**Architecture:** Three sensor inputs and two simulated output channels. A PDM microphone feeds an on-device FFT that fires a coarse local alert in ~79 ms and a confirmed-siren classification in 1–2 s. A VL53L0CX ToF gives a purely local proximity reflex with no network in the path. A phone browser POSTs frames at 2 Hz to a Modal endpoint that runs YOLO26n, holds two seconds of detection history, latches exactly one `BUS_ARRIVED` event, crops the destination blind and asks Claude to read it under a strict JSON schema. The phone owns the `STILL`/`MOVING` interaction state and translates camera results into bus-information or LEFT/RIGHT/AHEAD navigation commands. Those commands reach the board through the existing Vercel + Upstash polling relay. P1 at 2350 Hz and P3 at 3050 Hz audibly simulate two future vibration channels. See the latest Revision note below.
+**Architecture:** Three sensor inputs and two simulated output channels. A PDM microphone feeds an on-device FFT that fires a shape-aware coarse local alert after about 0.5 s and a confirmed-siren classification after at least 1.02 s. A VL53L0CX ToF gives a purely local proximity reflex with no network in the path. A phone browser POSTs frames at 2 Hz to a Modal endpoint that runs YOLO26n, holds two seconds of detection history, latches exactly one `BUS_ARRIVED` event, crops the destination blind and asks Claude to read it under a strict JSON schema. The phone owns the `STILL`/`MOVING` interaction state and translates camera results into bus-information or LEFT/RIGHT/AHEAD navigation commands. Those commands reach the board through the existing Vercel + Upstash polling relay. P1 at 2350 Hz and P3 at 3050 Hz audibly simulate two future vibration channels. See the latest Revision note below.
 
 **Tech Stack:** ESP32-S3-MINI-1 (Arduino-ESP32 3.x / ESP-IDF v5.x, FreeRTOS, LEDC in **tone** mode, I2S0 PDM→PCM, `arduinoFFT<float>`, `Adafruit_VL53L0X`, `ArduinoJson` v7) · 2× AX22-0018 passive buzzer (MLT-8530) as audio proxies, not haptic actuators · Modal 1.5.2 + Ultralytics YOLO26n on T4 · `anthropic` 0.117.0 with `output_config.format` structured outputs · Next.js 16.2.10 on Vercel + Upstash Redis · in-browser `getUserMedia` capture on the phone (Python/OpenCV survives only inside Modal, not on a laptop) · build123d via `cad/tests/fake_adsk` for CAD.
 
@@ -466,7 +466,7 @@ Notation: `A` = Port 1 buzzer, `B` = Port 3 buzzer, `BOTH` = both (optional 30 m
 | **P0** | **READY** | BOTH | 0→65 % | ramp `0→65` over 200, hold `65` for 200 | ×1 | **400** | STATUS | no | Boot complete: ToF init OK, motors OK, Wi-Fi joined or offline confirmed |
 | **P1** | **DANGER** | BOTH | 100 % | `(200 on / 150 off) ×5`, then `500` sustained tail | ×4, gap **750** | **2250/cycle · 11 250 total** | **SAFETY** | no | Tier-2b confirmed siren **AND** amplitude trend rising |
 | **P2** | **SIREN WARNING** | BOTH | 65 % | `(400 on / 300 off) ×2` | ×1 | **1400** | ALERT | no | Tier-2b confirmed siren, flat or falling trend. Rate-limited 1 per 10 s |
-| **P3** | **ATTENTION** | BOTH | 100 % | single `250` pulse | ×1 | **250** | **SAFETY** | no | Tier-2a: band energy exceeds the adaptive floor by +12 dB on 2 consecutive FFT frames (~79 ms) |
+| **P3** | **ATTENTION** | BOTH | 100 % | single `250` pulse | ×1 | **250** | **SAFETY** | no | Tier-2a: 16 consecutive tonal, +12 dB frames with a directional peak sweep of at least 2 bins (~0.5 s) |
 | **P4** | **PROXIMITY** | **A only** | 2350 Hz audio proxy | `120 on / gap`, `gap = map(mm, 300→1200, 120→900)` — closer = faster | state refreshed on every valid range sample | continuous | HAZARD | no | ToF < 1200 mm on 3 consecutive samples (~150 ms in the isolated runner) |
 | **P5** | **BUS ARRIVING** | BOTH | 65 → 82 → 100 % | `(250 on / 250 off) ×3`, ascending | ×1 | **1500** | INFORMATION | no | `BUS_ARRIVED` edge from the relay |
 | **P6** | **ROUTE NUMBER** | BOTH | digits **buzz band ~100 Hz**, brackets **alert band ~200 Hz** | preamble `500 @ ~200 Hz` + `600` silence · digits: `LONG=500`, `SHORT=150`, intra-gap `250`, inter-digit gap **800** · terminator `600` silence + `500 @ ~200 Hz` | ×1 | **6400 for "88"** | INFORMATION | **yes** | Claude returned `confidence == "high"` and the 3-vote gate reached consensus |
@@ -618,21 +618,19 @@ The fix is to split the tier, and the split produces a better story rather than 
 
 | Sub-tier | Budget | Test | Haptic |
 |---|---|---|---|
-| **2a — acoustic alert** | **<100 ms** (measured 78.6 ms) | Band energy in bins 16…58 exceeds the adaptive noise floor by +12 dB on 2 consecutive frames | **P3 ATTENTION** |
+| **2a — acoustic alert** | **~0.5 s** (16 frames = 512 ms, plus processing/tick) | Band energy in bins 16…58 exceeds the adaptive noise floor by +12 dB, at least 45% of that energy occupies the strongest bin, and the peak moves directionally by at least 2 bins over 16 consecutive frames | **P3 ATTENTION** |
 | **2b — siren confirmed** | **1–2 s** | ≥1.02 s of sustained band energy **AND** (2–4 Hz modulation index > 0.35 **OR** a monotonic peak sweep) | **P1 DANGER** if the amplitude trend is rising, else **P2 SIREN WARNING** |
 
-**This mirrors the two-stage bus haptic exactly — coarse now, precise shortly after.** That consistency is worth stating out loud: the device matches latency to certainty, and it does it twice, in two independent sensing paths. It is architecture, not a special case.
+**This mirrors the two-stage bus haptic — coarse first, precise shortly after.** The original two-frame coarse gate was rejected at physical calibration: it emitted five false ATTENTION decisions in about 30 seconds of ordinary room noise. The 16-frame tonal-sweep gate emitted none during the subsequent 60-second ambient run and still detected the controlled siren sweep. This is bench evidence, not field validation against real emergency vehicles.
 
 **Tier 2a latency, shown:**
 
 ```
-capture frame 1                32.0 ms
-FFT + features                  2.3 ms
-capture frame 2                32.0 ms
-FFT + features                  2.3 ms
-haptic tick quantisation     ≤ 10.0 ms
-                             ─────────
-TOTAL                        ≈ 78.6 ms      ← inside the <100 ms budget
+16 non-overlapped frames       512.0 ms
+FFT + feature processing       measured inside the capture cadence
+haptic tick quantisation      ≤ 10.0 ms
+                              ─────────
+TOTAL                         ≈ 0.52 s
 ```
 
 ### The bin arithmetic
@@ -667,7 +665,7 @@ Envelope is sampled at 31.25 Hz. A modulation of period P frames = 1000/(P × 32
 
 **Why Hann, not Hamming.** We measure band *energy* and track a *peak bin*; we never need to resolve two close tones. Hann's far-sidelobe rolloff is −60 dB/decade against Hamming's −20 dB/decade, so a loud low-frequency component — traffic rumble, wind, HVAC — leaks far less into the 500–1800 Hz band. Sidelobe rejection is the property that matters.
 
-**Why no overlap.** 50 % overlap would halve detection latency at double the CPU, but it also doubles the envelope sample rate and complicates the lag table. Non-overlapped frames give an envelope sampled at exactly 31.25 Hz, which keeps the lag table clean, and 78.6 ms already meets the budget.
+**Why no overlap.** 50 % overlap would halve detection latency at double the CPU, but it also doubles the envelope sample rate and complicates the lag table. Non-overlapped frames give an envelope sampled at exactly 31.25 Hz and the physically calibrated ~0.5 s coarse gate is adequate for this prototype.
 
 **No DC blocker is required, by construction.** The tunable high-pass fields (`hp_en`, `hp_cut_off_freq_hz`) are gated on `SOC_I2S_SUPPORTS_PDM_RX_HP_FILTER`, defined only for the ESP32-P4. That would normally force a software DC blocker — **it does not here, because every feature is computed from bins 13…58 and DC lands in bin 0.** Deriving the amplitude trend from FFT band energy rather than time-domain RMS makes the whole chain DC-immune for free.
 

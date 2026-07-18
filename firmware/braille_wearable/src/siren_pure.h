@@ -17,13 +17,15 @@ inline constexpr uint8_t SIREN_NOISE_HIGH_LAST_BIN = 255;
 inline constexpr uint8_t SIREN_NOISE_TRIMMED_BIN_COUNT = 8;
 inline constexpr uint8_t SIREN_HISTORY_FRAMES = 64;
 inline constexpr uint8_t SIREN_HISTORY_MASK = SIREN_HISTORY_FRAMES - 1;
-inline constexpr uint8_t SIREN_ATTENTION_FRAMES = 2;
+inline constexpr uint8_t SIREN_ATTENTION_FRAMES = 16;
 inline constexpr uint8_t SIREN_SUSTAINED_FRAMES = 32;
 inline constexpr uint8_t SIREN_BOOTSTRAP_FRAMES = SIREN_SUSTAINED_FRAMES;
 inline constexpr uint8_t SIREN_MODULATION_MIN_LAG = 8;
 inline constexpr uint8_t SIREN_MODULATION_MAX_LAG = 16;
 inline constexpr uint8_t SIREN_MIN_SWEEP_BINS = 8;
+inline constexpr uint8_t SIREN_ATTENTION_MIN_SWEEP_BINS = 2;
 inline constexpr float SIREN_ENERGY_THRESHOLD_RATIO = 15.848932f;
+inline constexpr float SIREN_MIN_PEAK_ENERGY_RATIO = 0.45f;
 inline constexpr float SIREN_THRESHOLD_RELATIVE_EPSILON = 0.00001f;
 inline constexpr float SIREN_MODULATION_INDEX_THRESHOLD = 0.35f;
 inline constexpr float SIREN_NOISE_FLOOR_ALPHA = 0.05f;
@@ -47,6 +49,7 @@ struct SirenFeatures {
     float bandEnergy;
     float noiseFloorEstimate;
     uint8_t peakBin;
+    float peakEnergyRatio;
 };
 
 struct SirenState {
@@ -56,6 +59,7 @@ struct SirenState {
     uint8_t historyHead = 0;
     uint8_t historyCount = 0;
     uint8_t consecutiveElevatedFrames = 0;
+    uint8_t consecutiveTonalFrames = 0;
     uint8_t bootstrapFrames = 0;
     bool noiseFloorInitialized = false;
     bool bootstrapComplete = false;
@@ -102,6 +106,15 @@ inline SirenFeatures extractSirenFeatures(const float magnitudes[SIREN_SPECTRUM_
         referenceEnergy * ENERGY_BIN_COUNT /
         (REFERENCE_BIN_COUNT - SIREN_NOISE_TRIMMED_BIN_COUNT);
 
+    float strongestBandEnergy = 0.0f;
+    for (uint8_t bin = SIREN_ENERGY_FIRST_BIN; bin <= SIREN_ENERGY_LAST_BIN; ++bin) {
+        const float energy = magnitudes[bin] * magnitudes[bin];
+        strongestBandEnergy = energy > strongestBandEnergy ? energy : strongestBandEnergy;
+    }
+    const float peakEnergyRatio = bandEnergy > 0.0f
+        ? strongestBandEnergy / bandEnergy
+        : 0.0f;
+
     uint8_t peakBin = SIREN_PEAK_FIRST_BIN;
     float peakMagnitude = magnitudes[peakBin];
     for (uint8_t bin = SIREN_PEAK_FIRST_BIN + 1; bin <= SIREN_PEAK_LAST_BIN; ++bin) {
@@ -110,7 +123,7 @@ inline SirenFeatures extractSirenFeatures(const float magnitudes[SIREN_SPECTRUM_
             peakBin = bin;
         }
     }
-    return {bandEnergy, noiseFloorEstimate, peakBin};
+    return {bandEnergy, noiseFloorEstimate, peakBin, peakEnergyRatio};
 }
 
 inline void resetSiren(SirenState& state) {
@@ -118,6 +131,7 @@ inline void resetSiren(SirenState& state) {
     state.historyHead = 0;
     state.historyCount = 0;
     state.consecutiveElevatedFrames = 0;
+    state.consecutiveTonalFrames = 0;
     state.bootstrapFrames = 0;
     state.noiseFloorInitialized = false;
     state.bootstrapComplete = false;
@@ -213,6 +227,32 @@ inline bool hasMonotonicPeakSweep(const SirenState& state) {
            (nonDecreasing || nonIncreasing);
 }
 
+inline bool hasRecentAttentionSweep(const SirenState& state) {
+    if (state.historyCount < SIREN_ATTENTION_FRAMES) {
+        return false;
+    }
+
+    const uint8_t start = static_cast<uint8_t>(
+        state.historyCount - SIREN_ATTENTION_FRAMES);
+    bool nonDecreasing = true;
+    bool nonIncreasing = true;
+    uint8_t previous = sirenHistoryPeak(state, start);
+    uint8_t minimum = previous;
+    uint8_t maximum = previous;
+    for (uint8_t index = 1; index < SIREN_ATTENTION_FRAMES; ++index) {
+        const uint8_t current = sirenHistoryPeak(
+            state, static_cast<uint8_t>(start + index));
+        nonDecreasing = nonDecreasing && current >= previous;
+        nonIncreasing = nonIncreasing && current <= previous;
+        minimum = current < minimum ? current : minimum;
+        maximum = current > maximum ? current : maximum;
+        previous = current;
+    }
+    return static_cast<uint8_t>(maximum - minimum) >=
+               SIREN_ATTENTION_MIN_SWEEP_BINS &&
+           (nonDecreasing || nonIncreasing);
+}
+
 inline bool hasRisingAmplitudeTrend(const SirenState& state) {
     if (state.historyCount < SIREN_SUSTAINED_FRAMES) {
         return false;
@@ -283,6 +323,7 @@ inline SirenDecision updateSiren(SirenState& state, const SirenFeatures& feature
 
         state.bootstrapComplete = true;
         state.consecutiveElevatedFrames = 0;
+        state.consecutiveTonalFrames = 0;
         const bool startupShapeConfirmed =
             sirenModulationIndex(state) > SIREN_MODULATION_INDEX_THRESHOLD ||
             hasMonotonicPeakSweep(state);
@@ -305,6 +346,7 @@ inline SirenDecision updateSiren(SirenState& state, const SirenFeatures& feature
 
     if (!hasUsableSirenNoiseFloor(state)) {
         state.consecutiveElevatedFrames = 0;
+        state.consecutiveTonalFrames = 0;
         const bool shapeConfirmed =
             sirenModulationIndex(state) > SIREN_MODULATION_INDEX_THRESHOLD ||
             hasMonotonicPeakSweep(state);
@@ -316,18 +358,32 @@ inline SirenDecision updateSiren(SirenState& state, const SirenFeatures& feature
         return SirenDecision::NONE;
     }
 
-    const bool elevated = features.bandEnergy > 0.0f &&
-                          features.bandEnergy >=
-                              state.noiseFloorEnergy * SIREN_ENERGY_THRESHOLD_RATIO *
-                                  (1.0f - SIREN_THRESHOLD_RELATIVE_EPSILON);
-    if (elevated) {
+    const bool energyElevated = features.bandEnergy > 0.0f &&
+                                features.bandEnergy >=
+                                    state.noiseFloorEnergy *
+                                        SIREN_ENERGY_THRESHOLD_RATIO *
+                                        (1.0f - SIREN_THRESHOLD_RELATIVE_EPSILON);
+    const bool tonalElevated = energyElevated &&
+                               features.peakEnergyRatio >=
+                                   SIREN_MIN_PEAK_ENERGY_RATIO;
+    if (energyElevated) {
         if (state.consecutiveElevatedFrames < SIREN_SUSTAINED_FRAMES) {
             ++state.consecutiveElevatedFrames;
         }
     } else {
         state.consecutiveElevatedFrames = 0;
+    }
+    if (tonalElevated) {
+        if (state.consecutiveTonalFrames < SIREN_ATTENTION_FRAMES) {
+            ++state.consecutiveTonalFrames;
+        }
+    } else {
+        state.consecutiveTonalFrames = 0;
+    }
+    if (!tonalElevated) {
         state.noiseFloorEnergy +=
-            SIREN_NOISE_FLOOR_ALPHA * (features.bandEnergy - state.noiseFloorEnergy);
+            SIREN_NOISE_FLOOR_ALPHA *
+            (features.noiseFloorEstimate - state.noiseFloorEnergy);
     }
 
     const bool shapeConfirmed =
@@ -338,7 +394,8 @@ inline SirenDecision updateSiren(SirenState& state, const SirenFeatures& feature
         return hasRisingAmplitudeTrend(state) ? SirenDecision::DANGER
                                                : SirenDecision::SIREN_WARNING;
     }
-    if (state.consecutiveElevatedFrames >= SIREN_ATTENTION_FRAMES) {
+    if (state.consecutiveTonalFrames >= SIREN_ATTENTION_FRAMES &&
+        hasRecentAttentionSweep(state)) {
         return SirenDecision::ATTENTION;
     }
     return SirenDecision::NONE;

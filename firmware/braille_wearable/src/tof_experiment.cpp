@@ -202,7 +202,10 @@ void setup() {
     pinMode(TOF_XSHUT_PIN, INPUT);
     delay(10);
 
-    if (!tof.begin(0x29, false, &Wire)) {
+    if (!tof.begin(0x29,
+                   false,
+                   &Wire,
+                   Adafruit_VL53L0X::VL53L0X_SENSE_LONG_RANGE)) {
         haltWithError("ERROR component=tof reason=init_failed expected_address=0x29");
     }
     if (!tof.startRangeContinuous(RANGE_PERIOD_MS)) {
@@ -210,7 +213,8 @@ void setup() {
     }
     lastRangeCompletionMs = millis();
 
-    Serial.println(F("READY component=tof address=0x29 period_ms=50 reflex=0"));
+    Serial.println(
+        F("READY component=tof address=0x29 profile=long_range period_ms=50 reflex=0"));
     printHelp();
 }
 

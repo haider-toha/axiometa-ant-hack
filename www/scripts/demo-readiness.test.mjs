@@ -22,6 +22,8 @@ const COMPLETE_STATE = {
   telemetry: { playing: "NUMBER" },
 };
 
+const READINESS_NOW_MS = COMPLETE_PULL.activityTs + 1_000;
+
 function response({ status = 200, contentType = "text/html", body = "<html></html>" }) {
   return {
     ok: status >= 200 && status < 300,
@@ -63,6 +65,7 @@ describe("runReadiness", () => {
     const report = await runReadiness({
       baseUrl: "https://demo.example",
       fetchImpl,
+      nowMs: READINESS_NOW_MS,
     });
 
     expect(report.ok).toBe(true);
@@ -85,6 +88,7 @@ describe("runReadiness", () => {
           "/api/pull": response({ contentType: "application/json", body: pullWithoutActivity }),
         }),
       ),
+      nowMs: READINESS_NOW_MS,
     });
 
     expect(report.ok).toBe(false);
@@ -105,6 +109,7 @@ describe("runReadiness", () => {
           }),
         }),
       ),
+      nowMs: READINESS_NOW_MS,
     });
 
     expect(report.ok).toBe(false);
@@ -120,7 +125,11 @@ describe("runReadiness", () => {
       }),
     );
 
-    const report = await runReadiness({ baseUrl: "https://demo.example", fetchImpl });
+    const report = await runReadiness({
+      baseUrl: "https://demo.example",
+      fetchImpl,
+      nowMs: READINESS_NOW_MS,
+    });
 
     expect(report.ok).toBe(false);
     expect(report.checks.find((check) => check.id === "capture")).toMatchObject({
@@ -128,5 +137,30 @@ describe("runReadiness", () => {
       detail: "network error: offline",
     });
     expect(fetchImpl).toHaveBeenCalledTimes(5);
+  });
+
+  it("fails readiness when relay activity is older than the firmware lease", async () => {
+    const stalePull = {
+      ...COMPLETE_PULL,
+      activityTs: READINESS_NOW_MS - 120_001,
+    };
+
+    const report = await runReadiness({
+      baseUrl: "https://demo.example",
+      fetchImpl: mockFetch(
+        deployment({
+          "/api/pull": response({ contentType: "application/json", body: stalePull }),
+        }),
+      ),
+      nowMs: READINESS_NOW_MS,
+    });
+
+    expect(report.ok).toBe(false);
+    expect(report.checks.find((check) => check.id === "activity-contract")).toMatchObject({
+      ok: true,
+    });
+    expect(report.checks.find((check) => check.id === "activity-freshness")).toMatchObject({
+      ok: false,
+    });
   });
 });

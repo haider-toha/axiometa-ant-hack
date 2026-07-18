@@ -2,6 +2,8 @@ import { pathToFileURL } from "node:url";
 
 const CLOUD_PATTERNS = new Set(["NONE", "BUS", "NUMBER", "WAIT", "UNKNOWN", "ERROR"]);
 const ACTIVITIES = new Set(["MOVING", "STILL"]);
+const ACTIVITY_LEASE_MS = 120_000;
+const MAX_CLOCK_SKEW_MS = 30_000;
 
 function check(id, label, ok, detail) {
   return { id, label, ok, detail };
@@ -37,6 +39,11 @@ function activityContract(value) {
     isNonNegativeInteger(value.activitySeq) &&
     isPositiveInteger(value.activityTs)
   );
+}
+
+function activityFresh(activityTs, nowMs) {
+  const ageMs = nowMs - activityTs;
+  return ageMs >= -MAX_CLOCK_SKEW_MS && ageMs <= ACTIVITY_LEASE_MS;
 }
 
 function debugStateContract(value) {
@@ -82,7 +89,7 @@ async function checkPage(fetchImpl, baseUrl, id, label, path) {
   }
 }
 
-async function checkPull(fetchImpl, baseUrl) {
+async function checkPull(fetchImpl, baseUrl, nowMs) {
   let response;
   try {
     response = await get(fetchImpl, baseUrl, "/api/pull");
@@ -92,6 +99,7 @@ async function checkPull(fetchImpl, baseUrl) {
       check("pull", "Relay pull route", false, detail),
       check("pull-contract", "Relay command contract", false, detail),
       check("activity-contract", "Relay activity contract", false, detail),
+      check("activity-freshness", "Relay activity freshness", false, detail),
     ];
   }
 
@@ -107,6 +115,7 @@ async function checkPull(fetchImpl, baseUrl) {
     const detail = `invalid JSON: ${errorDetail(error)}`;
     checks.push(check("pull-contract", "Relay command contract", false, detail));
     checks.push(check("activity-contract", "Relay activity contract", false, detail));
+    checks.push(check("activity-freshness", "Relay activity freshness", false, detail));
     return checks;
   }
 
@@ -118,14 +127,28 @@ async function checkPull(fetchImpl, baseUrl) {
       commandContract(body) ? "command fields present" : "missing or invalid command fields",
     ),
   );
+  const validActivity = activityContract(body);
   checks.push(
     check(
       "activity-contract",
       "Relay activity contract",
-      routeOk && activityContract(body),
-      activityContract(body)
+      routeOk && validActivity,
+      validActivity
         ? `${body.activity} seq=${body.activitySeq}`
         : "requires activity, activitySeq, and positive activityTs",
+    ),
+  );
+  const freshActivity = validActivity && activityFresh(body.activityTs, nowMs);
+  checks.push(
+    check(
+      "activity-freshness",
+      "Relay activity freshness",
+      routeOk && freshActivity,
+      validActivity
+        ? freshActivity
+          ? `age=${Math.max(0, nowMs - body.activityTs)}ms`
+          : `stale or clock-skewed activityTs=${body.activityTs}`
+        : "cannot evaluate without a valid activity contract",
     ),
   );
   return checks;
@@ -165,13 +188,17 @@ async function checkState(fetchImpl, baseUrl) {
   return checks;
 }
 
-export async function runReadiness({ baseUrl, fetchImpl = globalThis.fetch }) {
+export async function runReadiness({
+  baseUrl,
+  fetchImpl = globalThis.fetch,
+  nowMs = Date.now(),
+}) {
   const normalizedBaseUrl = new URL(baseUrl).toString();
   const [home, capture, output, pull, state] = await Promise.all([
     checkPage(fetchImpl, normalizedBaseUrl, "home", "Relay monitor page", "/"),
     checkPage(fetchImpl, normalizedBaseUrl, "capture", "Phone capture page", "/capture"),
     checkPage(fetchImpl, normalizedBaseUrl, "output", "Laptop output page", "/output"),
-    checkPull(fetchImpl, normalizedBaseUrl),
+    checkPull(fetchImpl, normalizedBaseUrl, nowMs),
     checkState(fetchImpl, normalizedBaseUrl),
   ]);
   const checks = [home, capture, output, ...pull, ...state];

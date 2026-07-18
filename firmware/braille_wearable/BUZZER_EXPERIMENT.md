@@ -9,7 +9,7 @@ This is the first-hour, buzzer-only experiment. It tests whether the wearer can 
 3. Fit the AX22-0050 tactile LED button in **P2**. It is the start/stop control.
 4. Fit the second AX22-0018 passive buzzer in **P3**. Treat this as **RIGHT**.
 5. Leave **P4 empty** for this test.
-6. Match the keyed connectors and module/board silk. Do not force a reversed connector.
+6. The 2x5 sockets are not keyed. On every module, align the `G` / GND pin-1 corner with the socket corner marked `G`. Check this twice; do not power a module inserted 180 degrees around.
 7. Put the two buzzer modules in the intended wearable position and secure them consistently. Then reconnect the board by USB-C.
 
 The verified signal mapping is P1 buzzer IO1 to GPIO3, P2 button IO1 to GPIO6, P2 LED IO2 to GPIO5, and P3 buzzer IO1 to GPIO16. The button is active-low and the LED is active-high. Disconnect power again before correcting any placement. Keep the buzzers on the wrist or bench and never near an ear.

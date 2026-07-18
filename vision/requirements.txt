@@ -1,0 +1,25 @@
+# Local environment for the machine that runs `modal deploy vision/service.py`.
+#
+# This is NOT the container's dependency list. The container image is declared
+# in code, as `IMAGE` inside service.py (ultralytics, anthropic==0.117.0,
+# upstash-redis, pillow, fastapi[standard]) — Modal builds it remotely, so none
+# of those need to exist here.
+#
+# What DOES need to exist here is anything imported at MODULE level in
+# service.py, because module-level code runs on both sides: once locally
+# while Modal serialises the app, and again in the container.
+#
+#   pip install -r vision/requirements.txt
+
+# Pinned — spec 05 §(a) Q2 grounds every Modal API in this file (asgi_app's
+# label=, enable_memory_snapshot, modal.enter(snap=...), Image.run_function)
+# against the 1.5.2 docs. Do not float this.
+modal==1.5.2
+
+# Pinned — Global Constraint 11. Same version the container installs, so a
+# standalone read_blind test on this machine exercises the identical SDK.
+anthropic==0.117.0
+
+# Imported at module level in service.py for the Contract A request/response
+# models (spec 05 §(c), Pydantic v2 — `field_validator`, `model_dump`).
+pydantic>=2.0

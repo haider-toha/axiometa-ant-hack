@@ -107,6 +107,7 @@ export default function DebugScreen() {
             <Field label="Destination" value={det?.destination || EMPTY} />
             <Field label="Reading conf" value={det?.readingConf || EMPTY} num />
             <Field label="Votes" value={det?.votes?.length ? det.votes.join(", ") : EMPTY} num />
+            <Field label="In view" value={det?.labels?.length ? det.labels.join(", ") : EMPTY} />
           </Panel>
 
           <Panel title="Device telemetry">

@@ -7,9 +7,9 @@ isolated buzzer and ToF runners for combined testing.
 
 | Slot | Module | Signal mapping |
 |---|---|---|
-| P1 | AX22-0018 passive buzzer | GPIO3, 2350 Hz LEFT audio proxy |
+| P1 | AX22-0018 passive buzzer | GPIO3, 2350 Hz channel-A audio proxy |
 | P2 | AX22-0015 VL53L0CX ToF | SDA GPIO10, SCL GPIO11, XSHUT GPIO6 |
-| P3 | AX22-0018 passive buzzer | GPIO16, 3050 Hz RIGHT audio proxy |
+| P3 | AX22-0018 passive buzzer | GPIO16, 3050 Hz channel-B audio proxy |
 | P4 | AX22-0044 PDM microphone | CLK GPIO18, DT GPIO17, SL GPIO1 driven high; I2S0 pulled-high slot |
 
 The firmware boots operationally without a button. The buzzers simulate future
@@ -31,27 +31,27 @@ $HOME/.platformio/penv/bin/pio device monitor -e board_firmware --port /dev/cu.u
 
 ## Current Interaction
 
-The board owns two runtime modes. It boots in `WAITING`.
+The board boots operationally with an effective `MOVING` fallback while the independent cloud activity state is missing, stale, or establishing its first baseline. A fresh relay activity transition can take control; service Serial can override it for deterministic testing.
 
-| Serial stub | Future phone input | Board behavior |
+| Serial | Relay equivalent | Board behavior |
 |---|---|---|
-| `s` | `STILL` | Enter `WAITING`; accept BUS and WAIT scenarios |
-| `n` | `MOVING` | Enter `NAVIGATION`; accept LEFT, RIGHT, and AHEAD |
-| `l` / `r` / `a` | Direction command | Play P1 low, P3 high, or both proxy tones |
-| `b` / `w` | Waiting scenario | Play BUS or WAIT pattern |
-| `8` / `u` / `e` | Waiting scenario | Play route 88, UNKNOWN, or ERROR pattern |
+| `s` | fresh `STILL` activity | Set service `STILL`; accept fresh BUS/WAIT/NUMBER/UNKNOWN and suppress ToF output |
+| `n` | fresh `MOVING` activity | Set service `MOVING`; suppress bus information and enable ToF output |
+| `c` | relay owns activity | Clear the service override; use a fresh relay activity lease or the safe `MOVING` fallback |
+| `l` / `r` / `a` | none | Play conceptual channel tones in `MOVING`; service simulation only, not sensed navigation |
+| `b` / `w` | BUS / WAIT | Exercise the same activity and local-priority gate as relay commands |
+| `8` / `u` / `e` | NUMBER 88 / UNKNOWN / ERROR | Exercise route 88, unreadable, or global error output |
 | `x` | Service emergency stop | Stop all output immediately; sensing remains active |
 | `o` | Service resume | Re-enable output after `x` |
 | `h` | Service only | Print controls |
 
-The serial commands are temporary substitutes for the future relay parser. The
-mode gate and output behavior run on the ESP32 and do not depend on the camera.
+The relay parser accepts exactly `NONE`, `BUS`, `NUMBER`, `WAIT`, `UNKNOWN`, and `ERROR`. It rejects `LEFT`, `RIGHT`, `AHEAD`, and unknown strings. The first command snapshot is a non-rendering baseline. Commands received while `MOVING` still advance sequence state, so switching to `STILL` cannot replay an earlier camera result.
 
-The ToF proximity reflex remains active in both modes. It preempts and drops a
-cloud cue while proximity is active, revokes output immediately on an invalid
-sample, and clears active proximity after three invalid samples.
+The route waveform is hardcoded for route 88. Firmware requires the `NUMBER` payload route to be exactly `"88"` and its confidence to be `"high"`; another number or lower confidence is consumed without playing the route-88 output.
 
-The PDM microphone also remains active in both modes. I2S0 captures 512-sample
+The ToF sensor continues sampling in both activities. Proximity output exists only in `MOVING`, where it provides supplementary forward-clearance feedback while the cane remains the primary mobility aid. Entering `STILL` clears proximity output immediately so nearby people, shelters, and street furniture do not create nuisance alerts. One forward ToF zone cannot choose whether left or right is safe.
+
+The PDM microphone remains active in both activities. I2S0 captures 512-sample
 frames at 16 kHz on a Core 1 worker. A Hann FFT supplies local siren features:
 
 - `ATTENTION` requires about 0.5 seconds of elevated, tonal energy with a short
@@ -68,8 +68,12 @@ is still classified active is eligible to resume immediately.
 
 ## Remaining Board Work
 
-1. Replace the serial phone stub with the fixed-size Vercel relay command parser
-   while preserving outbound-only polling.
-2. Validate the local siren classifier against labelled real siren recordings
+1. Coordinate a board session, provide ignored `secrets.h` with the phone hotspot credentials, and run the end-to-end relay/activity soak. No upload or reboot should happen while another developer owns the board.
+2. Land the web-owned independent `activity`, `activitySeq`, and `activityTs` fields. The currently deployed command response omits them, so use `s`/`n` until that endpoint update is live.
+3. Validate the local siren classifier against labelled real siren recordings
    and a longer representative environmental-negative set.
-3. Complete the remaining output vocabulary and general queue arbitration.
+4. Confirm the web producer holds transient BUS long enough for a 300 ms latest-value poll, or add queue/ack semantics.
+
+## Phone Hotspot Configuration
+
+Copy `src/secrets.example.h` to ignored `src/secrets.h`. On iPhone enable **Maximize Compatibility**; on Android select the **2.4 GHz** hotspot band. A checkout without secrets still builds and boots local-only, logging `RELAY configured=0`.

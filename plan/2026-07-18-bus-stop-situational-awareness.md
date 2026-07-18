@@ -34,7 +34,7 @@ This revision supersedes Revision 2026-07-18d's camera-guided LEFT/RIGHT/AHEAD s
 
 **3a. Local sensing is state-aware without becoming network-dependent.** ToF sampling remains local and continuous for diagnostics, but its proximity output is permitted only in `MOVING`; entering `STILL` clears it so people and street furniture near a bus stop do not produce a nuisance alert. Siren detection and output remain local and active in both phases.
 
-**3b. Route 88 is guarded on the board.** The P6 waveform is hardcoded to mean route 88. A `NUMBER` command whose wire `route` is not exactly `"88"` is consumed and logged as a mismatch without playing P6. This prevents a different bus number from producing a confident false route-88 signal.
+**3b. Route 88 is guarded on the board.** The P6 waveform is hardcoded to mean route 88. A `NUMBER` command whose wire `route` is not exactly `"88"` or whose `conf` is not `"high"` is consumed without playing P6. This prevents a different or low-confidence reading from producing a confident false route-88 signal.
 
 **4. Activity and command edges are independent.** `/api/pull` exposes activity plus separate activity freshness/version fields. An activity heartbeat must not increment command `seq` or refresh a previous command's `ts`, because doing either could re-fire or make stale bus information appear fresh. Missing, invalid, or stale activity closes the bus-information output gate unless service Serial explicitly controls the bench test.
 

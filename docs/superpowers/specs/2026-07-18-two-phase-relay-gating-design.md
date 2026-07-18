@@ -22,7 +22,7 @@ The hack demo has two explicit activity phases, but it does not attempt camera-g
 
 A camera-derived command observed while `MOVING` is received, parsed, sequence-acknowledged, and recorded as suppressed by the activity gate. It does not reach output arbitration and is never replayed after the switch to `STILL`; the demo must generate a fresh event after the switch.
 
-The device's route pattern is physically hardcoded for `88`. A `NUMBER` command may therefore reach that pattern only when the wire `route` is exactly `"88"`. Any other route is consumed and logged as a mismatch without playing the route-88 output.
+The device's route pattern is physically hardcoded for `88`. A `NUMBER` command may therefore reach that pattern only when the wire `route` is exactly `"88"` and `conf` is `"high"`. Any other route or lower confidence is consumed and logged without playing the route-88 output.
 
 ## Ownership Boundaries
 
@@ -108,7 +108,7 @@ Host tests cover:
 - activity transition ordering and stale/missing activity behavior;
 - consuming without rendering while `MOVING`;
 - accepting a fresh bus command while `STILL`;
-- rejecting a `NUMBER` command whose route is not exactly `88` without replay;
+- rejecting a `NUMBER` command whose route is not exactly `88` or whose confidence is not high, without replay;
 - ToF output enabled only in `MOVING`, with immediate clearing on entry to `STILL`;
 - siren output accepted in both phases;
 - no replay after a mode transition, boot baseline, reconnect, sequence gap, or timestamp wrap.

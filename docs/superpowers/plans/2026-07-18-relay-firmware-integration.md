@@ -16,7 +16,7 @@
 - Camera preview and 2 Hz frame submission to Modal remain unchanged in both phases.
 - `MOVING` consumes but suppresses `BUS`, `WAIT`, `NUMBER`, and `UNKNOWN`; `STILL` accepts fresh events; `ERROR` is available in either phase.
 - A command consumed while `MOVING` is never replayed after a later `STILL` transition.
-- Only route string `"88"` may drive the hardcoded `NUMBER_88` output. Any other route must be rejected without a false route-88 signal.
+- Only route string `"88"` with high confidence may drive the hardcoded `NUMBER_88` output. Any other route or confidence must be rejected without a false route-88 signal.
 - ToF sampling stays active in both phases, but proximity output is allowed only in `MOVING`; siren sensing and output remain active in both.
 - The single forward ToF zone must not generate an automatic left/right decision. Existing service tones are a conceptual-channel demonstration only.
 - The first command/activity snapshot after boot or a long outage establishes a baseline without output.

@@ -1,6 +1,6 @@
 # ToF Proximity Reflex Bench Test
 
-**Date:** 2026-07-18  
+**Date:** 2026-07-18
 **Branch:** `feat/tof-proximity-reflex`  
 **Hardware:** Genesis Mini, AX22-0015 VL53L0CX in P2, AX22-0018 passive buzzer in P1
 
@@ -31,3 +31,17 @@
 Keep `VL53L0X_SENSE_LONG_RANGE` as the best-performing profile observed so far. It materially improved useful range, but it is not yet proven at the 1.2 m proximity threshold. The existing validity and debounce rules prevent intermittent returns from producing unsafe output while that gate remains open.
 
 Do not mark the ToF hardware task complete or merge the branch until a large matte target, held perpendicular and centered on the sensor, produces sustained valid readings at 300, 600, and 1,200 mm. Record the three clusters and confirm that the P1 cadence is perceptibly faster at the nearer distances and stops when the target leaves view.
+
+## Unmeasured In-Situ Sweep
+
+**Date:** 2026-07-18
+**Setup:** Board face-up on a table; a white napkin was moved vertically over the sensor by hand. No ruler or fixed target distance was available, so reported millimetres are sensor output rather than independently verified ground truth.
+
+- The napkin produced long consecutive `status=0` sequences while moving through reported ranges from roughly 40 mm to at least 900 mm.
+- The reported range rose and fell monotonically during a slow outward and return sweep.
+- The computed off-gap moved from 120 ms in the near band to about 640 ms near 900 mm.
+- Removing or misaligning the napkin produced three invalid samples and a `PROXIMITY transition=exited`, revoking output as designed.
+- With the napkin removed, the upward-facing sensor produced a sustained cluster around 2.0-2.2 m, plausibly from a room surface. Because that surface was not identified or measured, this is evidence of distant detection only, not accuracy or maximum range.
+- The 2350 Hz proximity proxy was enabled for the return sweep and then stopped with serial `x`. User confirmation of loudness and cadence discriminability remains outstanding.
+
+**Interpretation:** The in-situ run supports using the ToF as a deliberate, single-ray near-field scanning aid and validates relative distance-to-cadence behavior. It does not pass the controlled 300/600/1,200 mm gate, establish outdoor or dark-target performance, validate room mapping, or substantiate the Axiometa 4 m claim.

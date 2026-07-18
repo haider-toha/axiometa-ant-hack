@@ -75,6 +75,12 @@ extension kit**, so component placement is fixed by the board.
 
 The first hardware experiment is complete: the buzzers were audible but produced virtually no tactile movement. They are rejected as haptic actuators. The demo retains them only to simulate two future vibration channels through distinct audible frequencies; see `audit/bus-stop-situational-awareness/05-buzzer-bench-test.md`.
 
+The high-level hardware, firmware, serial-protocol, and laptop-UI migration path
+for replacing P1/P3 with AX22-0039 LRA modules is documented in
+[`docs/lra-motor-upgrade.md`](docs/lra-motor-upgrade.md). The two-driver I2C
+topology must be verified before treating the modules as a drop-in electrical
+replacement.
+
 The current combined ESP32 build is `firmware/braille_wearable` environment
 `board_firmware`. It contains the local ToF and siren paths plus an older
 experimental directionality stub. The current target supersedes that stub:

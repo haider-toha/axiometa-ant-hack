@@ -7,6 +7,7 @@
 // the device's — so it owns the translation and the edge-trigger.
 import { useCallback, useEffect, useRef, useState } from "react";
 import Link from "next/link";
+import { Button } from "@/components/ui/button";
 import {
   detectorToEvent,
   sameEvent,
@@ -168,12 +169,9 @@ export default function CapturePage() {
       <div className="mx-auto flex w-full max-w-xl flex-col gap-4">
         <header className="flex items-center justify-between gap-4">
           <h1 className="text-xl font-medium tracking-tight">Camera</h1>
-          <Link
-            href="/"
-            className="flex h-8 items-center rounded-md border border-border px-3 text-sm font-medium hover:bg-accent"
-          >
+          <Button variant="outline" size="sm" nativeButton={false} render={<Link href="/" />}>
             Monitor
-          </Link>
+          </Button>
         </header>
 
         <div className="relative overflow-hidden rounded-lg border border-border bg-black">
@@ -188,19 +186,13 @@ export default function CapturePage() {
 
         <div className="flex flex-wrap items-center gap-3">
           {!running ? (
-            <button
-              onClick={start}
-              className="flex h-9 items-center rounded-md bg-primary px-4 text-sm font-medium text-primary-foreground hover:opacity-90"
-            >
+            <Button size="sm" onClick={start}>
               Start camera
-            </button>
+            </Button>
           ) : (
-            <button
-              onClick={stop}
-              className="flex h-9 items-center rounded-md border border-border px-4 text-sm font-medium hover:bg-accent"
-            >
+            <Button variant="outline" size="sm" onClick={stop}>
               Stop
-            </button>
+            </Button>
           )}
           <span className="text-sm text-muted-foreground">
             <span className="font-mono tabular-nums text-foreground">{frames}</span> frames

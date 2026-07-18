@@ -5,6 +5,7 @@
 // Without this, the wrist buzz is invisible and judges take it on faith.
 import { useEffect, useRef, useState } from "react";
 import Link from "next/link";
+import { Button } from "@/components/ui/button";
 import type { DebugState } from "@/lib/contract";
 
 const POLL_MS = 500;
@@ -57,12 +58,14 @@ export default function DebugScreen() {
           <h1 className="text-xl font-medium tracking-tight">Relay monitor</h1>
           <div className="flex items-center gap-3">
             <StatusDot online={online} />
-            <Link
-              href="/capture"
-              className="flex h-8 items-center rounded-md border border-border px-3 text-sm font-medium hover:bg-accent"
+            <Button
+              variant="outline"
+              size="sm"
+              nativeButton={false}
+              render={<Link href="/capture" />}
             >
               Open camera
-            </Link>
+            </Button>
           </div>
         </header>
 

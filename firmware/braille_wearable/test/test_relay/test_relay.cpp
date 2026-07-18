@@ -1,0 +1,201 @@
+#include <unity.h>
+
+#include <limits.h>
+#include <string.h>
+
+#include "relay_pure.h"
+
+void setUp(void) {}
+void tearDown(void) {}
+
+static RelayCommand command(uint32_t seq, CloudCommand pattern,
+                            const char* route = "") {
+    RelayCommand result{};
+    result.seq = seq;
+    result.pattern = pattern;
+    copyRelayRoute(result.route, route);
+    return result;
+}
+
+void test_wire_command_parser_accepts_only_six_cloud_patterns(void) {
+    TEST_ASSERT_EQUAL_UINT8(static_cast<uint8_t>(CloudCommand::NONE),
+                            static_cast<uint8_t>(parseCloudCommand("NONE")));
+    TEST_ASSERT_EQUAL_UINT8(static_cast<uint8_t>(CloudCommand::BUS),
+                            static_cast<uint8_t>(parseCloudCommand("BUS")));
+    TEST_ASSERT_EQUAL_UINT8(static_cast<uint8_t>(CloudCommand::NUMBER),
+                            static_cast<uint8_t>(parseCloudCommand("NUMBER")));
+    TEST_ASSERT_EQUAL_UINT8(static_cast<uint8_t>(CloudCommand::WAIT),
+                            static_cast<uint8_t>(parseCloudCommand("WAIT")));
+    TEST_ASSERT_EQUAL_UINT8(static_cast<uint8_t>(CloudCommand::UNKNOWN),
+                            static_cast<uint8_t>(parseCloudCommand("UNKNOWN")));
+    TEST_ASSERT_EQUAL_UINT8(static_cast<uint8_t>(CloudCommand::ERROR),
+                            static_cast<uint8_t>(parseCloudCommand("ERROR")));
+
+    TEST_ASSERT_EQUAL_UINT8(static_cast<uint8_t>(CloudCommand::INVALID),
+                            static_cast<uint8_t>(parseCloudCommand("LEFT")));
+    TEST_ASSERT_EQUAL_UINT8(static_cast<uint8_t>(CloudCommand::INVALID),
+                            static_cast<uint8_t>(parseCloudCommand("RIGHT")));
+    TEST_ASSERT_EQUAL_UINT8(static_cast<uint8_t>(CloudCommand::INVALID),
+                            static_cast<uint8_t>(parseCloudCommand("AHEAD")));
+    TEST_ASSERT_EQUAL_UINT8(static_cast<uint8_t>(CloudCommand::INVALID),
+                            static_cast<uint8_t>(parseCloudCommand("BUS ")));
+    TEST_ASSERT_EQUAL_UINT8(static_cast<uint8_t>(CloudCommand::INVALID),
+                            static_cast<uint8_t>(parseCloudCommand(nullptr)));
+}
+
+void test_activity_parser_is_closed_for_missing_or_invalid_values(void) {
+    TEST_ASSERT_EQUAL_UINT8(static_cast<uint8_t>(UserActivity::MOVING),
+                            static_cast<uint8_t>(parseUserActivity("MOVING")));
+    TEST_ASSERT_EQUAL_UINT8(static_cast<uint8_t>(UserActivity::STILL),
+                            static_cast<uint8_t>(parseUserActivity("STILL")));
+    TEST_ASSERT_EQUAL_UINT8(static_cast<uint8_t>(UserActivity::UNKNOWN),
+                            static_cast<uint8_t>(parseUserActivity("WAITING")));
+    TEST_ASSERT_EQUAL_UINT8(static_cast<uint8_t>(UserActivity::UNKNOWN),
+                            static_cast<uint8_t>(parseUserActivity(nullptr)));
+}
+
+void test_route_copy_is_bounded_and_only_exact_88_is_expected(void) {
+    char route[8] = {};
+    copyRelayRoute(route, "1234567890");
+    TEST_ASSERT_EQUAL_STRING("1234567", route);
+    TEST_ASSERT_TRUE(isExpectedRoute("88"));
+    TEST_ASSERT_FALSE(isExpectedRoute("088"));
+    TEST_ASSERT_FALSE(isExpectedRoute("87"));
+    TEST_ASSERT_FALSE(isExpectedRoute(""));
+    TEST_ASSERT_FALSE(isExpectedRoute(nullptr));
+}
+
+void test_first_command_is_a_non_rendering_baseline(void) {
+    RelaySequenceState state{};
+    const RelayDecision decision =
+        consumeRelayCommand(state, command(20, CloudCommand::BUS), UserActivity::STILL);
+    TEST_ASSERT_EQUAL_UINT8(static_cast<uint8_t>(RelayDisposition::BASELINE),
+                            static_cast<uint8_t>(decision.disposition));
+    TEST_ASSERT_EQUAL_UINT32(20, state.lastSeq);
+    TEST_ASSERT_FALSE(decision.sequenceGap);
+}
+
+void test_moving_consumes_bus_information_without_render_or_replay(void) {
+    RelaySequenceState state{};
+    consumeRelayCommand(state, command(20, CloudCommand::NONE), UserActivity::MOVING);
+
+    const RelayDecision moving =
+        consumeRelayCommand(state, command(21, CloudCommand::BUS), UserActivity::MOVING);
+    TEST_ASSERT_EQUAL_UINT8(static_cast<uint8_t>(RelayDisposition::SUPPRESS),
+                            static_cast<uint8_t>(moving.disposition));
+    TEST_ASSERT_EQUAL_UINT32(21, state.lastSeq);
+
+    const RelayDecision afterTransition =
+        consumeRelayCommand(state, command(21, CloudCommand::BUS), UserActivity::STILL);
+    TEST_ASSERT_EQUAL_UINT8(static_cast<uint8_t>(RelayDisposition::UNCHANGED),
+                            static_cast<uint8_t>(afterTransition.disposition));
+}
+
+void test_still_accepts_fresh_bus_information_and_error_is_global(void) {
+    RelaySequenceState state{};
+    consumeRelayCommand(state, command(20, CloudCommand::NONE), UserActivity::MOVING);
+
+    TEST_ASSERT_EQUAL_UINT8(
+        static_cast<uint8_t>(RelayDisposition::ACCEPT),
+        static_cast<uint8_t>(consumeRelayCommand(
+            state, command(21, CloudCommand::NUMBER, "88"), UserActivity::STILL).disposition));
+    TEST_ASSERT_EQUAL_UINT8(
+        static_cast<uint8_t>(RelayDisposition::ACCEPT),
+        static_cast<uint8_t>(consumeRelayCommand(
+            state, command(22, CloudCommand::ERROR), UserActivity::MOVING).disposition));
+}
+
+void test_wrong_route_is_consumed_without_false_route_88_output(void) {
+    RelaySequenceState state{};
+    consumeRelayCommand(state, command(20, CloudCommand::NONE), UserActivity::STILL);
+
+    const RelayDecision mismatch = consumeRelayCommand(
+        state, command(21, CloudCommand::NUMBER, "87"), UserActivity::STILL);
+    TEST_ASSERT_EQUAL_UINT8(static_cast<uint8_t>(RelayDisposition::ROUTE_MISMATCH),
+                            static_cast<uint8_t>(mismatch.disposition));
+    TEST_ASSERT_EQUAL_UINT32(21, state.lastSeq);
+    TEST_ASSERT_EQUAL_UINT8(
+        static_cast<uint8_t>(RelayDisposition::UNCHANGED),
+        static_cast<uint8_t>(consumeRelayCommand(
+            state, command(21, CloudCommand::NUMBER, "88"), UserActivity::STILL).disposition));
+}
+
+void test_duplicate_regressed_invalid_and_none_edges_do_not_render(void) {
+    RelaySequenceState state{};
+    consumeRelayCommand(state, command(20, CloudCommand::NONE), UserActivity::STILL);
+
+    TEST_ASSERT_EQUAL_UINT8(
+        static_cast<uint8_t>(RelayDisposition::UNCHANGED),
+        static_cast<uint8_t>(consumeRelayCommand(
+            state, command(20, CloudCommand::BUS), UserActivity::STILL).disposition));
+    TEST_ASSERT_EQUAL_UINT8(
+        static_cast<uint8_t>(RelayDisposition::UNCHANGED),
+        static_cast<uint8_t>(consumeRelayCommand(
+            state, command(19, CloudCommand::BUS), UserActivity::STILL).disposition));
+    TEST_ASSERT_EQUAL_UINT8(
+        static_cast<uint8_t>(RelayDisposition::REJECT),
+        static_cast<uint8_t>(consumeRelayCommand(
+            state, command(21, CloudCommand::INVALID), UserActivity::STILL).disposition));
+    TEST_ASSERT_EQUAL_UINT8(
+        static_cast<uint8_t>(RelayDisposition::NO_OUTPUT),
+        static_cast<uint8_t>(consumeRelayCommand(
+            state, command(22, CloudCommand::NONE), UserActivity::STILL).disposition));
+}
+
+void test_sequence_gap_is_reported_but_new_edge_is_consumed(void) {
+    RelaySequenceState state{};
+    consumeRelayCommand(state, command(20, CloudCommand::NONE), UserActivity::STILL);
+    const RelayDecision decision =
+        consumeRelayCommand(state, command(24, CloudCommand::BUS), UserActivity::STILL);
+    TEST_ASSERT_TRUE(decision.sequenceGap);
+    TEST_ASSERT_EQUAL_UINT32(3, decision.missedCount);
+    TEST_ASSERT_EQUAL_UINT32(24, state.lastSeq);
+}
+
+void test_activity_policy_uses_moving_fallback_and_manual_override(void) {
+    ActivityControlState state{};
+    TEST_ASSERT_EQUAL_UINT8(static_cast<uint8_t>(UserActivity::MOVING),
+                            static_cast<uint8_t>(effectiveActivity(state, 1000)));
+
+    applyCloudActivity(state, UserActivity::STILL, 1000);
+    TEST_ASSERT_EQUAL_UINT8(static_cast<uint8_t>(UserActivity::STILL),
+                            static_cast<uint8_t>(effectiveActivity(state, 1001)));
+    TEST_ASSERT_EQUAL_UINT8(static_cast<uint8_t>(UserActivity::MOVING),
+                            static_cast<uint8_t>(effectiveActivity(
+                                state, 1000 + CLOUD_ACTIVITY_LEASE_MS + 1)));
+
+    setServiceActivity(state, UserActivity::STILL);
+    TEST_ASSERT_EQUAL_UINT8(static_cast<uint8_t>(UserActivity::STILL),
+                            static_cast<uint8_t>(effectiveActivity(
+                                state, 1000 + CLOUD_ACTIVITY_LEASE_MS + 1)));
+    clearServiceActivity(state);
+    TEST_ASSERT_EQUAL_UINT8(static_cast<uint8_t>(UserActivity::MOVING),
+                            static_cast<uint8_t>(effectiveActivity(
+                                state, 1000 + CLOUD_ACTIVITY_LEASE_MS + 1)));
+}
+
+void test_activity_lease_and_tof_policy_are_millis_wrap_safe(void) {
+    ActivityControlState state{};
+    applyCloudActivity(state, UserActivity::STILL, UINT32_MAX - 10);
+    TEST_ASSERT_EQUAL_UINT8(static_cast<uint8_t>(UserActivity::STILL),
+                            static_cast<uint8_t>(effectiveActivity(state, 20)));
+    TEST_ASSERT_FALSE(allowsProximityOutput(UserActivity::STILL));
+    TEST_ASSERT_TRUE(allowsProximityOutput(UserActivity::MOVING));
+    TEST_ASSERT_FALSE(allowsProximityOutput(UserActivity::UNKNOWN));
+}
+
+int main(int, char**) {
+    UNITY_BEGIN();
+    RUN_TEST(test_wire_command_parser_accepts_only_six_cloud_patterns);
+    RUN_TEST(test_activity_parser_is_closed_for_missing_or_invalid_values);
+    RUN_TEST(test_route_copy_is_bounded_and_only_exact_88_is_expected);
+    RUN_TEST(test_first_command_is_a_non_rendering_baseline);
+    RUN_TEST(test_moving_consumes_bus_information_without_render_or_replay);
+    RUN_TEST(test_still_accepts_fresh_bus_information_and_error_is_global);
+    RUN_TEST(test_wrong_route_is_consumed_without_false_route_88_output);
+    RUN_TEST(test_duplicate_regressed_invalid_and_none_edges_do_not_render);
+    RUN_TEST(test_sequence_gap_is_reported_but_new_edge_is_consumed);
+    RUN_TEST(test_activity_policy_uses_moving_fallback_and_manual_override);
+    RUN_TEST(test_activity_lease_and_tof_policy_are_millis_wrap_safe);
+    return UNITY_END();
+}

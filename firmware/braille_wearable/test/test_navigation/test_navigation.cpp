@@ -13,42 +13,29 @@ static void assertStep(const OutputStep& step, uint16_t p1Hz,
     TEST_ASSERT_EQUAL_UINT16(durationMs, step.durationMs);
 }
 
-void test_all_board_mode_and_command_combinations(void) {
+void test_all_activity_and_relay_command_combinations(void) {
     const CloudCommand commands[] = {
         CloudCommand::NONE, CloudCommand::BUS, CloudCommand::NUMBER,
         CloudCommand::WAIT, CloudCommand::UNKNOWN, CloudCommand::ERROR,
-        CloudCommand::LEFT, CloudCommand::RIGHT, CloudCommand::AHEAD,
+        CloudCommand::INVALID,
     };
-    const bool stillAccepted[] = {true, true, true, true, true, true, false, false, false};
-    const bool movingAccepted[] = {true, false, false, false, false, true, true, true, true};
+    const bool stillAccepted[] = {true, true, true, true, true, true, false};
+    const bool movingAccepted[] = {true, false, false, false, false, true, false};
 
     for (uint8_t index = 0; index < sizeof(commands) / sizeof(commands[0]); ++index) {
-        TEST_ASSERT_EQUAL_INT(stillAccepted[index], acceptsCloudCommand(BoardMode::WAITING, commands[index]));
-        TEST_ASSERT_EQUAL_INT(movingAccepted[index], acceptsCloudCommand(BoardMode::NAVIGATION, commands[index]));
+        TEST_ASSERT_EQUAL_INT(stillAccepted[index], acceptsRelayCommand(UserActivity::STILL, commands[index]));
+        TEST_ASSERT_EQUAL_INT(movingAccepted[index], acceptsRelayCommand(UserActivity::MOVING, commands[index]));
     }
 }
 
-void test_phone_activity_maps_to_explicit_board_modes(void) {
-    const CloudCommand commands[] = {
-        CloudCommand::NONE, CloudCommand::BUS, CloudCommand::NUMBER,
-        CloudCommand::WAIT, CloudCommand::UNKNOWN, CloudCommand::ERROR,
-        CloudCommand::LEFT, CloudCommand::RIGHT, CloudCommand::AHEAD,
-    };
-
-    TEST_ASSERT_EQUAL_UINT8(static_cast<uint8_t>(BoardMode::WAITING),
-                            static_cast<uint8_t>(boardModeFor(UserActivity::STILL)));
-    TEST_ASSERT_EQUAL_UINT8(static_cast<uint8_t>(BoardMode::NAVIGATION),
-                            static_cast<uint8_t>(boardModeFor(UserActivity::MOVING)));
-    TEST_ASSERT_EQUAL_UINT8(static_cast<uint8_t>(BoardMode::WAITING),
-                            static_cast<uint8_t>(boardModeFor(UserActivity::UNKNOWN)));
-    for (uint8_t index = 0; index < sizeof(commands) / sizeof(commands[0]); ++index) {
-        TEST_ASSERT_EQUAL_INT(acceptsCloudCommand(BoardMode::WAITING, commands[index]),
-                              acceptsCloudCommand(boardModeFor(UserActivity::UNKNOWN), commands[index]));
-    }
+void test_unknown_activity_keeps_bus_gate_closed(void) {
+    TEST_ASSERT_FALSE(acceptsRelayCommand(UserActivity::UNKNOWN, CloudCommand::BUS));
+    TEST_ASSERT_FALSE(acceptsRelayCommand(UserActivity::UNKNOWN, CloudCommand::NUMBER));
+    TEST_ASSERT_TRUE(acceptsRelayCommand(UserActivity::UNKNOWN, CloudCommand::ERROR));
 }
 
 void test_left_audio_pattern_is_exact(void) {
-    const OutputPattern* pattern = navigationPattern(CloudCommand::LEFT);
+    const OutputPattern* pattern = serviceDirectionPattern(ServiceDirection::LEFT);
     TEST_ASSERT_NOT_NULL(pattern);
     TEST_ASSERT_EQUAL_UINT8(4, pattern->stepCount);
     assertStep(pattern->steps[0], 2350, 0, 200);
@@ -59,7 +46,7 @@ void test_left_audio_pattern_is_exact(void) {
 }
 
 void test_right_audio_pattern_is_exact(void) {
-    const OutputPattern* pattern = navigationPattern(CloudCommand::RIGHT);
+    const OutputPattern* pattern = serviceDirectionPattern(ServiceDirection::RIGHT);
     TEST_ASSERT_NOT_NULL(pattern);
     TEST_ASSERT_EQUAL_UINT8(4, pattern->stepCount);
     assertStep(pattern->steps[0], 0, 3050, 200);
@@ -70,7 +57,7 @@ void test_right_audio_pattern_is_exact(void) {
 }
 
 void test_ahead_audio_pattern_is_exact(void) {
-    const OutputPattern* pattern = navigationPattern(CloudCommand::AHEAD);
+    const OutputPattern* pattern = serviceDirectionPattern(ServiceDirection::AHEAD);
     TEST_ASSERT_NOT_NULL(pattern);
     TEST_ASSERT_EQUAL_UINT8(3, pattern->stepCount);
     assertStep(pattern->steps[0], 2350, 3050, 400);
@@ -80,12 +67,9 @@ void test_ahead_audio_pattern_is_exact(void) {
 }
 
 void test_non_navigation_commands_have_no_audio_pattern(void) {
-    TEST_ASSERT_NULL(navigationPattern(CloudCommand::NONE));
-    TEST_ASSERT_NULL(navigationPattern(CloudCommand::BUS));
-    TEST_ASSERT_NULL(navigationPattern(CloudCommand::NUMBER));
-    TEST_ASSERT_NULL(navigationPattern(CloudCommand::WAIT));
-    TEST_ASSERT_NULL(navigationPattern(CloudCommand::UNKNOWN));
-    TEST_ASSERT_NULL(navigationPattern(CloudCommand::ERROR));
+    TEST_ASSERT_NOT_NULL(serviceDirectionPattern(ServiceDirection::LEFT));
+    TEST_ASSERT_NOT_NULL(serviceDirectionPattern(ServiceDirection::RIGHT));
+    TEST_ASSERT_NOT_NULL(serviceDirectionPattern(ServiceDirection::AHEAD));
 }
 
 void test_implemented_cloud_commands_map_to_canonical_patterns(void) {
@@ -94,10 +78,8 @@ void test_implemented_cloud_commands_map_to_canonical_patterns(void) {
     TEST_ASSERT_EQUAL_PTR(&WAIT_PATTERN, cloudPattern(CloudCommand::WAIT));
     TEST_ASSERT_EQUAL_PTR(&UNKNOWN_PATTERN, cloudPattern(CloudCommand::UNKNOWN));
     TEST_ASSERT_EQUAL_PTR(&ERROR_PATTERN, cloudPattern(CloudCommand::ERROR));
-    TEST_ASSERT_EQUAL_PTR(&LEFT_PATTERN, cloudPattern(CloudCommand::LEFT));
-    TEST_ASSERT_EQUAL_PTR(&RIGHT_PATTERN, cloudPattern(CloudCommand::RIGHT));
-    TEST_ASSERT_EQUAL_PTR(&AHEAD_PATTERN, cloudPattern(CloudCommand::AHEAD));
     TEST_ASSERT_NULL(cloudPattern(CloudCommand::NONE));
+    TEST_ASSERT_NULL(cloudPattern(CloudCommand::INVALID));
 }
 
 void test_wait_and_waiting_mode_payload_durations_match_plan(void) {
@@ -140,8 +122,8 @@ void test_waiting_mode_waveforms_keep_the_locked_audio_contrasts(void) {
 
 int main(int, char**) {
     UNITY_BEGIN();
-    RUN_TEST(test_all_board_mode_and_command_combinations);
-    RUN_TEST(test_phone_activity_maps_to_explicit_board_modes);
+    RUN_TEST(test_all_activity_and_relay_command_combinations);
+    RUN_TEST(test_unknown_activity_keeps_bus_gate_closed);
     RUN_TEST(test_left_audio_pattern_is_exact);
     RUN_TEST(test_right_audio_pattern_is_exact);
     RUN_TEST(test_ahead_audio_pattern_is_exact);

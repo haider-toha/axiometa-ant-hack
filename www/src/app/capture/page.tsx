@@ -165,7 +165,7 @@ export default function CapturePage() {
   useEffect(() => () => stop(), [stop]);
 
   return (
-    <main className="min-h-full flex-1 bg-background px-6 py-8 font-sans text-foreground">
+    <main className="flex-1 bg-background px-6 py-8 font-sans text-foreground">
       <div className="mx-auto flex w-full max-w-xl flex-col gap-4">
         <header className="flex items-center justify-between gap-4">
           <h1 className="text-xl font-medium tracking-tight">Camera</h1>

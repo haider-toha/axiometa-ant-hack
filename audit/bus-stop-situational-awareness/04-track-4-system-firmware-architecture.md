@@ -123,7 +123,7 @@ problem in this system — Claude's generation time is.
                                      │ HTTPS POST /api/event {"pattern":"BUS",…}
                                      ▼
 ┌─────────────────────────────────────────────────────────────────────────────────┐
-│ VERCEL   app-eight-lyart-98.vercel.app        ┌────────────────────────────┐    │
+│ VERCEL   bus-stop-awareness.vercel.app        ┌────────────────────────────┐    │
 │   POST /api/event  ─ MSET payload → INCR seq ─▶│ UPSTASH REDIS              │    │
 │   POST /api/pull   ◀─ MGET ────────────────────│  seq · pattern · route     │    │
 │   GET  /api/state  ◀─ MGET  (debug screen) ────│  conf · arrivalId · tlm    │    │
@@ -1245,7 +1245,7 @@ Stated for completeness; the hardware support is confirmed, so this should not a
 | `app/components/SpeakButton` · `SuggestionCards` · `History` | **DELETE** | All three are speech/reply-loop UI. |
 | `app/page.tsx` | **ADAPTABLE — ~15 % survives** | The demo needs a **debug/companion screen**, because the actual output is invisible to an audience. What survives: the **poll-with-in-flight-guard** idiom (:336-359, `pullInFlightRef`) — genuinely valuable, it prevents request pile-up when the network stalls; the `useEffect` + `setInterval` + cleanup shape (:376-382); the interval constants (:33-34). **Everything else goes** — MediaRecorder (:172-238), the STT/condense/push pipeline (:85-148), TTS playback (:300-319), reply handling (:268-325). The new page renders §Contract D: detector state + bbox confidence, Claude's raw JSON with all three votes, the live FFT signature (band RMS, peak Hz, modulation index, trend), and the currently-playing haptic pattern. |
 | `app/package.json` | **ADAPTABLE** | Keep `next` 16.2.10, `react` 19.2.4, `@upstash/redis` ^1.38.0, `vitest` ^4.1.10. **Remove `@anthropic-ai/sdk`** — Claude moves to Modal's Python. |
-| `app/.env.example` · Vercel project link | **DIRECTLY REUSABLE** | Project `haider-projects/app`, stable alias `app-eight-lyart-98.vercel.app`, `UPSTASH_*` already set at Production scope. **`ELEVENLABS_API_KEY` and `ANTHROPIC_API_KEY` can be removed from Vercel** once the six routes are deleted. |
+| `www/.env.example` · Vercel project link | **IN USE** | Project `haider-projects/bus-stop-awareness`, stable alias `bus-stop-awareness.vercel.app`, `UPSTASH_*` at Production scope. The legacy `app-eight-lyart-98.vercel.app` speech app is retired. |
 
 ---
 
@@ -1305,7 +1305,7 @@ The existing pattern is correct and should be carried over unchanged. `.gitignor
 // firmware/braille_wearable/src/secrets.h   — git-ignored; fill in and flash
 #define WIFI_SSID   "your-hotspot-ssid"
 #define WIFI_PASS   "your-hotspot-password"
-#define VERCEL_HOST "app-eight-lyart-98.vercel.app"   // bare host: no scheme, no trailing slash
+#define VERCEL_HOST "bus-stop-awareness.vercel.app"   // bare host: no scheme, no trailing slash
 ```
 
 `net.cpp:42` prepends `https://` and appends the path — do not put a scheme in the constant.
@@ -1339,7 +1339,7 @@ consequence of choosing the Vercel relay:
 
 ```bash
 export MODAL_URL="https://haider--bus-vision-ingest.modal.run"
-export RELAY_URL="https://app-eight-lyart-98.vercel.app"
+export RELAY_URL="https://bus-stop-awareness.vercel.app"
 python bus_client.py
 ```
 
@@ -1467,7 +1467,7 @@ touching digit timing, exactly as Track 3's R12 advises.
 | The "datasheet" is an **LCSC HTML page**, not a PDF | `parts/…/files/AX22-0013-datasheet.pdf` (`file(1)` → `HTML document text`) |
 | Prior audit's incorrect pin claim: *"Data line is pin 3/GPIO4"* | `audit/speech-to-braille-wearable/03-track-3-parts-truth.md:311,330` |
 | *"Firmware is compile-verified only — no physical board attached … Motor/LCD/WiFi runtime behavior is untested"* | `audit/speech-to-braille-wearable/33-phase5-deploy-smoke.md` §5 |
-| Live relay smoke test green; stable alias `app-eight-lyart-98.vercel.app` | `audit/…/33-phase5-deploy-smoke.md` §1–2 |
+| Live relay at `bus-stop-awareness.vercel.app` | Production deploy of `www/` |
 | Motor separation **33.9 mm**, HIGH confidence | `audit/speech-to-braille-wearable/20-enclosure-cad-consolidated.md:19` |
 | Arduino 3.x platform **not cached** (only `espressif32`, `native`) | `~/.platformio/platforms/` |
 

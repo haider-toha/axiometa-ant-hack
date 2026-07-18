@@ -241,14 +241,18 @@ def _bake_detector() -> None:
     into the checkpoint, after which the saved .pt "behaves like any other
     pretrained YOLOv8 model" (Ultralytics docs).
 
-    `yolov8s-world.pt`, not `-m`. The prop is a frame-filling A3
-    print or tablet at 1.0–1.5 m; `s` already has far more capacity than that
-    needs and `m` costs ~2.5× the parameters for no measurable gain.
+    `yolov8s-worldv2.pt`, not `-m` and not the plain (v1) `-world`. The prop is
+    a frame-filling A3 print or tablet at 1.0–1.5 m; `s` already has far more
+    capacity than that needs and `m` costs ~2.5× the parameters for no
+    measurable gain. `v2` over v1 is a same-API, same-download-mechanism swap:
+    Ultralytics' own benchmarks put v2 slightly ahead on both mAP and mAP50
+    (37.4→37.7, 52.0→52.2) and v2 is the only variant that also supports
+    export, so there is no reason left to bake the older v1 checkpoint.
     """
     from ultralytics import YOLO
 
     vocab = _vocab()
-    m = YOLO("yolov8s-world.pt")  # auto-downloads from ultralytics/assets
+    m = YOLO("yolov8s-worldv2.pt")  # auto-downloads from ultralytics/assets
     m.set_classes(vocab)
     m.save(BAKED_WEIGHTS)
     print(f"[bake] {len(vocab)} classes baked, e.g. {vocab[:3]} … {vocab[-3:]}")

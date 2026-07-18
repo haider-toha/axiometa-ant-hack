@@ -377,11 +377,17 @@ void serviceRelay(uint32_t nowMs) {
             Serial.println(F("RELAY command=baseline_reset reason=long_outage"));
         }
         if (update.hasActivity) {
-            applyCloudActivity(activityControl, update.activity, nowMs);
-            Serial.printf("RELAY activity=%s seq=%lu override=%u\n",
-                          userActivityName(update.activity),
-                          static_cast<unsigned long>(update.activitySeq),
-                          activityControl.serviceOverride ? 1 : 0);
+            if (update.activity == UserActivity::UNKNOWN) {
+                invalidateCloudActivity(activityControl);
+                Serial.printf("RELAY activity=invalidated override=%u\n",
+                              activityControl.serviceOverride ? 1 : 0);
+            } else {
+                applyCloudActivity(activityControl, update.activity, nowMs);
+                Serial.printf("RELAY activity=%s seq=%lu override=%u\n",
+                              userActivityName(update.activity),
+                              static_cast<unsigned long>(update.activitySeq),
+                              activityControl.serviceOverride ? 1 : 0);
+            }
             refreshEffectiveActivity(nowMs, "relay");
         }
         if (!update.hasCommand) {

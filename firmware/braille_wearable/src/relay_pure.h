@@ -66,6 +66,26 @@ struct ActivityControlState {
     UserActivity serviceActivity = UserActivity::MOVING;
 };
 
+enum class ActivityWireDisposition : uint8_t {
+    NO_CHANGE = 0,
+    BASELINE,
+    APPLY,
+    INVALIDATE,
+};
+
+struct ActivityWireState {
+    bool observed = false;
+    bool authorized = false;
+    UserActivity activity = UserActivity::UNKNOWN;
+    uint32_t seq = 0;
+    int64_t serverTs = 0;
+};
+
+struct ActivityWireDecision {
+    ActivityWireDisposition disposition = ActivityWireDisposition::NO_CHANGE;
+    UserActivity activity = UserActivity::UNKNOWN;
+};
+
 inline CloudCommand parseCloudCommand(const char* value) {
     if (value == nullptr) return CloudCommand::INVALID;
     if (strcmp(value, "NONE") == 0) return CloudCommand::NONE;
@@ -177,12 +197,61 @@ inline RelayDecision consumeRelayCommand(RelaySequenceState& state,
     return decision;
 }
 
+inline ActivityWireDecision observeActivitySnapshot(
+    ActivityWireState& state,
+    bool fieldsComplete,
+    UserActivity activity,
+    uint32_t seq,
+    int64_t serverTs) {
+    const bool valid = fieldsComplete && activity != UserActivity::UNKNOWN &&
+                       serverTs > 0;
+    if (!valid) {
+        const bool mustInvalidate = state.observed;
+        state = ActivityWireState{};
+        return {mustInvalidate ? ActivityWireDisposition::INVALIDATE
+                               : ActivityWireDisposition::NO_CHANGE,
+                UserActivity::UNKNOWN};
+    }
+
+    if (!state.observed) {
+        state = {true, false, activity, seq, serverTs};
+        return {ActivityWireDisposition::BASELINE, UserActivity::UNKNOWN};
+    }
+
+    const bool regressed = seq < state.seq || serverTs < state.serverTs;
+    const bool changedWithoutSequence = seq == state.seq &&
+                                        activity != state.activity;
+    if (regressed || changedWithoutSequence) {
+        state = ActivityWireState{};
+        return {ActivityWireDisposition::INVALIDATE, UserActivity::UNKNOWN};
+    }
+
+    if (seq == state.seq && serverTs == state.serverTs) {
+        return {ActivityWireDisposition::NO_CHANGE, UserActivity::UNKNOWN};
+    }
+
+    if (seq == state.seq) {
+        state.serverTs = serverTs;
+        return {state.authorized ? ActivityWireDisposition::APPLY
+                                 : ActivityWireDisposition::NO_CHANGE,
+                state.authorized ? activity : UserActivity::UNKNOWN};
+    }
+
+    state = {true, true, activity, seq, serverTs};
+    return {ActivityWireDisposition::APPLY, activity};
+}
+
 inline void applyCloudActivity(ActivityControlState& state,
                                UserActivity activity,
                                uint32_t nowMs) {
     if (activity == UserActivity::UNKNOWN) return;
     state.cloudActivity = activity;
     state.cloudUpdatedMs = nowMs;
+}
+
+inline void invalidateCloudActivity(ActivityControlState& state) {
+    state.cloudActivity = UserActivity::UNKNOWN;
+    state.cloudUpdatedMs = 0;
 }
 
 inline void setServiceActivity(ActivityControlState& state,

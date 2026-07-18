@@ -203,6 +203,81 @@ void test_activity_policy_uses_moving_fallback_and_manual_override(void) {
                                 state, 1000 + CLOUD_ACTIVITY_LEASE_MS + 1)));
 }
 
+void test_missing_activity_snapshot_revokes_still_before_next_command(void) {
+    ActivityWireState wire{};
+    ActivityControlState control{};
+    RelaySequenceState sequence{};
+
+    TEST_ASSERT_EQUAL_UINT8(
+        static_cast<uint8_t>(ActivityWireDisposition::BASELINE),
+        static_cast<uint8_t>(observeActivitySnapshot(
+            wire, true, UserActivity::MOVING, 1, 1000).disposition));
+
+    const ActivityWireDecision still = observeActivitySnapshot(
+        wire, true, UserActivity::STILL, 2, 2000);
+    TEST_ASSERT_EQUAL_UINT8(
+        static_cast<uint8_t>(ActivityWireDisposition::APPLY),
+        static_cast<uint8_t>(still.disposition));
+    applyCloudActivity(control, still.activity, 100);
+    TEST_ASSERT_EQUAL_UINT8(static_cast<uint8_t>(UserActivity::STILL),
+                            static_cast<uint8_t>(effectiveActivity(control, 101)));
+
+    const ActivityWireDecision missing = observeActivitySnapshot(
+        wire, false, UserActivity::UNKNOWN, 0, 0);
+    TEST_ASSERT_EQUAL_UINT8(
+        static_cast<uint8_t>(ActivityWireDisposition::INVALIDATE),
+        static_cast<uint8_t>(missing.disposition));
+    invalidateCloudActivity(control);
+    TEST_ASSERT_EQUAL_UINT8(static_cast<uint8_t>(UserActivity::MOVING),
+                            static_cast<uint8_t>(effectiveActivity(control, 102)));
+
+    consumeRelayCommand(sequence, command(20, CloudCommand::NONE),
+                        UserActivity::MOVING);
+    TEST_ASSERT_EQUAL_UINT8(
+        static_cast<uint8_t>(RelayDisposition::SUPPRESS),
+        static_cast<uint8_t>(consumeRelayCommand(
+            sequence, command(21, CloudCommand::BUS),
+            effectiveActivity(control, 102)).disposition));
+}
+
+void test_activity_heartbeat_refreshes_lease_without_changing_sequence(void) {
+    ActivityWireState wire{};
+    ActivityControlState control{};
+    observeActivitySnapshot(wire, true, UserActivity::MOVING, 1, 1000);
+    const ActivityWireDecision still = observeActivitySnapshot(
+        wire, true, UserActivity::STILL, 2, 2000);
+    applyCloudActivity(control, still.activity, 100);
+
+    const ActivityWireDecision heartbeat = observeActivitySnapshot(
+        wire, true, UserActivity::STILL, 2, 3000);
+    TEST_ASSERT_EQUAL_UINT8(
+        static_cast<uint8_t>(ActivityWireDisposition::APPLY),
+        static_cast<uint8_t>(heartbeat.disposition));
+    applyCloudActivity(control, heartbeat.activity,
+                       100 + CLOUD_ACTIVITY_LEASE_MS);
+    TEST_ASSERT_EQUAL_UINT8(
+        static_cast<uint8_t>(UserActivity::STILL),
+        static_cast<uint8_t>(effectiveActivity(
+            control, 100 + CLOUD_ACTIVITY_LEASE_MS + 1)));
+
+    TEST_ASSERT_EQUAL_UINT8(
+        static_cast<uint8_t>(ActivityWireDisposition::NO_CHANGE),
+        static_cast<uint8_t>(observeActivitySnapshot(
+            wire, true, UserActivity::STILL, 2, 3000).disposition));
+}
+
+void test_baseline_heartbeat_does_not_open_still_gate(void) {
+    ActivityWireState wire{};
+    TEST_ASSERT_EQUAL_UINT8(
+        static_cast<uint8_t>(ActivityWireDisposition::BASELINE),
+        static_cast<uint8_t>(observeActivitySnapshot(
+            wire, true, UserActivity::STILL, 4, 1000).disposition));
+    TEST_ASSERT_EQUAL_UINT8(
+        static_cast<uint8_t>(ActivityWireDisposition::NO_CHANGE),
+        static_cast<uint8_t>(observeActivitySnapshot(
+            wire, true, UserActivity::STILL, 4, 2000).disposition));
+}
+
 void test_activity_lease_and_tof_policy_are_millis_wrap_safe(void) {
     ActivityControlState state{};
     applyCloudActivity(state, UserActivity::STILL, UINT32_MAX - 10);
@@ -241,6 +316,9 @@ int main(int, char**) {
     RUN_TEST(test_duplicate_regressed_invalid_and_none_edges_do_not_render);
     RUN_TEST(test_sequence_gap_is_reported_but_new_edge_is_consumed);
     RUN_TEST(test_activity_policy_uses_moving_fallback_and_manual_override);
+    RUN_TEST(test_missing_activity_snapshot_revokes_still_before_next_command);
+    RUN_TEST(test_activity_heartbeat_refreshes_lease_without_changing_sequence);
+    RUN_TEST(test_baseline_heartbeat_does_not_open_still_gate);
     RUN_TEST(test_activity_lease_and_tof_policy_are_millis_wrap_safe);
     RUN_TEST(test_entering_still_clears_rendered_proximity_but_moving_does_not);
     return UNITY_END();

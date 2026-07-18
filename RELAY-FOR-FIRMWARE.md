@@ -52,7 +52,7 @@ curl -fsS https://bus-stop-awareness.vercel.app/api/pull
 }
 ```
 
-The currently deployed response may omit all three activity fields. Firmware continues parsing commands but keeps the bus-information gate closed unless service Serial has explicitly selected `STILL`. The first valid activity snapshot establishes a non-rendering baseline; the phone/operator must then produce a fresh transition. A received transition has a 120-second demo lease, after which the board falls back to `MOVING` unless another transition or service override refreshes control.
+The currently deployed response may omit all three activity fields. Firmware continues parsing commands but keeps the bus-information gate closed unless service Serial has explicitly selected `STILL`. The first complete, valid activity snapshot establishes a non-rendering baseline; the phone/operator must then produce a fresh transition. All three fields are required together. Missing or invalid activity data immediately revokes prior cloud `STILL` authority. A newer `activityTs` with the same `activitySeq` is a heartbeat that refreshes the 120-second demo lease without touching command state; an unchanged timestamp does not refresh it, so stale activity falls back to `MOVING`.
 
 ### Field → firmware struct
 

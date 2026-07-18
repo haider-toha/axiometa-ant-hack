@@ -28,8 +28,7 @@ char pullUrl[160] = {};
 
 bool commandObserved = false;
 uint32_t lastQueuedCommandSeq = 0;
-bool activityObserved = false;
-uint32_t lastActivitySeq = 0;
+ActivityWireState activityWireState;
 
 bool enqueueUpdate(const RelayUpdate& update) {
     if (xQueueSend(updateQueue, &update, 0) == pdTRUE) {
@@ -43,8 +42,7 @@ bool enqueueUpdate(const RelayUpdate& update) {
 void resetWireBaselines() {
     commandObserved = false;
     lastQueuedCommandSeq = 0;
-    activityObserved = false;
-    lastActivitySeq = 0;
+    activityWireState = ActivityWireState{};
 }
 
 bool joinHotspot(uint8_t& backoffIndex) {
@@ -138,25 +136,36 @@ bool parseResponse(RelayUpdate& update) {
         lastQueuedCommandSeq = seq;
     }
 
-    if (responseDocument["activity"].is<const char*>() &&
-        responseDocument["activitySeq"].is<uint32_t>()) {
-        const UserActivity activity =
-            parseUserActivity(responseDocument["activity"].as<const char*>());
-        const uint32_t activitySeq = responseDocument["activitySeq"].as<uint32_t>();
-        if (activity != UserActivity::UNKNOWN) {
-            if (!activityObserved) {
-                activityObserved = true;
-                lastActivitySeq = activitySeq;
-                Serial.printf("RELAY activity=baseline seq=%lu value=%s\n",
-                              static_cast<unsigned long>(activitySeq),
-                              userActivityName(activity));
-            } else if (activitySeq > lastActivitySeq) {
-                update.hasActivity = true;
-                update.activity = activity;
-                update.activitySeq = activitySeq;
-                lastActivitySeq = activitySeq;
-            }
-        }
+    const bool activityFieldsComplete =
+        responseDocument["activity"].is<const char*>() &&
+        responseDocument["activitySeq"].is<uint32_t>() &&
+        responseDocument["activityTs"].is<int64_t>();
+    const UserActivity activity = activityFieldsComplete
+        ? parseUserActivity(responseDocument["activity"].as<const char*>())
+        : UserActivity::UNKNOWN;
+    const uint32_t activitySeq = activityFieldsComplete
+        ? responseDocument["activitySeq"].as<uint32_t>()
+        : 0;
+    const int64_t activityTs = activityFieldsComplete
+        ? responseDocument["activityTs"].as<int64_t>()
+        : 0;
+    const ActivityWireDecision activityDecision = observeActivitySnapshot(
+        activityWireState, activityFieldsComplete, activity, activitySeq,
+        activityTs);
+    if (activityDecision.disposition == ActivityWireDisposition::BASELINE) {
+        Serial.printf("RELAY activity=baseline seq=%lu value=%s\n",
+                      static_cast<unsigned long>(activitySeq),
+                      userActivityName(activity));
+    } else if (activityDecision.disposition == ActivityWireDisposition::APPLY) {
+        update.hasActivity = true;
+        update.activity = activityDecision.activity;
+        update.activitySeq = activitySeq;
+        update.activityTs = activityTs;
+    } else if (activityDecision.disposition ==
+               ActivityWireDisposition::INVALIDATE) {
+        update.hasActivity = true;
+        update.activity = UserActivity::UNKNOWN;
+        Serial.println(F("RELAY activity=invalidated reason=missing_invalid_or_stale"));
     }
     return true;
 }

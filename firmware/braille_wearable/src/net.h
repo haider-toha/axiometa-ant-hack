@@ -9,6 +9,7 @@ struct RelayUpdate {
     bool hasActivity = false;
     UserActivity activity = UserActivity::UNKNOWN;
     uint32_t activitySeq = 0;
+    int64_t activityTs = 0;
     bool hasCommand = false;
     RelayCommand command{};
 };

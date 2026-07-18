@@ -45,7 +45,7 @@ The board boots operationally with an effective `MOVING` fallback while the inde
 | `o` | Service resume | Re-enable output after `x` |
 | `h` | Service only | Print controls |
 
-The relay parser accepts exactly `NONE`, `BUS`, `NUMBER`, `WAIT`, `UNKNOWN`, and `ERROR`. It rejects `LEFT`, `RIGHT`, `AHEAD`, and unknown strings. The first command snapshot is a non-rendering baseline. Commands received while `MOVING` still advance sequence state, so switching to `STILL` cannot replay an earlier camera result.
+The relay parser accepts exactly `NONE`, `BUS`, `NUMBER`, `WAIT`, `UNKNOWN`, and `ERROR`. It rejects `LEFT`, `RIGHT`, `AHEAD`, and unknown strings. The first command snapshot is a non-rendering baseline. Commands received while `MOVING` still advance sequence state, so switching to `STILL` cannot replay an earlier camera result. Activity requires a complete valid `activity`/`activitySeq`/`activityTs` snapshot; missing, invalid, regressed, or locally stale activity revokes cloud `STILL` and falls back to `MOVING`.
 
 The route waveform is hardcoded for route 88. Firmware requires the `NUMBER` payload route to be exactly `"88"` and its confidence to be `"high"`; another number or lower confidence is consumed without playing the route-88 output.
 

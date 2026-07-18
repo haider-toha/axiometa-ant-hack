@@ -913,10 +913,11 @@ FFT full of garbage with no diagnostic. This is Track 3's R11 and it is real.
 > so *any* port's pins can carry I2S0. The port choice is free; the peripheral choice is not.
 
 **TRAP 2 — the mono slot default is LEFT.** `I2S_PDM_RX_SLOT_*_DEFAULT_CONFIG` sets
-`.slot_mask = (mono) ? I2S_PDM_SLOT_LEFT : I2S_PDM_SLOT_BOTH`. A PDM mic whose L/R select pin is
-tied **high** lands on the **right** slot, and the mono default then reads **pure silence** — again
-with no error. If bring-up shows an all-zero buffer, override `slot_mask` to `I2S_PDM_SLOT_RIGHT`
-**before** suspecting anything else.
+`.slot_mask = (mono) ? I2S_PDM_SLOT_LEFT : I2S_PDM_SLOT_BOTH`. The T3902 datasheet calls
+SELECT=VDD its DATA2/left lane, while the installed ESP-IDF header names the device with select
+pulled high `I2S_PDM_SLOT_RIGHT`. For the photographed AX22-0044, drive SL/GPIO1 **high** and
+override `slot_mask` with `I2S_PDM_SLOT_RIGHT`, or capture reads **pure silence**. This distinction
+is driver naming, not an electrical contradiction.
 
 **The bring-up assertion that catches both traps in one line.** After `i2s_channel_enable()`,
 capture 512 samples and print the standard deviation:
@@ -1486,7 +1487,7 @@ silicon.
 
 | # | Unresolved | Why it matters | What resolves it |
 |---|---|---|---|
-| 1 | **The AX22-0044 microphone's pinout is unknown.** No `parts/` folder exists (uncatalogued new hardware, Track 3 D6). I do not know which AX22 pin carries CLK and which carries DATA, or whether the L/R select pin is tied high or low. | `MIC_CLK_PIN`/`MIC_DIN_PIN` cannot be written until this is known, and the L/R tie determines whether the mono slot must be LEFT or RIGHT (TRAP 2). | **Photograph the module's silk and probe continuity** — 10 minutes. Given the ERM finding, assume nothing about which IO is which: **verify against the physical board, not against any document.** |
+| 1 | **RESOLVED 2026-07-18: AX22-0044 P4 pinout.** The installed module silk reads `G / 3V3 / SL / DT / CLK`; board connector pins 3/4/5 are IO0/IO1/IO2. | Capture can now use verified pins instead of inference. | User-provided bench photograph `IMG_0195.HEIC` plus `SCH_MTX0013.pdf`: CLK GPIO18, DT GPIO17, SL GPIO1 high; use I2S0 and the ESP-IDF pulled-high mask `I2S_PDM_SLOT_RIGHT`. |
 | 2 | **The ERM start voltage.** No datasheet exists in the repo (§R5). | Determines whether Track 3's MED = 65 % works from rest. | 5-minute duty sweep on the bench, kick disabled. |
 | 3 | **Claude vision call latency is unmeasured.** Track 2 correctly flags it as unpublished; my 1.5–3.0 s figure is inference from "Moderate" comparative latency plus ~45 output tokens. | It is the **single largest term** in the Stage-2 budget — larger than every other hop combined. | Run Track 2's timing script (its §Claude Vision §4). Run it **twice** — the first run pays the one-time schema-compilation cost. Put the second run's number in the plan. |
 | 4 | **Venue Wi-Fi RTT.** Every network hop above uses Track 2's ~100–300 ms estimate. | If the venue is 500 ms+, the ~1.4 s Stage-1 mean roughly doubles. | Measure on site with `ping` and a timed `curl` to the Vercel alias. If it is bad, the Modal-direct path (§Decision 2) removes two hops. |

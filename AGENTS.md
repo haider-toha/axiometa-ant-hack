@@ -79,10 +79,10 @@ Firmware:
 ```bash
 cd firmware/braille_wearable
 pio test -e native
-pio run -e genesis_mini
+pio run -e board_firmware
 ```
 
-`pio run -e genesis_mini` intentionally downloads the Arduino-ESP32 3.x toolchain on first use. If `pio` is missing, say so plainly and do not report firmware verification as complete.
+`board_firmware` is the current integrated target and uses the pinned Arduino-ESP32 3.x toolchain. The `genesis_mini` and `genesis_mini_offline` environments build closed speech/braille code and are legacy provenance, not verification targets. Run an isolated experiment environment as an additional check when changing that runner. If `pio` is missing, say so plainly and do not report firmware verification as complete.
 
 CAD:
 

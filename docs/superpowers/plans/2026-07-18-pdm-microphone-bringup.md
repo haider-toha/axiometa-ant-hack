@@ -10,7 +10,7 @@
 
 ## Global Constraints
 
-- P4 silk mapping is `SL -> GPIO18`, `DT -> GPIO17`, `CLK -> GPIO1`.
+- P4 silk and board-connector mapping is `SL -> GPIO1`, `DT -> GPIO17`, `CLK -> GPIO18`.
 - Bind only to `I2S_NUM_0`; ESP32-S3 PDM-to-PCM conversion is not available on I2S1.
 - Drive `SL` high before enabling I2S and select `I2S_PDM_SLOT_RIGHT`, matching ESP-IDF's pulled-high slot convention.
 - Capture signed 16-bit mono PCM at 16 kHz in 512-sample frames.
@@ -28,10 +28,10 @@
 - Consumes: `const int16_t* samples`, `size_t count`
 - Produces: `AudioFrameStats analyzeAudioFrame(...)` and `AudioFrameHealth classifyAudioFrame(...)`
 
-- [ ] Write native tests for silence, healthy changing PCM, excessive variance, and clipping.
-- [ ] Run `pio test -e native -f test_audio` and confirm the new tests fail before implementation.
-- [ ] Implement mean, standard deviation, min/max, clipping count, and deterministic health classification.
-- [ ] Re-run the targeted test and the complete native suite.
+- [x] Write native tests for silence, healthy changing PCM, excessive variance, and clipping.
+- [x] Run `pio test -e native -f test_audio` and confirm the new tests fail before implementation.
+- [x] Implement mean, standard deviation, min/max, clipping count, and deterministic health classification.
+- [x] Re-run the targeted test and the complete native suite.
 
 ### Task 2: Isolated PDM Capture Runner
 
@@ -45,22 +45,21 @@
 - Modify: `audit/bus-stop-situational-awareness/04-track-4-system-firmware-architecture.md`
 
 **Interfaces:**
-- Consumes: P4 T3902 PDM stream on GPIO17 with clock GPIO1 and select GPIO18.
+- Consumes: P4 T3902 PDM stream on GPIO17 with clock GPIO18 and select GPIO1.
 - Produces: one line per second containing frame count, mean, sigma, min, max, clipping, and health.
 
-- [ ] Add the verified P4 constants and correct the TDK-versus-ESP-IDF slot naming in durable docs.
-- [ ] Initialize I2S0 with four 256-frame DMA descriptors, 16 kHz PCM conversion, 16-bit mono, and `I2S_PDM_SLOT_RIGHT`.
-- [ ] Read exact 512-sample frames with a 100 ms timeout and classify partial reads separately from signal health.
-- [ ] Add `env:pdm_mic_experiment` and build it with the pinned Arduino-ESP32 3.x platform.
+- [x] Add the verified P4 constants and correct the TDK-versus-ESP-IDF slot naming in durable docs.
+- [x] Initialize I2S0 with four 256-frame DMA descriptors, 16 kHz PCM conversion, 16-bit mono, and `I2S_PDM_SLOT_RIGHT`.
+- [x] Read exact 512-sample frames with a 100 ms timeout and classify partial reads separately from signal health.
+- [x] Add `env:pdm_mic_experiment` and build it with the pinned Arduino-ESP32 3.x platform.
 
 ### Task 3: Physical PCM Gate
 
 **Files:**
 - No source changes unless the physical evidence identifies a slot or clock defect.
 
-- [ ] Upload `pdm_mic_experiment` to `/dev/cu.usbmodem1101`.
-- [ ] Monitor at 115200 baud and capture quiet-room diagnostics.
-- [ ] Speak or clap near the microphone and confirm sigma and extrema rise without persistent clipping.
-- [ ] If every sample is zero, test the opposite slot mask before changing pins or clock mode.
-- [ ] Record the measured result before connecting FFT and siren decisions.
-
+- [x] Upload `pdm_mic_experiment` to `/dev/cu.usbmodem1101`.
+- [x] Monitor at 115200 baud and capture quiet-room diagnostics.
+- [x] Use a repeatable nearby sound and confirm sigma and extrema rise without persistent clipping.
+- [x] Test the opposite slot mask after constant samples; the identical result ruled out slot selection and exposed the reversed CLK/SL mapping.
+- [x] Record the measured result before connecting FFT and siren decisions.

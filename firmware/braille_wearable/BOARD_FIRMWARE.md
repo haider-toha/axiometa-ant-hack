@@ -10,7 +10,7 @@ isolated buzzer and ToF runners for combined testing.
 | P1 | AX22-0018 passive buzzer | GPIO3, 2350 Hz LEFT audio proxy |
 | P2 | AX22-0015 VL53L0CX ToF | SDA GPIO10, SCL GPIO11, XSHUT GPIO6 |
 | P3 | AX22-0018 passive buzzer | GPIO16, 3050 Hz RIGHT audio proxy |
-| P4 | AX22-0044 PDM microphone | CLK/DATA assignment still requires module-silk verification |
+| P4 | AX22-0044 PDM microphone | CLK GPIO18, DT GPIO17, SL GPIO1 driven high; I2S0 pulled-high slot |
 
 The firmware boots operationally without a button. The buzzers simulate future
 vibration channels; they are not tactile actuators.
@@ -51,7 +51,6 @@ sample, and clears active proximity after three invalid samples.
 
 1. Replace the serial phone stub with the fixed-size Vercel relay command parser
    while preserving outbound-only polling.
-2. Verify the AX22-0044 PDM CLK/DATA silk in P4, then connect I2S0 capture to
-   the host-tested local siren classifier.
-3. Complete the remaining output vocabulary and severity arbitration before
-   making `board_firmware` the default PlatformIO environment.
+2. Connect the now-verified I2S0 PCM capture to the host-tested local siren
+   classifier.
+3. Complete the remaining output vocabulary and severity arbitration.

@@ -225,11 +225,11 @@ Port centres are **MEASURED-FROM-STEP** (`parts/Axiometa Genesis Mini - Starter 
 | **P1** | (−12.000, −12.000) | **Buzzer A (left)** | Signal = **GPIO3** (verify vs SCH_AX22-0018) |
 | **P2** | (+12.000, −12.000) | **VL53L0CX ToF** | SDA = GPIO10, SCL = GPIO11 (shared bus) · XSHUT = IO1 = GPIO6 |
 | **P3** | (+12.000, +12.000) | **Buzzer B (right)** | Signal = **GPIO16** (verify vs SCH_AX22-0018) |
-| **P4** | (−12.000, +12.000) | **PDM microphone (AX22-0044)** | CLK + DATA on two of GPIO1 / GPIO17 / GPIO18 — **read the silk at bring-up**. Bind to **I2S0** |
+| **P4** | (−12.000, +12.000) | **PDM microphone (AX22-0044)** | CLK = **GPIO18**, DT = **GPIO17**, SL = **GPIO1 high**. Bind to **I2S0**, `I2S_PDM_SLOT_RIGHT` |
 
 - Diagonals are **{1,3}** and **{2,4}**. P1↔P3 = **33.941 mm**; P1↔P2 = 24.000 mm (adjacent). Buzzers take the diagonal for maximum separation — which still falls short of spatial two-point discrimination, so L/R rides on the per-side frequency contrast, not this distance.
 - ToF I²C address is **0x29 (7-bit)** / 0x52 (8-bit write), fixed in silicon. One sensor, no collision. XSHUT is not required for single-sensor operation. `SCH_AX22-0015.pdf` labels XSHUT `IO1D`; on P2 that is GPIO6. This corrects the earlier IO0/GPIO7 inference.
-- **The PDM CLK/DATA assignment is the one unverified row.** No pinout image or CAD exists for AX22-0044, so it cannot be derived the way XSHUT was (by comparing header silk position-by-position across two modules). **Read it off the module's silkscreen.** An explicitly flagged unknown is more useful than a plausible wrong pin — do not let anyone guess it [T1 §Corrected Port Map].
+- **The PDM pin assignment was verified from the installed module silk on 2026-07-18.** The header order is `G / 3V3 / SL / DT / CLK`. Board connector pins 3/4/5 are IO0/IO1/IO2, giving SL GPIO1, DT GPIO17, and CLK GPIO18 on P4. The evidence is the user-provided bench photograph `IMG_0195.HEIC` plus `SCH_MTX0013.pdf`; no pin assignment is inferred from the missing catalogue folder.
 - Pin choice is otherwise free: ESP32-S3 routes I²S through the GPIO matrix, so any of GPIO1/17/18 can carry either signal. **The peripheral choice is not free — it must be I2S0.**
 
 ---
@@ -675,7 +675,7 @@ Envelope is sampled at 31.25 Hz. A modulation of period P frames = 1000/(P × 32
 
 **TRAP 1 — the PDM-to-PCM converter exists on I2S0 only.** ESP-IDF, verbatim: *"PDM RX is only supported on I2S0, and it only supports 16-bit width sample data."* Binding the mic to I2S1 **does not error** — it yields the raw 1-bit bitstream, producing an FFT full of garbage with no diagnostic.
 
-**TRAP 2 — the mono slot default is LEFT.** `I2S_PDM_RX_SLOT_*_DEFAULT_CONFIG` sets `.slot_mask = (mono) ? I2S_PDM_SLOT_LEFT : I2S_PDM_SLOT_BOTH`. **A PDM mic whose L/R select pin is tied high lands on the right slot, and the mono default then reads pure silence** — again with no error.
+**TRAP 2 — the mono slot default is LEFT.** `I2S_PDM_RX_SLOT_*_DEFAULT_CONFIG` sets `.slot_mask = (mono) ? I2S_PDM_SLOT_LEFT : I2S_PDM_SLOT_BOTH`. The T3902 datasheet calls SELECT=VDD its DATA2/left lane, while the installed ESP-IDF header names the PDM device with select pulled high `I2S_PDM_SLOT_RIGHT`. **For this module drive SL/GPIO1 high and override the mono default with `I2S_PDM_SLOT_RIGHT`, or capture reads pure silence** — again with no error.
 
 **One assertion at bring-up distinguishes both.** After `i2s_channel_enable()`, capture 512 samples and print the standard deviation:
 

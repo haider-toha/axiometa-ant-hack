@@ -180,6 +180,8 @@ export default function CapturePage() {
         readingConf: m.reading?.confidence ?? "",
         votes: m.votes ?? [],
         labels: (m.detections ?? []).map((d) => d.label),
+        hazards: m.hazards ?? [],
+        targetBearing: (m.detections ?? []).find((d) => d.target)?.bearing ?? "",
       };
       // Fire and forget, but explicitly swallowed: the monitor mirror is
       // advisory, and an unhandled rejection here would surface as an uncaught

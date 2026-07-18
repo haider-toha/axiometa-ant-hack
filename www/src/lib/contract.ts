@@ -85,6 +85,10 @@ export interface DetectorState {
   /** Top labels seen this frame, highest confidence first — so the monitor can
    *  show what the camera is pointed at without streaming boxes to it. */
   labels: string[];
+  /** Coarse hazards this frame (person / vehicle / bicycle / obstacle + bearing). */
+  hazards: ModalHazard[];
+  /** Bearing of the target (the bus); "" when no target is in view. */
+  targetBearing: Bearing | "";
 }
 
 /** The /api/state blob the debug screen polls. */

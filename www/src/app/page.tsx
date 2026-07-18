@@ -108,6 +108,15 @@ export default function DebugScreen() {
             <Field label="Reading conf" value={det?.readingConf || EMPTY} num />
             <Field label="Votes" value={det?.votes?.length ? det.votes.join(", ") : EMPTY} num />
             <Field label="In view" value={det?.labels?.length ? det.labels.join(", ") : EMPTY} />
+            <Field label="Target bearing" value={det?.targetBearing || EMPTY} num />
+            <Field
+              label="Hazards"
+              value={
+                det?.hazards?.length
+                  ? det.hazards.map((h) => `${h.kind} ${h.bearing}`).join(", ")
+                  : EMPTY
+              }
+            />
           </Panel>
 
           <Panel title="Device telemetry">

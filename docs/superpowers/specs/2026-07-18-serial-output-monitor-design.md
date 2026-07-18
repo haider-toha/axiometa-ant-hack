@@ -33,8 +33,8 @@ Contract rules:
 - `leftHz` is the actual P1 frequency after the write.
 - `rightHz` is the actual P3 frequency after the write.
 - `0` means that channel is inactive.
-- `upMs` is the ESP uptime from `millis()` and helps detect resets and order pulses.
-- Unchanged writes emit nothing, preventing loop-frequency serial traffic.
+- `upMs` is the ESP uptime from `millis()` and helps detect resets, order pulses, and verify the heartbeat.
+- Changes emit immediately. Unchanged writes emit at most one state heartbeat per second, preventing loop-frequency serial traffic while allowing the browser to detect stale firmware data.
 - Other human-readable firmware logs may remain on the same serial stream. The browser ignores lines without the `TACTA_OUTPUT ` prefix.
 - Version `1` is intentionally small and independent of relay command names. Future motors may retain the two-channel state shape while replacing frequency with additional fields in a later protocol version.
 

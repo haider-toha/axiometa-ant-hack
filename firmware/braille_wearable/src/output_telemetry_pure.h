@@ -4,6 +4,13 @@
 #include <stdint.h>
 #include <stdio.h>
 
+constexpr uint32_t OUTPUT_TELEMETRY_HEARTBEAT_MS = 1000;
+
+inline bool outputTelemetryDue(bool changed, uint32_t nowMs, uint32_t lastTelemetryMs) {
+    return changed ||
+           static_cast<uint32_t>(nowMs - lastTelemetryMs) >= OUTPUT_TELEMETRY_HEARTBEAT_MS;
+}
+
 inline int formatOutputTelemetry(
     char *buffer,
     size_t size,

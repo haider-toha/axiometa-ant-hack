@@ -9,6 +9,7 @@ namespace {
 constexpr uint8_t LEDC_RESOLUTION_BITS = 10;
 uint16_t currentP1Hz = UINT16_MAX;
 uint16_t currentP3Hz = UINT16_MAX;
+uint32_t lastTelemetryMs = 0;
 
 } // namespace
 
@@ -32,18 +33,20 @@ void hapticWrite(uint16_t p1Hz, uint16_t p3Hz) {
         changed = true;
     }
 
-    if (changed) {
+    const uint32_t nowMs = millis();
+    if (outputTelemetryDue(changed, nowMs, lastTelemetryMs)) {
         char telemetry[96];
         const int length = formatOutputTelemetry(
             telemetry,
             sizeof(telemetry),
             currentP1Hz,
             currentP3Hz,
-            millis());
+            nowMs);
         if (length > 0) {
             Serial.write(
                 reinterpret_cast<const uint8_t *>(telemetry),
                 static_cast<size_t>(length));
+            lastTelemetryMs = nowMs;
         }
     }
 }

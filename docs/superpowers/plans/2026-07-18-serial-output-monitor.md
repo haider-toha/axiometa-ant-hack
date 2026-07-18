@@ -4,14 +4,14 @@
 
 **Goal:** Show the ESP32's actual LEFT/P1 and RIGHT/P3 output transitions on a crowd-visible laptop route while the phone camera and ESP Wi-Fi relay remain active.
 
-**Architecture:** Firmware emits a prefixed JSON record only when `hapticWrite` changes a physical channel. A client-only `/output` route in the existing Next.js app reads those records with Web Serial and passes validated state to a separate presentational dashboard.
+**Architecture:** Firmware emits a prefixed JSON record when `hapticWrite` changes a physical channel and repeats the current state as a 1 Hz heartbeat. A client-only `/output` route in the existing Next.js app reads those records with Web Serial and passes validated state to a separate presentational dashboard.
 
 **Tech Stack:** ESP32-S3 Arduino C++17, PlatformIO/Unity, Next.js 16.2, React 19, TypeScript, Web Serial, Tailwind CSS 4, Vitest, Testing Library.
 
 ## Global Constraints
 
 - Work only on `feat/serial-output-monitor`; do not touch the relay agent's worktree.
-- Treat `hapticWrite` as the physical-output source of truth.
+- Treat `hapticWrite` as the physical-output source of truth and limit unchanged-state heartbeat records to 1 Hz.
 - Emit only `TACTA_OUTPUT {"v":1,"leftHz":N,"rightHz":N,"upMs":N}` records and preserve existing human-readable logs.
 - Keep the browser connection read-only and local to the MacBook.
 - Do not infer semantic events such as bus, siren, or navigation from frequency values.

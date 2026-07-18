@@ -31,10 +31,23 @@ void test_reports_truncation_for_small_buffer(void) {
     TEST_ASSERT_EQUAL_INT(-1, formatOutputTelemetry(buffer, sizeof(buffer), 2350, 0, 1));
 }
 
+void test_heartbeat_is_immediate_on_change_and_due_once_per_second(void) {
+    TEST_ASSERT_TRUE(outputTelemetryDue(true, 10, 10));
+    TEST_ASSERT_FALSE(outputTelemetryDue(false, 999, 0));
+    TEST_ASSERT_TRUE(outputTelemetryDue(false, 1000, 0));
+}
+
+void test_heartbeat_timing_is_wrap_safe(void) {
+    TEST_ASSERT_FALSE(outputTelemetryDue(false, 100, UINT32_MAX - 500));
+    TEST_ASSERT_TRUE(outputTelemetryDue(false, 1000, UINT32_MAX - 500));
+}
+
 int main(int, char **) {
     UNITY_BEGIN();
     RUN_TEST(test_formats_protocol_v1_record);
     RUN_TEST(test_formats_inactive_channels_and_max_uptime);
     RUN_TEST(test_reports_truncation_for_small_buffer);
+    RUN_TEST(test_heartbeat_is_immediate_on_change_and_due_once_per_second);
+    RUN_TEST(test_heartbeat_timing_is_wrap_safe);
     return UNITY_END();
 }

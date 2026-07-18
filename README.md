@@ -1,8 +1,9 @@
 # Axiometa × Anthropic Hardware Hack — London, 17–19 July 2026
 
-**Situational awareness for DeafBlind users.** A wrist-worn device that detects urgent sounds a
-DeafBlind person cannot hear and answers a question they cannot otherwise answer — *which bus just
-pulled in?* — delivering both as haptic patterns on the wrist.
+**Situational awareness for DeafBlind users.** A wrist-worn product concept that detects urgent
+sounds and answers a question the user cannot otherwise answer — *which bus just pulled in?* The
+intended product uses vibration motors. This hack prototype uses two audible buzzer tones as explicit
+proxies for those future vibration channels; it does not demonstrate viable tactile output.
 
 ---
 
@@ -67,9 +68,9 @@ extension kit**, so component placement is fixed by the board.
 
 | Port | Module | Notes |
 |---|---|---|
-| P1 | AX22-0018 passive buzzer A | Signal on **IO1 → GPIO3**, pending schematic/silk confirmation before first drive |
+| P1 | AX22-0018 passive buzzer A | Signal on **IO1 → GPIO3**; 700 Hz LEFT audio proxy |
 | P2 | VL53L0CX ToF distance sensor | I²C, shared bus |
-| P3 | AX22-0018 passive buzzer B | Signal on **IO1 → GPIO16**, pending confirmation. `{1,3}` is the diagonal — 33.941mm from P1, the maximum separation the board allows |
+| P3 | AX22-0018 passive buzzer B | Signal on **IO1 → GPIO16**; 1400 Hz RIGHT audio proxy |
 | P4 | PDM microphone (AX22-0044) | Must bind to **I2S0** — the PDM-to-PCM converter exists on I2S0 only |
 
-The first hardware experiment is to determine whether the two buzzers produce a usable felt output and whether distinct per-side low-frequency bands can be learned as left versus right. This is frequency discrimination, not spatial localization, and remains in scope until the wear test decides it.
+The first hardware experiment is complete: the buzzers were audible but produced virtually no tactile movement. They are rejected as haptic actuators. The demo retains them only to simulate two future vibration channels through distinct audible frequencies; see `audit/bus-stop-situational-awareness/05-buzzer-bench-test.md`.

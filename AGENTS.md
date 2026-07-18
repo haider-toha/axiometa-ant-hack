@@ -17,7 +17,7 @@ The plan is the authoritative build target. If current code, archived plans, or 
 Build the bus-stop situational-awareness prototype:
 
 - ESP32-S3 Genesis Mini device.
-- Two AX22-0018 passive buzzers on the P1/P3 diagonal, driven as low-frequency haptic/tone outputs.
+- Two AX22-0018 passive buzzers on the P1/P3 diagonal, used only as audible proxies for future vibration channels.
 - PDM microphone on I2S0 for local siren detection.
 - VL53L0CX ToF for local proximity reflex.
 - Phone browser camera capture through the Next.js app (`www/`).
@@ -26,10 +26,7 @@ Build the bus-stop situational-awareness prototype:
 
 Hardcoded route `88` / destination `Clapham Common` is intentional. Do not add generality unless the plan is changed first.
 
-The latest plan revision restored an explicit first-hour experiment: test whether the two passive buzzers can carry left/right through per-side low-frequency contrast. Do not remove the navigation test from scope just because earlier audit files cut spatial L/R. The current distinction is:
-
-- spatial left/right from physical separation: not supported;
-- experimental left/right from frequency contrast: in scope until the wear test says otherwise.
+The first-hour experiment is complete. The buzzers were audible but produced virtually no tactile movement, so tactile viability failed. Preserve LEFT/RIGHT only as a demo of two conceptual vibration channels: P1 uses a 700 Hz audio proxy and P3 uses a 1400 Hz audio proxy. This is not haptic or accessibility validation. The intended product assumes purpose-built ERM/LRA actuators and requires later retuning and representative-user testing.
 
 ## Web App
 
@@ -45,7 +42,7 @@ The old speech-to-braille idea is closed. Do not build from it.
 - `app/` is the stale legacy speech/braille Next.js app — do not use, edit, or reference it, and do not build new web work there. It informed the relay idioms named in the plan, but new web work lives in `www/`.
 - `cad/braille_wearable_exocage.py` is not the chosen design. Leave it alone unless the plan changes.
 
-Do not claim "opposite sides of the wrist" or spatial left/right localization. The two buzzers are 33.941 mm apart; any left/right attempt is via frequency contrast and must be described as experimental until wear-tested. Prioritize the buzzer viability and L/R discrimination wear test early, because it decides whether the haptic navigation scope survives.
+Do not claim "opposite sides of the wrist", spatial left/right localization, or usable tactile output from the buzzers. The two audible tones simulate separate future vibration channels; they do not prove those channels will be distinguishable on the body.
 
 ## Implementation Rules
 

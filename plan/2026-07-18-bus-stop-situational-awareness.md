@@ -2,11 +2,11 @@
 
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
-**Goal:** Build a wrist-worn ESP32-S3 device that tells a DeafBlind user, entirely through two vibration motors, that a siren is approaching, that something is close in front of them, and **which bus just pulled in**.
+**Goal:** Build a wrist-worn ESP32-S3 device that tells a DeafBlind user, entirely through two passive buzzers driven as haptic actuators, that a siren is approaching, that something is close in front of them, and **which bus just pulled in**.
 
-**Architecture:** Three inputs, one output. A PDM microphone feeds an on-device FFT that fires a coarse haptic alert in ~79 ms and a confirmed-siren classification in 1–2 s. A VL53L0CX ToF gives a purely local proximity reflex with no network in the path. A laptop webcam POSTs frames at 2 Hz to a Modal endpoint that runs YOLO26n, holds two seconds of detection history, latches exactly one `BUS_ARRIVED` event, crops the destination blind and asks Claude to read it under a strict JSON schema; the answer travels to the board through the existing Vercel + Upstash polling relay. All eleven haptic patterns are time-coded — the two motors are 33.941 mm apart, which is below the perceptual threshold for telling them apart, so nothing in the vocabulary depends on which motor fires.
+**Architecture:** Three inputs, one output. A PDM microphone feeds an on-device FFT that fires a coarse haptic alert in ~79 ms and a confirmed-siren classification in 1–2 s. A VL53L0CX ToF gives a purely local proximity reflex with no network in the path. A phone browser POSTs frames at 2 Hz to a Modal endpoint that runs YOLO26n, holds two seconds of detection history, latches exactly one `BUS_ARRIVED` event, crops the destination blind and asks Claude to read it under a strict JSON schema; the answer travels to the board through the existing Vercel + Upstash polling relay. The two AX22-0018 buzzers are 33.941 mm apart, so pure spatial left/right is unavailable — the default vocabulary stays time-coded, and left/right navigation is *attempted* through a per-side frequency contrast (felt pitch, not felt position). See the Revision note below.
 
-**Tech Stack:** ESP32-S3-MINI-1 (Arduino-ESP32 3.x / ESP-IDF v5.x, FreeRTOS, LEDC, I2S0 PDM→PCM, `arduinoFFT<float>`, `Adafruit_VL53L0X`, `ArduinoJson` v7) · Modal 1.5.2 + Ultralytics YOLO26n on T4 · `anthropic` 0.117.0 with `output_config.format` structured outputs · Next.js 16.2.10 on Vercel + Upstash Redis · Python 3.11 + OpenCV on the laptop · build123d via `cad/tests/fake_adsk` for CAD.
+**Tech Stack:** ESP32-S3-MINI-1 (Arduino-ESP32 3.x / ESP-IDF v5.x, FreeRTOS, LEDC in **tone** mode, I2S0 PDM→PCM, `arduinoFFT<float>`, `Adafruit_VL53L0X`, `ArduinoJson` v7) · 2× AX22-0018 passive buzzer (MLT-8530) · Modal 1.5.2 + Ultralytics YOLO26n on T4 · `anthropic` 0.117.0 with `output_config.format` structured outputs · Next.js 16.2.10 on Vercel + Upstash Redis · in-browser `getUserMedia` capture on the phone (Python/OpenCV survives only inside Modal, not on a laptop) · build123d via `cad/tests/fake_adsk` for CAD.
 
 **Evidence legend.** Every measured claim below traces to one of four audit files. They are authoritative over anything else in the repository.
 
@@ -21,6 +21,18 @@
 
 ---
 
+## Revision 2026-07-18b — Actuator swap, mobile capture, L/R navigation attempt
+
+This revision overrides earlier rulings where they conflict. Three changes, all landing after the four audit tracks were written; where a track finding is contradicted, **this section wins and states the reason.** Downstream mentions of "motor", "ERM", "duty %", and "laptop webcam" elsewhere in this document should be read through this revision.
+
+**1. The two ERM motors are replaced by two AX22-0018 passive buzzers.** The ERMs could not be sourced in time; the buzzer ships in the Genesis Mini Starter Kit and is in hand. It is an **MLT-8530 electromagnetic** (magnetic, not piezo) transducer on a 22×22 mm module — 2.7 kHz resonant, 80 dB — driven by a **single Signal-pin PWM** (header `G / Vin / S`); there is no second drive channel and no amplitude-by-duty knob the way an ERM has [`parts/Axiometa Genesis Mini - Starter Kit/passive-buzzer/CONTENT.md`]. This flips the drive model from *duty-cycle amplitude* to *frequency (tone)* and flips the output physics from inertial vibration to acoustic diaphragm motion. **We drive the buzzer at a low frequency to elicit a felt buzz rather than an audible tone.** This is an experiment: a sealed magnetic buzzer is not a tactile actuator, so the felt output may be weak. A first-hour wear test (Task 13-adjacent) decides whether the tactile path is viable or whether the device falls back to audible-tone signalling for a hearing companion. The overdrive-kick / start-voltage analysis written for the ERM is **moot** — buzzers have no stiction and no inrush.
+
+**2. Camera capture moves from the laptop Python client to a mobile-ready web app.** [T4 §Decision 1] locked `cv2.VideoCapture(0)` on the laptop and explicitly rejected a browser app; that ruling is **reversed by request.** Capture is now a route in the existing Next.js app (`app/`), served over HTTPS on the same Vercel deployment, using `getUserMedia({ video })` + a `<canvas>` grab at 2 Hz. `app/app/page.tsx:176-191` already calls `getUserMedia` for audio, so the permission/stream idiom is already in-repo. `vision/bus_client.py` is **cut**; `vision/bus_vision.py` (Modal) and `vision/read_blind.py` remain. The trade [T4 §Decision 1] warned of — iOS Safari permission UX, a possible reload-and-re-grant on stage — is now **accepted, not avoided**; rehearse the grant flow before the demo.
+
+**3. Left/right navigation is back in scope, as an explicit attempt.** [T3 D14/D20] cut LEFT/RIGHT/AHEAD and retired all spatial coding because the two ports are a fixed 33.941 mm apart — below the ~70 mm forearm two-point threshold. **That geometry is unchanged by the swap** and pure spatial localization stays unavailable. What the buzzer newly enables is a **per-side frequency contrast**: each side is driven at a distinct low band, so L/R is carried by felt *pitch*, not felt *position*. This is added as an experimental pattern block (P11–P13 in the vocabulary), gated behind the same wear test, carrying an honest "may not discriminate" caveat. It is only meaningful if change 1's tactile path proves viable at all.
+
+---
+
 ## Global Constraints
 
 Every task's requirements implicitly include this section.
@@ -28,11 +40,11 @@ Every task's requirements implicitly include this section.
 1. **Today is 2026-07-18. The hack ends 2026-07-19. Roughly 1.5 days remain.** Sequencing beats completeness. The Cut List near the end is binding when the clock runs out.
 2. **Hardcoding is sanctioned.** Route **88**, destination **Clapham Common**. No configuration knobs, no generality, no "make this pluggable".
 3. **No soldering. All modules are AX22 snap-in. No extension kit, no ribbon leads, no purchased extras.** All four ports are occupied and every part is in hand.
-4. **The two ERM motors are 33.941 mm apart on the {1,3} diagonal** — the maximum the board allows, and 48 % of the ~70 mm forearm two-point-discrimination threshold [T1 §Motor Separation Finding]. **Left/right spatial coding is unachievable. Every haptic pattern is time-coded.** Treat the two ERMs as one actuator with two drive channels. The phrase "opposite sides of the wrist" describes a physically impossible arrangement and must not appear in any artefact of this project.
-5. **Motor drive pins are GPIO3 (Port 1) and GPIO16 (Port 3).** The AX22-0013 leaves IO0 **not connected** and drives from IO1 [T4 §Motor Drive Electrical Findings]. The committed `firmware/braille_wearable/src/pins.h:9-10` says GPIO4/GPIO9 and is **wrong**; with those pins the motors never move and it looks like dead hardware.
+4. **The two buzzers are 33.941 mm apart on the {1,3} diagonal** — the maximum the board allows, and 48 % of the ~70 mm forearm two-point-discrimination threshold [T1 §Motor Separation Finding]. **Pure spatial left/right localization is unachievable; the default vocabulary stays time-coded.** The buzzer swap adds one lever the ERMs lacked — a **per-side frequency contrast** — so L/R is *attempted* via felt pitch, not felt position (see the Navigation block, P11–P13). The phrase "opposite sides of the wrist" still describes a physically impossible *spatial* arrangement and must not be used to claim spatial localization; any L/R claim rests on frequency discrimination and the wear test, not geometry.
+5. **Buzzer Signal pins drive from Port 1 and Port 3.** The AX22-0018 header is `G / Vin / S` — a single Signal line per buzzer plus power and ground; there is no second drive channel. Working assumption: Signal → **GPIO3 (Port 1)** and **GPIO16 (Port 3)**, reusing the ERM diagonal. **Confirm the Signal-pin-to-IO mapping against `parts/Axiometa Genesis Mini - Starter Kit/passive-buzzer/files/SCH_AX22-0018.pdf` and the module silk before first drive** — it was derived for the ERM (AX22-0013), not this part. The committed `firmware/braille_wearable/src/pins.h:9-10` says GPIO4/GPIO9 and is **wrong** for either part; with those pins nothing sounds and it looks like dead hardware.
 6. **The microphone binds to `I2S_NUM_0`. Never `I2S_NUM_1`, never `I2S_NUM_AUTO`.** The PDM-to-PCM converter exists on I2S0 only, and binding I2S1 fails silently by yielding a raw bitstream [T3 §PDM capture, T4 §TRAP 1].
 7. **The ToF → haptic reflex and the siren → haptic reflex are fully local.** No network in either path. The device must work with Wi-Fi unplugged for both safety tiers.
-8. **Power: a ≥1 A (≥5 W) USB-C source.** The binding constraint was never average draw — it is 2 × ERM inrush, and both ERMs remain [T1 §Old Global Constraints row 3].
+8. **Power: a ≥1 A (≥5 W) USB-C source — kept for margin, but its old binding reason is gone.** That constraint was 2 × ERM inrush [T1 §Old Global Constraints row 3]. Two MLT-8530 buzzers draw on the order of ~30 mA each with no inertial inrush, so the rail is comfortable now; ESP32-S3 + Wi-Fi transients dominate. Keep ≥1 A anyway — headroom is free.
 9. **The ESP32 is outbound-only.** It polls `https://app-eight-lyart-98.vercel.app/api/pull` every 300 ms and never accepts an inbound connection.
 10. **Serverless is stateless; all shared state lives in Upstash Redis.** The one exception is the Modal container's own arrival state machine, which is safe only because `max_containers=1` pins it to a single process.
 11. **Pin versions exactly:** `modal==1.5.2`, `anthropic==0.117.0`, `kosme/arduinoFFT@^2.0.4`, `bblanchon/ArduinoJson@^7.4.3`, `adafruit/Adafruit_VL53L0X@^1.2.4`, `next@16.2.10`, `@upstash/redis@^1.38.0`.
@@ -88,7 +100,7 @@ Write both answers into this plan's Task 16 before the print starts.
 
 ### 4. Start the print as soon as Task 16's STL exists
 
-37.01 cm³ measured, ~3–4.5 h estimated (not sliced). **Black or dark filament, 10–15 % infill.** Dark filament for bore-wall IR absorption at the ToF aperture; low infill because 37 cm³ of PLA damping a 0.9 g coin motor is the one real cost of enclosing [T1 §Three caveats]. This is machine time, not person time — it runs while firmware is written.
+37.01 cm³ measured, ~3–4.5 h estimated (not sliced). **Black or dark filament, 10–15 % infill.** Dark filament for bore-wall IR absorption at the ToF aperture; low infill matters even more now — a passive buzzer's felt output is already weak, so **the enclosure must not damp it**. Keep the P1 open-reveal well so buzzer A couples directly to the wrist, and treat the P3 louvre grille as the vent for the audible fallback. This is machine time, not person time — it runs while firmware is written. [T1 §Three caveats, amended by Revision §1]
 
 ---
 
@@ -102,12 +114,13 @@ Earlier drafts assumed a missing microphone. That assumption was wrong, and its 
 |---|---|---|
 | Axiometa Genesis Mini (ESP32-S3-MINI-1-N4R2) | **REUSE / IN-HAND** | 55.000 × 55.000 mm PCB, MEASURED-FROM-STEP [T1] |
 | VL53L0CX ToF, AX22-0015 | **REUSE / IN-HAND** | `parts/distance-sensor-vl53l0cx/files/AX22-0015.step` |
-| ERM vibration motor ×2, AX22-0013 | **REUSE / IN-HAND** | `parts/Vibration Motor (ERM)/vibration-motor-erm/` |
+| ~~ERM vibration motor ×2, AX22-0013~~ | **CUT — could not source in time** | Superseded by the buzzer below (Revision §1) |
+| **Passive buzzer ×2, AX22-0018 (MLT-8530)** | **REUSE / IN-HAND** | `parts/Axiometa Genesis Mini - Starter Kit/passive-buzzer/`. 22×22 mm module, single Signal-pin PWM, STEP present so Z is CAD-derivable. Driven low-freq for felt buzz — tactile viability is a wear-test question |
 | **PDM microphone, AX22-0044, marking T3902** | **REUSE / IN-HAND** | **No `parts/` folder, no STEP, no public product page — new uncatalogued hardware.** Footprint is `ASSUMED-AX22-STANDARD`; Z height and port face need calipers (Do This First §3) |
 | USB-C source, ≥1 A | **REUSE / IN-HAND** | Constraint 8 |
 | 20 mm strap + Ø2.5 pins | **REUSE / IN-HAND** | Drives `LUG_GAP = 20.0`, not 22.0 |
 | FDM printer + dark filament | **REUSE / IN-HAND** | Task 16 |
-| Laptop with webcam | **REUSE / IN-HAND** | The camera host. Locked [T2, T4 §Decision 1] |
+| **Phone with rear camera + modern browser** | **REUSE / IN-HAND** | The camera host (Revision §2). Runs the `getUserMedia` capture page over HTTPS; replaces the laptop webcam. Needs the venue Wi-Fi/hotspot, nothing installed |
 | A3 bus-front print **or** an 11–13″ tablet | **NET-NEW** | Task 17. Build the tablet version first — it needs no printer |
 | Calipers | **REUSE / IN-HAND** | 60 seconds of work, two load-bearing answers |
 
@@ -130,9 +143,9 @@ The directory keeps its legacy name to avoid churning PlatformIO paths. Nothing 
 | `test/test_braille/` | **DELETE (content) / REUSE (technique)** | It proves `[env:native]` works and demonstrates re-deriving the table under test rather than copying it (`:33-48`). Mirror that technique |
 | `src/haptic_pure.h` | **NET-NEW** | Arduino-free sequencer + arbitration. Host-testable |
 | `src/haptic_route_pure.h` | **NET-NEW** | Quinary route encoder. Host-testable |
-| `src/patterns.h` | **NET-NEW** | The 11 static pattern tables. Host-testable |
+| `src/patterns.h` | **NET-NEW** | The 11 base pattern tables + the 3 experimental nav patterns (P11–P13). Each step is a `(freq, on/off)` pair, not a duty. Host-testable |
 | `src/siren_pure.h` | **NET-NEW** | Siren decision logic over a magnitude array. Host-testable |
-| `src/haptic.cpp` · `src/haptic.h` | **NET-NEW** | LEDC glue + `hapticTask` |
+| `src/haptic.cpp` · `src/haptic.h` | **NET-NEW** | LEDC **tone** glue (`ledcAttach(pin, freq, res)` + `ledcWriteTone(pin, hz)`, or `ledcWrite` at 50 % duty for a given freq) + `hapticTask`. No duty-amplitude control — steps set a frequency or 0 |
 | `src/audio.cpp` · `src/audio.h` | **NET-NEW** | I2S0 PDM capture + FFT + `audioTask` |
 | `src/tof.cpp` · `src/tof.h` | **NET-NEW** | VL53L0X continuous ranging |
 | `src/main.cpp` | **NET-NEW** (from `braille_wearable.cpp`) | `setup()` + `loop()` = ToF and button only |
@@ -153,13 +166,14 @@ The directory keeps its legacy name to avoid churning PlatformIO paths. Nothing 
 | `app/package.json` | **REUSE (modify)** | Remove `@anthropic-ai/sdk`. Keep everything else |
 | Vercel project link + Upstash env | **REUSE unchanged** | `haider-projects/app`, stable alias `app-eight-lyart-98.vercel.app`, `UPSTASH_*` already set at Production scope |
 | `app/app/api/state/route.ts` · `api/detector/route.ts` · `lib/contract.test.ts` | **NET-NEW** | Debug-screen feed and its tests |
+| `app/app/capture/page.tsx` (or a `?capture` mode on `page.tsx`) | **NET-NEW** | Mobile capture page (Revision §2): `getUserMedia({video})` + `<canvas>` grab at 2 Hz → POST to Modal. Adapt the existing audio `getUserMedia` at `page.tsx:176-191`. Served over the existing HTTPS Vercel origin |
 
 ### Vision — `vision/` (net-new directory)
 
 | Path | Verdict |
 |---|---|
 | `vision/bus_vision.py` | **NET-NEW** — the Modal app |
-| `vision/bus_client.py` | **NET-NEW** — the laptop capture loop |
+| ~~`vision/bus_client.py`~~ | **CUT (Revision §2)** — laptop capture replaced by the in-browser `getUserMedia` page in `app/` |
 | `vision/read_blind.py` | **NET-NEW** — standalone Claude call, developed and timed before it is pasted into Modal |
 | `vision/requirements.txt` | **NET-NEW** |
 
@@ -167,7 +181,7 @@ The directory keeps its legacy name to avoid churning PlatformIO paths. Nothing 
 
 | Path | Verdict | Detail |
 |---|---|---|
-| `cad/braille_wearable_enclosure.py` | **REUSE (modify) — the chosen design** | Ten one-line deletions produce a closed body in 0.24 s |
+| `cad/braille_wearable_enclosure.py` | **REUSE (modify) — the chosen design** | Ten one-line deletions produce a closed body in 0.24 s. **Also reconcile `MOTOR_TOP = 15.25` (ERM body top) with the AX22-0018 buzzer height measured from `parts/.../passive-buzzer/files/AX22-0018.step`** — if the buzzer module is taller, raise `Z_ROOF_INNER`/`Z_ROOF_OUTER` by the difference; the 22×22 mm footprint is unchanged (Revision §1) |
 | `cad/tests/test_enclosure_build.py` | **REUSE (modify)** | Update two lug-bore probes and add two aperture probes |
 | `cad/tests/fake_adsk/` | **REUSE unchanged** | A real build123d engine, not a stub. **Fusion 360 is not required for anything in this plan** |
 | `cad/braille_wearable_exocage.py` | **LEAVE ALONE** | Not used. Do not edit it; its `POST_INNER = 22.0` is a trap (see Task 16) |
@@ -180,12 +194,12 @@ Port centres are **MEASURED-FROM-STEP** (`parts/Axiometa Genesis Mini - Starter 
 
 | Port | Centre | Module | Signal |
 |---|---|---|---|
-| **P1** | (−12.000, −12.000) | **ERM motor A** | Data = **IO1 → GPIO3** |
+| **P1** | (−12.000, −12.000) | **Buzzer A (left)** | Signal = **GPIO3** (verify vs SCH_AX22-0018) |
 | **P2** | (+12.000, −12.000) | **VL53L0CX ToF** | SDA = GPIO10, SCL = GPIO11 (shared bus) · XSHUT = IO0 = GPIO7 |
-| **P3** | (+12.000, +12.000) | **ERM motor B** | Data = **IO1 → GPIO16** |
+| **P3** | (+12.000, +12.000) | **Buzzer B (right)** | Signal = **GPIO16** (verify vs SCH_AX22-0018) |
 | **P4** | (−12.000, +12.000) | **PDM microphone (AX22-0044)** | CLK + DATA on two of GPIO1 / GPIO17 / GPIO18 — **read the silk at bring-up**. Bind to **I2S0** |
 
-- Diagonals are **{1,3}** and **{2,4}**. P1↔P3 = **33.941 mm**; P1↔P2 = 24.000 mm (adjacent). ERMs take the diagonal for maximum separation.
+- Diagonals are **{1,3}** and **{2,4}**. P1↔P3 = **33.941 mm**; P1↔P2 = 24.000 mm (adjacent). Buzzers take the diagonal for maximum separation — which still falls short of spatial two-point discrimination, so L/R rides on the per-side frequency contrast, not this distance.
 - ToF I²C address is **0x29 (7-bit)** / 0x52 (8-bit write), fixed in silicon. One sensor, no collision. XSHUT is not required for single-sensor operation.
 - **The PDM CLK/DATA assignment is the one unverified row.** No pinout image or CAD exists for AX22-0044, so it cannot be derived the way XSHUT was (by comparing header silk position-by-position across two modules). **Read it off the module's silkscreen.** An explicitly flagged unknown is more useful than a plausible wrong pin — do not let anyone guess it [T1 §Corrected Port Map].
 - Pin choice is otherwise free: ESP32-S3 routes I²S through the GPIO matrix, so any of GPIO1/17/18 can carry either signal. **The peripheral choice is not free — it must be I2S0.**
@@ -196,7 +210,7 @@ Port centres are **MEASURED-FROM-STEP** (`parts/Axiometa Genesis Mini - Starter 
 
 Four contracts, all literal, all worked with route 88.
 
-### Contract A — laptop → Modal
+### Contract A — phone → Modal
 
 ```jsonc
 // POST https://<workspace>--bus-vision-ingest.modal.run
@@ -236,9 +250,9 @@ Four contracts, all literal, all worked with route 88.
  "reading_ready":true,"votes":["88","88","88"]}
 ```
 
-### Contract B — laptop → Vercel
+### Contract B — phone browser → Vercel
 
-The laptop is the only component that understands both the detector's vocabulary and the device's. It translates, and it POSTs to `/api/event` **only on change** — the relay is edge-triggered on `seq`, so re-posting an unchanged state would re-fire the haptic.
+The **browser capture page** is now the only component that understands both the detector's vocabulary and the device's (Revision §2 — it inherits this role from the cut laptop client). It translates Modal's detector response into a `CloudPattern`, and it POSTs to `/api/event` **only on change** — the relay is edge-triggered on `seq`, so re-posting an unchanged state would re-fire the haptic. (Alternatively Modal POSTs to `/api/event` directly; keep it in the browser so the one component that speaks both vocabularies also owns the edge-trigger.)
 
 ```ts
 // app/app/lib/contract.ts — REPLACES Mode / PullResponse / Choice / KEYWORD_MAX
@@ -306,15 +320,15 @@ export const CLOUD_PATTERNS: readonly CloudPattern[] =
 **The locked demo, in order, literally.**
 
 ```jsonc
-// t = 0.00 s   laptop → POST /api/event      (YOLO latched arrival_id 1)
+// t = 0.00 s   browser → POST /api/event      (YOLO latched arrival_id 1)
 { "pattern":"BUS", "route":"", "dest":"", "conf":"", "arrivalId":1 }
 // ← 200 {"seq":7}
 
-// t = 0.10 s   laptop → POST /api/event      (Claude in flight)
+// t = 0.10 s   browser → POST /api/event      (Claude in flight)
 { "pattern":"WAIT", "route":"", "dest":"", "conf":"", "arrivalId":1 }
 // ← 200 {"seq":8}
 
-// t = 2.60 s   laptop → POST /api/event      (3 concurrent votes agreed on "88")
+// t = 2.60 s   browser → POST /api/event      (3 concurrent votes agreed on "88")
 { "pattern":"NUMBER", "route":"88", "dest":"Clapham Common", "conf":"high", "arrivalId":1 }
 // ← 200 {"seq":9}
 ```
@@ -379,34 +393,33 @@ static const size_t PULL_BODY_MAX = 512;   // reject anything larger BEFORE pars
 
 ## The Haptic Vocabulary — 11 patterns, all time-coded
 
-Two ERM motors, 33.941 mm apart. **No pattern's meaning depends on which motor fires.** [T3 §Locked Gesture Vocabulary]
+Two AX22-0018 passive buzzers, 33.941 mm apart. The **default** vocabulary (P0–P10) depends on *which side fires only via the both-vs-one presence rule*, never on spatial localization. The **navigation** block (P11–P13, experimental) deliberately does encode side — via a per-side frequency contrast, not position. [T3 §Locked Gesture Vocabulary, amended by Revision §1/§3]
+
+> **Buzzer caveat carried into every rule below.** These patterns were authored for ERMs, whose control channel is *amplitude* (duty). A passive magnetic buzzer's control channel is *frequency* (tone), and its felt output is diaphragm motion, not inertial vibration. Where a rule below says "duty %", read it as "map to a drive **frequency/tone**": the buzzer is driven at a **low fundamental (~60–200 Hz square wave, ~50 % duty)** to trade its 2.7 kHz acoustic job for a felt buzz. Loudness/intensity is *not* a clean channel on this part, so patterns that leaned on MED-vs-FULL amplitude now lean harder on **count, rhythm and duration**. A first-hour wear test confirms any of this is felt at all.
 
 ### Design rules
 
-1. **Zero L/R-contingent patterns.** 33.941 mm against a ~70 mm two-point threshold. Consequently **no blindfold left/right discrimination test is required for anything in this build.** Prior drafts opened day one with that test and prescribed "move them apart" as the remedy — an action that cannot be performed, since the ports are fixed. The time-coded vocabulary retires the risk rather than mitigating it [T3 D20].
-2. **BOTH motors = the world. ONE motor = the device.** External events (danger, sirens, buses, numbers) always fire both; internal state (proximity, acknowledgement, waiting, errors) always fires one. This is an **amplitude** distinction, not a spatial one, so it survives at 33.9 mm — the user feels "strong" vs "weak", never "left" vs "right". It halves the recognition space before any counting.
-3. **Intensity is a 2-level channel.** ERMs do not reliably start below ~50–55 % duty. Usable levels: **MED = 65 %** and **FULL = 100 %**.
-4. **Proven primitives reused, not reinvented** (`firmware/braille_wearable/src/braille.cpp:12-16`): buzz 400 ms · beat gap 300 ms · letter gap 800 ms (reused as the inter-digit gap) · both-fire stagger 100 ms.
-5. **The both-motor stagger is electrical, not perceptual.** 2 × 90 mA plus startup surge on a shared 3V3 rail is a real inrush; staggering the starts halves the peak. At 33.9 mm the perceptual benefit is nil, so state the electrical reason. **Implemented as 30 ms, not 100 ms** — see the Decisions Beyond the Rulings note in Task 4.
-6. **Every pattern is a step table** driven by a 10 ms tick. This makes arbitration a pointer store and keeps all timing off the main loop.
-7. **Overdrive kick on every onset:** 100 % for the first 30 ms, then the target duty. **This is load-bearing, not polish** — see below.
+1. **Default patterns are L/R-agnostic; the navigation block is the one exception.** For P0–P10, 33.941 mm against a ~70 mm two-point threshold still means no side-localization claim. **The navigation block (P11–P13) is a deliberate, bounded L/R attempt** and it — and only it — requires a blindfold wear test to decide whether the per-side frequency contrast is discriminable. If that test fails, P11–P13 are cut and the rest of the build is unaffected [T3 D20, amended].
+2. **BOTH buzzers = the world. ONE buzzer = the device.** External events (danger, sirens, buses, numbers) fire both; internal state (proximity, acknowledgement, waiting, errors) fires one. On ERMs this was an amplitude ("strong vs weak") distinction; on buzzers it is a **two-source-vs-one-source presence** distinction — coarser and itself a wear-test item, but it still halves the recognition space before any counting. If both-vs-one proves unreliable, fall back to distinguishing these classes by rhythm alone.
+3. **Frequency is the primary channel; loudness is not.** Usable design: a **buzz band ≈ 60–120 Hz** and an **alert band ≈ 180–250 Hz**, both felt as coarse "low" vs "high" texture, plus plain on/off gating. Do not design meaning onto fine amplitude steps — the buzzer cannot deliver them.
+4. **Proven timing primitives reused, not reinvented** (`firmware/braille_wearable/src/braille.cpp:12-16`): buzz 400 ms · beat gap 300 ms · letter gap 800 ms (reused as the inter-digit gap). The both-fire stagger is retained at 30 ms only for onset legibility, not electrical reasons (see rule 5).
+5. **No electrical stagger is needed.** The ERM rule staggered onsets to halve 2×90 mA inrush on a shared rail; buzzers have **no inrush**, so that reason is void. Keep a 30 ms both-fire stagger *only if* the wear test shows it improves onset legibility — otherwise fire both simultaneously.
+6. **Every pattern is a step table** driven by a 10 ms tick. Arbitration is a pointer store; all timing stays off the main loop. Each step now carries a **(freq, on/off)** pair instead of a duty %.
+7. **No overdrive kick.** It existed to break ERM stiction on unknown start voltage — a problem buzzers do not have. Onsets are clean; drive straight to the target frequency.
 
-### Why the overdrive kick is load-bearing
+### Driving a passive buzzer for touch, not sound
 
-`parts/Vibration Motor (ERM)/vibration-motor-erm/files/AX22-0013-datasheet.pdf` **is not a datasheet.** `file(1)` reports `HTML document text`; the scrape captured LCSC's JavaScript landing page and recorded a sha256 for it, so the failure was silent. **There is no motor datasheet in this repository** [T4 §Finding 4].
+The AX22-0018 is built for **audible** output — MLT-8530, 2.7 kHz resonant, 80 dB [`passive-buzzer/CONTENT.md`]. We are using it off-label: driven near resonance it is a loud tone (useless to a DeafBlind user and antisocial in a demo room); driven at a **low fundamental it becomes a coarse tactile buzz**, at the cost of most of its output. The open question the wear test answers first:
 
-Two Precision Microdrives 10 mm coin cells bracket the uncertainty:
+- **Is a ~60–200 Hz drive felt through the strap and sleeve at all?** A sealed magnetic buzzer moves a small diaphragm, not an eccentric mass, so the felt energy is far lower than an ERM's. If nothing is felt, the tactile concept fails and the device becomes an **audible** signaller for a hearing companion — a documented, honest fallback, not a silent one.
+- **Which two low bands read as distinct "low" vs "high" texture?** Vibrotactile pitch is coarse; pick the two most-separated bands that are both felt (start ~60–100 Hz and ~180–250 Hz) and lock them.
+- **Does two-buzzers-vs-one register as "stronger/wider"?** This is the BOTH-vs-ONE rule's new physical basis and it is weaker than the ERM amplitude cue. Verify or fall back to rhythm-only class coding.
 
-| Part | Rated V | Start voltage | As % of rated | Min duty on 3V3 |
-|---|---|---|---|---|
-| PM 310-101 | 3.0 V | **2.3 V** | 77 % | **~70 %** |
-| PM 310-103 | 3.0 V | **1.2 V** | 40 % | **~36 %** |
-
-A 2× spread between two same-size coin cells from the same vendor. **If the AX22-0013 behaves like the 310-101, 65 % duty is below its start voltage and every MED pattern would silently never spin from rest** — P0, P2, P10 and P6's brackets. Driving 100 % for 30 ms breaks stiction, and a *running* ERM sustains well below its start voltage. The kick is what makes MED safe on unknown hardware.
+There is no buzzer datasheet risk of the ERM kind — the MLT-8530 part is named on the product page and the LCSC datasheet (C94599) is the real PDF, not an HTML scrape. The uncertainty here is **perceptual**, and only a wrist can resolve it.
 
 ### The locked table
 
-Notation: `A` = Port 1 motor, `B` = Port 3 motor, `BOTH` = both with B joining 30 ms late at an onset. All durations in ms.
+Notation: `A` = Port 1 buzzer, `B` = Port 3 buzzer, `BOTH` = both (optional 30 ms B stagger only if it aids onset legibility — see rule 5). All durations in ms. Per the table note below, the Intensity column is a drive-frequency selector, not an amplitude.
 
 | # | Pattern | Motors | Intensity | Timing spec | Repeats | Total | Class | Queueable | Trigger |
 |---|---|---|---|---|---|---|---|---|---|
@@ -414,15 +427,33 @@ Notation: `A` = Port 1 motor, `B` = Port 3 motor, `BOTH` = both with B joining 3
 | **P1** | **DANGER** | BOTH | 100 % | `(200 on / 150 off) ×5`, then `500` sustained tail | ×4, gap **750** | **2250/cycle · 11 250 total** | **SAFETY** | no | Tier-2b confirmed siren **AND** amplitude trend rising |
 | **P2** | **SIREN WARNING** | BOTH | 65 % | `(400 on / 300 off) ×2` | ×1 | **1400** | ALERT | no | Tier-2b confirmed siren, flat or falling trend. Rate-limited 1 per 10 s |
 | **P3** | **ATTENTION** | BOTH | 100 % | single `250` pulse | ×1 | **250** | **SAFETY** | no | Tier-2a: band energy exceeds the adaptive floor by +12 dB on 2 consecutive FFT frames (~79 ms) |
-| **P4** | **PROXIMITY** | **A only** | 55→100 % | `120 on / gap`, `gap = map(mm, 300→1200, 120→900)`, `duty = map(mm, 1200→300, 55→100)` | re-posted every 100 ms while in range | continuous | HAZARD | no | ToF < 1200 mm on 3 consecutive frames (60 ms debounce against arm-swing) |
+| **P4** | **PROXIMITY** | **A only** | 80→180 Hz | `120 on / gap`, `gap = map(mm, 300→1200, 120→900)`, `freq = map(mm, 1200→300, 80→180 Hz)` — closer = faster **and** higher-pitched | re-posted every 100 ms while in range | continuous | HAZARD | no | ToF < 1200 mm on 3 consecutive frames (60 ms debounce against arm-swing) |
 | **P5** | **BUS ARRIVING** | BOTH | 65 → 82 → 100 % | `(250 on / 250 off) ×3`, ascending | ×1 | **1500** | INFORMATION | no | `BUS_ARRIVED` edge from the relay |
-| **P6** | **ROUTE NUMBER** | BOTH | 100 % digits, 65 % brackets | preamble `ramp 0→65` over 500 + `600` silence · digits: `LONG=500`, `SHORT=150`, intra-gap `250`, inter-digit gap **800** · terminator `600` silence + `500 @65` | ×1 | **6400 for "88"** | INFORMATION | **yes** | Claude returned `confidence == "high"` and the 3-vote gate reached consensus |
+| **P6** | **ROUTE NUMBER** | BOTH | digits **buzz band ~100 Hz**, brackets **alert band ~200 Hz** | preamble `500 @ ~200 Hz` + `600` silence · digits: `LONG=500`, `SHORT=150`, intra-gap `250`, inter-digit gap **800** · terminator `600` silence + `500 @ ~200 Hz` | ×1 | **6400 for "88"** | INFORMATION | **yes** | Claude returned `confidence == "high"` and the 3-vote gate reached consensus |
 | **P7** | **WAIT** | A, B alternating | 100 % | `A 300 on / 200 off / B 300 on / 200 off` ×2 | ×4, gap **500** | **2000/cycle · 9500 total** | FEEDBACK | no | Vision request in flight, no result yet |
 | **P8** | **UNKNOWN** | BOTH | 100→0 % | single `900` pulse, linear fade-out across its full duration | ×1 | **900** | INFORMATION | **yes** | `confidence == "low"`, **or** the vote failed consensus, **or** the request timed out (>8 s), **or** the route contains a non-digit |
 | **P9** | **ACK** | **A only** | 100 % | single `150` pulse, within 20 ms of the press | ×1 | **150** | FEEDBACK | no | Onboard button press, debounced |
 | **P10** | **ERROR / OFFLINE** | **A only** | 65 % | `600 on / 300 off / 150 on / 300 off / 600 on` (long-short-long) | ×1, re-fires every 60 s while degraded | **1950** | STATUS | no | Wi-Fi down >5 s, **or** 5 consecutive ToF I²C failures, **or** 3 consecutive relay failures |
 
-**Deliberately cut:** LEFT, RIGHT, AHEAD, STOP, MOVE OVER — unbuildable at 33.9 mm *and* untriggerable once navigation is out of scope [T3 D14]. **Deliberately not added:** any TURN pattern. A rotation instruction the user cannot verify they executed correctly is worse than no instruction — it produces a user who has turned an unknown amount in an unknown direction and now believes the device has seen something. On insufficient information the device fires **P8 UNKNOWN** [T3 D2].
+**Reading the table for buzzers:** the **Motors** column (A / B / BOTH) is unchanged in *routing* — A = Port 1 buzzer, B = Port 3 buzzer. The **Intensity** column is now a **drive-frequency** column: read "100 %" as *buzz band (~60–120 Hz)*, "65 %" as a quieter/shorter gate of the same band, and any ramp as a short frequency glide within the buzz band. No pattern depends on a precise amplitude level.
+
+**Partially uncut:** LEFT, RIGHT and AHEAD return as the experimental Navigation block below (Revision §3). **Still cut:** STOP and MOVE OVER — no trigger produces them in this build. **Still deliberately not added:** any TURN pattern. A rotation instruction the user cannot verify they executed correctly is worse than no instruction — it produces a user who has turned an unknown amount in an unknown direction and now believes the device has seen something. On insufficient information the device fires **P8 UNKNOWN** [T3 D2].
+
+### Navigation block — EXPERIMENTAL (P11–P13), gated on the wear test
+
+**These three exist only if the wear test proves the per-side frequency contrast is discriminable.** They are the buildable form of "steer toward the bus door" — attempted, not promised. The mechanism is **frequency-coded laterality**: left and right are carried by felt *pitch*, and the responsible buzzer is *also* the one physically on that side, so spatial and frequency cues reinforce rather than compete. If the test fails, delete all three; nothing else depends on them.
+
+| # | Pattern | Buzzer | Drive | Timing spec | Repeats | Class | Trigger |
+|---|---|---|---|---|---|---|---|
+| **P11** | **LEFT** | A only | **low band ~70 Hz** | `(200 on / 200 off) ×2` | ×1, re-postable | INFORMATION | Detector says the bus door / target is to the user's left |
+| **P12** | **RIGHT** | B only | **high band ~220 Hz** | `(200 on / 200 off) ×2` | ×1, re-postable | INFORMATION | Target is to the user's right |
+| **P13** | **AHEAD** | BOTH | both bands together | `400 on / 200 off / 400 on` | ×1 | INFORMATION | Target is roughly centred — proceed forward |
+
+**Design honesty for P11–P13:**
+- **Redundant coding is the whole point.** Side is signalled *three* ways at once — which buzzer fires (spatial, weak at 33.9 mm), the pitch band (frequency, the load-bearing cue), and, if kept, a habitual mental "low = left / high = right" mapping the user is taught. Any one working is enough.
+- **This is not verified navigation.** As with the cut TURN pattern, the device cannot confirm the user moved correctly. P11–P13 are advisory nudges toward a *dwelling* bus (15–30 s), not turn-by-turn guidance. On low detector confidence, fire **P8 UNKNOWN**, never a guessed direction.
+- **"We have not validated this with DeafBlind users"** applies with double force here — frequency-coded laterality on a repurposed buzzer is the least-grounded idea in the build. It ships flagged as an experiment, or not at all.
+- **Triggering** needs the detector to emit a coarse left/centre/right for the bus box (its horizontal centroid vs frame thirds). That is a few lines in `bus_vision.py`; the relay carries it as a new `CloudPattern` value only if the block survives the wear test.
 
 ### Discriminability analysis
 
@@ -434,7 +465,7 @@ Assessed as felt through a sleeve on the volar wrist, where amplitude is attenua
 | **P2 SIREN vs P5 BUS ARRIVING** | **High** — both a few medium pulses from both motors | Pulse count 2 vs 3; beat 400 vs 250 ms; envelope flat vs ascending | **Test this pair first in the wear test.** If confused: extend P5 to 4 pulses, or prepend a 700 ms sustained head. Both are one-line step-table changes |
 | **P1 DANGER vs P4 PROXIMITY at close range** | **High in principle** — as an object nears, P4 becomes a fast insistent buzz | Amplitude (both @100 % vs one @100 %); P1 has a 500 ms sustained tail and repeats, P4 never does | **Safe by arbitration, not by waveform.** P1 preempts P4 (SAFETY > HAZARD), so they never overlap, and the mandatory 150 ms clearing gap marks the transition |
 | **P1 DANGER vs P10 ERROR** | Medium | Motors (2 vs 1), intensity (100 vs 65 %), rhythm (fast even ×5 vs asymmetric long-short-long), persistence (every 3 s vs every 60 s) | **Safe — four independent margins.** An earlier fast-triplet ERROR was too close to DANGER and was replaced with the asymmetric figure |
-| **P6 preamble (500 @65 % ramped) vs P6 LONG (500 @100 % abrupt)** | Medium — identical duration | Intensity (65 vs 100 %, above the ~15–20 % Weber fraction), onset (500 ms ramp vs abrupt), following gap (600 vs 250 ms, 2.4×) | **Safe on three dimensions** |
+| **P6 preamble (500 @ alert band) vs P6 LONG (500 @ buzz band)** | Medium — identical duration | **Pitch band** (alert ~200 Hz vs buzz ~100 Hz — a coarse but felt texture difference) and following gap (600 vs 250 ms, 2.4×). Relies on the buzz-vs-alert band contrast being felt — a wear-test item | **Safe if the two bands are discriminable; else lengthen the preamble gap** |
 | **P6 LONG (500) vs P6 SHORT (150)** | Low | 3.3× duration ratio, far above the ~20–25 % duration JND. Identical intensity and motor set, so duration is the only varying dimension | **Safe. The cleanest contrast in the vocabulary** — correctly so, because it carries the payload |
 | **P7 WAIT vs P4 PROXIMITY** | Low | Both single-motor and repeating, but P4's gap **changes as the user moves their arm** and P7's never does; P7 has 500 ms silent windows, P4 is continuous | **Safe — and the discriminator is embodied.** The user's own motion disambiguates within one arm movement |
 | **P8 UNKNOWN vs P0 READY** | Low | Opposite envelopes (900 ms fade-out vs 400 ms ramp-up), 2.25× duration, and P0 fires only at boot | **Safe** |
@@ -498,7 +529,7 @@ Assessed as felt through a sleeve on the volar wrist, where amplitude is attenua
 | 3 | `SHORT ×3` | 3 | 8 | `LONG SHORT ×3` | 4 |
 | 4 | `SHORT ×4` | 4 | 9 | `LONG SHORT ×4` | 5 |
 
-**Parameters:** `SHORT = 150` · `LONG = 500` · intra-digit gap `250` · **inter-digit gap `800`** (the proven constant, reused) · both motors @ 100 % throughout · preamble `ramp 0→65 % over 500` + `600` silence · terminator `600` silence + `500 @ 65 %`.
+**Parameters:** `SHORT = 150` · `LONG = 500` · intra-digit gap `250` · **inter-digit gap `800`** (the proven constant, reused) · both buzzers, **digit tones in the buzz band (~100 Hz)** throughout · preamble `500 @ ~200 Hz` (alert band) + `600` silence · terminator `600` silence + `500 @ ~200 Hz`. The digit/bracket contrast is now **pitch** (buzz vs alert band), a cleaner discriminator on this hardware than the ERM's amplitude ramp.
 
 **Per-digit block** (tone + intra-digit gaps only):
 
@@ -645,7 +676,7 @@ The detector is ~7× cheaper **and both numbers are under a dollar.** It becomes
 
 There is also a latency floor. A warm T4 running YOLO-nano returns a box in ~10 ms of compute; the round trip is network-dominated at ~100–300 ms. A Claude response requires network RTT **plus** time-to-first-token **plus** generation of ~45 output tokens. **There is no model configuration in which a complete Claude JSON response beats a warm YOLO bounding box** — that inequality holds regardless of the exact milliseconds, and it is what the two-stage haptic rests on. Human perception of "instant" for a haptic response is roughly <300 ms; a ~1 s round trip reads as lag, not feedback.
 
-**The verdict:** *Modal hosts the stateful arrival detector, because the arrival event is a temporal object and Claude is a stateless oracle. Modal also calls Claude server-side, so the crop is made and read in the same process it was detected in* — saving a ~100–200 ms round trip and keeping `ANTHROPIC_API_KEY` off a laptop about to be handed to a judge.
+**The verdict:** *Modal hosts the stateful arrival detector, because the arrival event is a temporal object and Claude is a stateless oracle. Modal also calls Claude server-side, so the crop is made and read in the same process it was detected in* — saving a ~100–200 ms round trip and keeping `ANTHROPIC_API_KEY` off the phone about to be handed to a judge.
 
 **Stage line: *"Detection is when. Claude is what."***
 
@@ -653,9 +684,9 @@ There is also a latency floor. A warm T4 running YOLO-nano returns a box in ~10 
 
 **Does the two-stage haptic mask latency, or relocate it? It relocates it, and relocation is the point.** Total time from prop-raised to route-known is unchanged. What changes is that the user gets actionable information at ~1.4 s instead of ~3.8 s. "A bus is here" is itself useful — a London bus dwells 15–30 seconds, and knowing early is real time to start moving toward the door. **It stops working the moment stage one is slow:** if the arrival pulse lands late, the audience perceives two lags rather than coarse-then-precise. That is the whole reason the detector must be warm and must be a detector.
 
-### Camera and transport — both locked
+### Camera and transport
 
-**Camera host: the laptop webcam.** `cv2.VideoCapture(0)` plus `cv2.imencode` is ~120 lines and ~45 minutes. A mobile web app is `getUserMedia()` + HTTPS + permission UX + iOS Safari quirks, ~400 lines and ~4 hours plus device testing, and it fails on stage by needing a reload and a re-grant. The phone's only former job was hotspot, and any 2.4 GHz AP does that [T4 §Decision 1].
+**Camera host: a mobile web app on the phone (Revision §2 — this reverses [T4 §Decision 1]).** Capture is `getUserMedia({ video: { facingMode: "environment" } })` + a `<canvas>.drawImage` grab + `canvas.toDataURL("image/jpeg", 0.85)` at 2 Hz, POSTed to Modal. The original ruling costed this at ~400 lines / ~4 hours and rejected it for iOS-Safari quirks and stage-reload risk; that cost and risk are **accepted now**, and two things soften them: `app/app/page.tsx:176-191` already runs the `getUserMedia` permission/stream dance for audio (adapt it for video), and serving from the existing HTTPS Vercel origin satisfies the secure-context requirement for free. **Rehearse the permission grant on the actual demo phone/browser** — the one failure mode that still bites is a denied or reset camera permission mid-demo. The laptop `cv2.VideoCapture` client (`vision/bus_client.py`) is cut.
 
 **Transport: the existing Vercel + Upstash polling relay**, ESP32 outbound-only at 300 ms. It is already built, deployed and smoke-tested green end-to-end; `net.cpp` already implements TLS join, poll, `seq` gate and JSON POST; `/api/pull` already sets `Access-Control-Allow-Origin: *` so the debug screen reads the same state from the same place for free.
 
@@ -663,7 +694,7 @@ There is also a latency floor. A warm T4 running YOLO-nano returns a box in ~10 
 
 | Consumer | How it gets the URL | Cost to change |
 |---|---|---|
-| Laptop `bus_client.py` | `MODAL_URL` env var | edit a shell var, restart — **2 seconds** |
+| Phone capture page | `MODAL_URL` as a build-time env / query param on the page URL | redeploy or edit the URL — **seconds** |
 | **ESP32** | **never sees it.** The board only knows `VERCEL_HOST` | n/a |
 | Debug screen | never sees it. Reads Redis | n/a |
 
@@ -676,17 +707,17 @@ There is also a latency floor. A warm T4 running YOLO-nano returns a box in ~10 
 | # | Hop | Estimate |
 |---|---|---|
 | 1 | Prop enters frame → next capture tick | 0–500 ms (mean **250**) |
-| 2 | JPEG encode 1280×720 q85 | ~**10 ms** |
-| 3 | Laptop → Modal POST, ~120 kB | 80–250 ms (mean **150**) |
+| 2 | `canvas.toDataURL` JPEG encode ~q85 | ~**10 ms** |
+| 3 | Phone → Modal POST, ~120 kB | 80–250 ms (mean **150**) |
 | 4 | YOLO26n forward pass, warm T4 | **10–30 ms** |
 | 5 | Debounce `HITS_TO_ARRIVE = 2` @ 2 Hz | +**500 ms** (deliberate) |
-| 6 | Modal → laptop response, ~200 B | 30–80 ms (mean **50**) |
-| 7 | Laptop → Vercel `POST /api/event` | 60–150 ms (mean **100**) |
+| 6 | Modal → phone response, ~200 B | 30–80 ms (mean **50**) |
+| 7 | Phone → Vercel `POST /api/event` | 60–150 ms (mean **100**) |
 | 8 | Redis MSET + INCR | 20–60 ms (mean **40**) |
 | 9 | ESP32 poll wait | 0–300 ms (mean **150**) |
 | 10 | `POST /api/pull` round trip with keep-alive | 50–200 ms (mean **120**) |
 | 11 | ArduinoJson parse + enum map + `xQueueSend` | <**2 ms** |
-| 12 | Queue → first motor edge | 0–10 ms (mean **5**) |
+| 12 | Queue → first buzzer onset | 0–10 ms (mean **5**) |
 | | **TOTAL** | **0.76 – 2.09 s · mean ≈ 1.38 s** |
 
 **Stage 2 — … → first digit of ROUTE NUMBER**
@@ -695,7 +726,7 @@ There is also a latency floor. A warm T4 running YOLO-nano returns a box in ~10 
 |---|---|---|
 | 13 | 3 × Claude vision calls, **run concurrently** | **1.5 – 3.0 s** (sequential would be 4.5–9.0 s) |
 | 14 | Vote + gate, in-process | <1 ms |
-| 15 | Laptop notices `reading_ready` on its next 500 ms poll | 0–500 ms (mean **250**) |
+| 15 | Phone notices `reading_ready` on its next 500 ms poll | 0–500 ms (mean **250**) |
 | 16 | `/api/event` → Redis → ESP32 poll → parse | 130–560 ms (mean **415**) |
 | | **prop raised → first digit** | **2.4 – 6.2 s · mean ≈ 3.8 s** |
 | 17 | P6 delivers route "88" | **6.4 s** |

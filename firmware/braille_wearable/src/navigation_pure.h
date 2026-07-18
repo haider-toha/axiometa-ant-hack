@@ -31,6 +31,16 @@ constexpr const OutputPattern* cloudPattern(CloudCommand command) {
             return &outputPatternFor(PatternId::UNKNOWN);
         case CloudCommand::ERROR:
             return &outputPatternFor(PatternId::ERROR);
+        // Camera-derived bus bearing reuses the two audio-proxy channels the
+        // service-Serial keys already drive. Same tones, same concept-only
+        // claim: P1 2350 Hz and P3 3050 Hz stand in for future actuators.
+        case CloudCommand::LEFT:
+            return &outputPatternFor(PatternId::LEFT);
+        case CloudCommand::RIGHT:
+            return &outputPatternFor(PatternId::RIGHT);
+        case CloudCommand::AHEAD:
+            return &outputPatternFor(PatternId::AHEAD);
+        case CloudCommand::NONE:
         case CloudCommand::INVALID:
         default:
             return nullptr;

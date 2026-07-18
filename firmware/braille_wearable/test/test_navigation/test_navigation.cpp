@@ -17,10 +17,13 @@ void test_all_activity_and_relay_command_combinations(void) {
     const CloudCommand commands[] = {
         CloudCommand::NONE, CloudCommand::BUS, CloudCommand::NUMBER,
         CloudCommand::WAIT, CloudCommand::UNKNOWN, CloudCommand::ERROR,
+        CloudCommand::LEFT, CloudCommand::RIGHT, CloudCommand::AHEAD,
         CloudCommand::INVALID,
     };
-    const bool stillAccepted[] = {true, true, true, true, true, true, false};
-    const bool movingAccepted[] = {true, false, false, false, false, true, false};
+    const bool stillAccepted[] = {true, true, true, true, true, true,
+                                  false, false, false, false};
+    const bool movingAccepted[] = {true, false, false, false, false, true,
+                                   true, true, true, false};
 
     for (uint8_t index = 0; index < sizeof(commands) / sizeof(commands[0]); ++index) {
         TEST_ASSERT_EQUAL_INT(stillAccepted[index], acceptsRelayCommand(UserActivity::STILL, commands[index]));
@@ -82,6 +85,25 @@ void test_implemented_cloud_commands_map_to_canonical_patterns(void) {
     TEST_ASSERT_NULL(cloudPattern(CloudCommand::INVALID));
 }
 
+void test_camera_bearing_reuses_the_service_direction_patterns(void) {
+    // A relay bearing must land on the same audio proxies the service-Serial
+    // l/r/a keys already drive — one output vocabulary, two input sources.
+    TEST_ASSERT_EQUAL_PTR(&LEFT_PATTERN, cloudPattern(CloudCommand::LEFT));
+    TEST_ASSERT_EQUAL_PTR(&RIGHT_PATTERN, cloudPattern(CloudCommand::RIGHT));
+    TEST_ASSERT_EQUAL_PTR(&AHEAD_PATTERN, cloudPattern(CloudCommand::AHEAD));
+
+    TEST_ASSERT_EQUAL_PTR(serviceDirectionPattern(ServiceDirection::LEFT),
+                          cloudPattern(CloudCommand::LEFT));
+    TEST_ASSERT_EQUAL_PTR(serviceDirectionPattern(ServiceDirection::RIGHT),
+                          cloudPattern(CloudCommand::RIGHT));
+    TEST_ASSERT_EQUAL_PTR(serviceDirectionPattern(ServiceDirection::AHEAD),
+                          cloudPattern(CloudCommand::AHEAD));
+
+    TEST_ASSERT_EQUAL_UINT16(800, outputPatternDurationMs(LEFT_PATTERN));
+    TEST_ASSERT_EQUAL_UINT16(800, outputPatternDurationMs(RIGHT_PATTERN));
+    TEST_ASSERT_EQUAL_UINT16(1000, outputPatternDurationMs(AHEAD_PATTERN));
+}
+
 void test_wait_and_waiting_mode_payload_durations_match_plan(void) {
     TEST_ASSERT_EQUAL_UINT16(400, outputPatternDurationMs(READY_PATTERN));
     TEST_ASSERT_EQUAL_UINT16(1500, outputPatternDurationMs(BUS_PATTERN));
@@ -129,6 +151,7 @@ int main(int, char**) {
     RUN_TEST(test_ahead_audio_pattern_is_exact);
     RUN_TEST(test_non_navigation_commands_have_no_audio_pattern);
     RUN_TEST(test_implemented_cloud_commands_map_to_canonical_patterns);
+    RUN_TEST(test_camera_bearing_reuses_the_service_direction_patterns);
     RUN_TEST(test_wait_and_waiting_mode_payload_durations_match_plan);
     RUN_TEST(test_waiting_mode_waveforms_keep_the_locked_audio_contrasts);
     return UNITY_END();

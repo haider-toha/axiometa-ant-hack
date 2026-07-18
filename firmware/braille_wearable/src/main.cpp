@@ -112,24 +112,25 @@ void clearServiceActivityMode() {
 }
 
 void submitCloudCommand(CloudCommand command, const char* name) {
-    if (!outputLatch.enabled) {
-        Serial.printf("COMMAND dropped=%s reason=output_stopped\n", name);
-        return;
-    }
-    if (!acceptsRelayCommand(currentActivity, command)) {
-        Serial.printf("COMMAND dropped=%s activity=%s reason=activity_gate\n",
-                      name, userActivityName(currentActivity));
-        return;
-    }
-    if (proximityCanRender()) {
-        Serial.printf("COMMAND dropped=%s activity=%s reason=local_proximity\n",
-                      name, userActivityName(currentActivity));
-        return;
-    }
-    if (sirenOutputActive()) {
-        Serial.printf("COMMAND dropped=%s activity=%s reason=local_siren\n",
-                      name, userActivityName(currentActivity));
-        return;
+    switch (evaluateCommandGate(outputLatch.enabled, currentActivity, command,
+                                proximityCanRender(), sirenOutputActive())) {
+        case CommandGate::OUTPUT_STOPPED:
+            Serial.printf("COMMAND dropped=%s reason=output_stopped\n", name);
+            return;
+        case CommandGate::ACTIVITY_GATE:
+            Serial.printf("COMMAND dropped=%s activity=%s reason=activity_gate\n",
+                          name, userActivityName(currentActivity));
+            return;
+        case CommandGate::LOCAL_PROXIMITY:
+            Serial.printf("COMMAND dropped=%s activity=%s reason=local_proximity\n",
+                          name, userActivityName(currentActivity));
+            return;
+        case CommandGate::LOCAL_SIREN:
+            Serial.printf("COMMAND dropped=%s activity=%s reason=local_siren\n",
+                          name, userActivityName(currentActivity));
+            return;
+        case CommandGate::ALLOW:
+            break;
     }
     const OutputPattern* pattern = cloudPattern(command);
     if (pattern == nullptr) {

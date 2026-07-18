@@ -499,7 +499,15 @@ Notation: `A` = Port 1 buzzer, `B` = Port 3 buzzer, `BOTH` = both (optional 30 m
 
 **Reading the table for buzzers:** the **Motors** column (A / B / BOTH) is unchanged in *routing* — A = Port 1 buzzer, B = Port 3 buzzer. The **Intensity** column is now a **drive-frequency** column: read "100 %" as *buzz band (~60–120 Hz)*, "65 %" as a quieter/shorter gate of the same band, and any ramp as a short frequency glide within the buzz band. No pattern depends on a precise amplitude level.
 
-**Directionality is cut.** LEFT, RIGHT, AHEAD, STOP, MOVE OVER, and TURN have no relay trigger or demo step. Existing P11–P13 source and tests may remain as dormant provenance so completed work is not destroyed, but runtime relay parsing, public controls, telemetry vocabulary, and stage claims must use only P0–P10. The MOVING phase demonstrates obstacle and siren awareness, not route guidance or bus-door approach.
+**Directionality is partly restored — camera-derived bus bearing only.** Superseded 2026-07-19 for LEFT, RIGHT, and AHEAD. **STOP, MOVE OVER, and TURN remain cut** and have no relay trigger or demo step.
+
+The original cut bundled two different claims together. The one that still holds is about **ToF**: a single forward ToF zone cannot choose a safe left/right bypass, so it must never emit a direction. That reasoning does not extend to the **camera**, which resolves the target's horizontal position directly — `vision/service.py` already returns `bearing: "left" | "center" | "right"` per detection with `target` marking the bus box, and has since the detector was written.
+
+P11–P13 are therefore live, not dormant: the phone maps the confirmed target bearing to LEFT/RIGHT/AHEAD and posts it to `/api/event`; the board accepts them **only while `activity == MOVING`**, mirroring how BUS/NUMBER/WAIT/UNKNOWN are accepted only while `STILL`. Bus information is the STILL payload; approach bearing is the MOVING payload.
+
+What this still does **not** claim: that the wearer can localise the two buzzers spatially (33.941 mm is far below the two-point threshold — the cue is the 2350/3050 Hz frequency contrast, not position), that this is verified navigation, or that the device can confirm the user moved correctly. It is an advisory nudge toward a *dwelling* bus, not turn-by-turn guidance, and low detector confidence must still fire P8 UNKNOWN rather than a guessed direction. The MOVING phase demonstrates obstacle awareness, siren awareness, **and** coarse camera-derived bus bearing.
+
+See `audit/bus-stop-situational-awareness/19-track-a-nav-contract.md` and `20-track-c-nav-firmware.md`.
 
 ### Discriminability analysis
 

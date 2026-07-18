@@ -20,7 +20,19 @@ static RelayCommand command(uint32_t seq, CloudCommand pattern,
     return result;
 }
 
-void test_wire_command_parser_accepts_only_six_cloud_patterns(void) {
+static uint8_t disposition(RelaySequenceState& state, const RelayCommand& input,
+                           UserActivity activity) {
+    return static_cast<uint8_t>(
+        consumeRelayCommand(state, input, activity).disposition);
+}
+
+static uint8_t gate(bool outputEnabled, UserActivity activity,
+                    CloudCommand input, bool proximity, bool siren) {
+    return static_cast<uint8_t>(
+        evaluateCommandGate(outputEnabled, activity, input, proximity, siren));
+}
+
+void test_wire_command_parser_accepts_the_nine_cloud_patterns(void) {
     TEST_ASSERT_EQUAL_UINT8(static_cast<uint8_t>(CloudCommand::NONE),
                             static_cast<uint8_t>(parseCloudCommand("NONE")));
     TEST_ASSERT_EQUAL_UINT8(static_cast<uint8_t>(CloudCommand::BUS),
@@ -34,16 +46,44 @@ void test_wire_command_parser_accepts_only_six_cloud_patterns(void) {
     TEST_ASSERT_EQUAL_UINT8(static_cast<uint8_t>(CloudCommand::ERROR),
                             static_cast<uint8_t>(parseCloudCommand("ERROR")));
 
-    TEST_ASSERT_EQUAL_UINT8(static_cast<uint8_t>(CloudCommand::INVALID),
+    // Camera-derived bus bearing. Previously parsed to INVALID and dropped.
+    TEST_ASSERT_EQUAL_UINT8(static_cast<uint8_t>(CloudCommand::LEFT),
                             static_cast<uint8_t>(parseCloudCommand("LEFT")));
-    TEST_ASSERT_EQUAL_UINT8(static_cast<uint8_t>(CloudCommand::INVALID),
+    TEST_ASSERT_EQUAL_UINT8(static_cast<uint8_t>(CloudCommand::RIGHT),
                             static_cast<uint8_t>(parseCloudCommand("RIGHT")));
-    TEST_ASSERT_EQUAL_UINT8(static_cast<uint8_t>(CloudCommand::INVALID),
+    TEST_ASSERT_EQUAL_UINT8(static_cast<uint8_t>(CloudCommand::AHEAD),
                             static_cast<uint8_t>(parseCloudCommand("AHEAD")));
+
+    // The parser stays closed and exact for everything else.
     TEST_ASSERT_EQUAL_UINT8(static_cast<uint8_t>(CloudCommand::INVALID),
                             static_cast<uint8_t>(parseCloudCommand("BUS ")));
     TEST_ASSERT_EQUAL_UINT8(static_cast<uint8_t>(CloudCommand::INVALID),
+                            static_cast<uint8_t>(parseCloudCommand("left")));
+    TEST_ASSERT_EQUAL_UINT8(static_cast<uint8_t>(CloudCommand::INVALID),
+                            static_cast<uint8_t>(parseCloudCommand("LEFT ")));
+    TEST_ASSERT_EQUAL_UINT8(static_cast<uint8_t>(CloudCommand::INVALID),
+                            static_cast<uint8_t>(parseCloudCommand("CENTRE")));
+    TEST_ASSERT_EQUAL_UINT8(static_cast<uint8_t>(CloudCommand::INVALID),
+                            static_cast<uint8_t>(parseCloudCommand("")));
+    TEST_ASSERT_EQUAL_UINT8(static_cast<uint8_t>(CloudCommand::INVALID),
                             static_cast<uint8_t>(parseCloudCommand(nullptr)));
+}
+
+void test_command_names_round_trip_through_the_wire_vocabulary(void) {
+    const CloudCommand all[] = {
+        CloudCommand::NONE, CloudCommand::BUS,   CloudCommand::NUMBER,
+        CloudCommand::WAIT, CloudCommand::UNKNOWN, CloudCommand::ERROR,
+        CloudCommand::LEFT, CloudCommand::RIGHT, CloudCommand::AHEAD,
+    };
+    for (uint8_t index = 0; index < sizeof(all) / sizeof(all[0]); ++index) {
+        TEST_ASSERT_EQUAL_UINT8(
+            static_cast<uint8_t>(all[index]),
+            static_cast<uint8_t>(parseCloudCommand(cloudCommandName(all[index]))));
+    }
+    TEST_ASSERT_EQUAL_STRING("LEFT", cloudCommandName(CloudCommand::LEFT));
+    TEST_ASSERT_EQUAL_STRING("RIGHT", cloudCommandName(CloudCommand::RIGHT));
+    TEST_ASSERT_EQUAL_STRING("AHEAD", cloudCommandName(CloudCommand::AHEAD));
+    TEST_ASSERT_EQUAL_STRING("INVALID", cloudCommandName(CloudCommand::INVALID));
 }
 
 void test_activity_parser_is_closed_for_missing_or_invalid_values(void) {
@@ -119,6 +159,122 @@ void test_still_accepts_fresh_bus_information_and_error_is_global(void) {
         static_cast<uint8_t>(RelayDisposition::ACCEPT),
         static_cast<uint8_t>(consumeRelayCommand(
             state, command(22, CloudCommand::ERROR), UserActivity::MOVING).disposition));
+}
+
+void test_activity_gate_truth_table_is_exhaustive(void) {
+    const CloudCommand commands[] = {
+        CloudCommand::NONE,    CloudCommand::BUS,   CloudCommand::NUMBER,
+        CloudCommand::WAIT,    CloudCommand::UNKNOWN, CloudCommand::ERROR,
+        CloudCommand::LEFT,    CloudCommand::RIGHT, CloudCommand::AHEAD,
+        CloudCommand::INVALID,
+    };
+    //                    NONE   BUS    NUM    WAIT   UNKN   ERR    LEFT   RIGHT  AHEAD  INVAL
+    const bool still[] = {true,  true,  true,  true,  true,  true,  false, false, false, false};
+    const bool moving[] = {true, false, false, false, false, true,  true,  true,  true,  false};
+    const bool unset[] = {true,  false, false, false, false, true,  false, false, false, false};
+
+    for (uint8_t index = 0; index < sizeof(commands) / sizeof(commands[0]); ++index) {
+        TEST_ASSERT_EQUAL_INT(
+            still[index], acceptsRelayCommand(UserActivity::STILL, commands[index]));
+        TEST_ASSERT_EQUAL_INT(
+            moving[index], acceptsRelayCommand(UserActivity::MOVING, commands[index]));
+        TEST_ASSERT_EQUAL_INT(
+            unset[index], acceptsRelayCommand(UserActivity::UNKNOWN, commands[index]));
+    }
+}
+
+void test_camera_bearing_renders_while_moving_and_is_suppressed_while_still(void) {
+    RelaySequenceState state{};
+    consumeRelayCommand(state, command(20, CloudCommand::NONE), UserActivity::MOVING);
+
+    TEST_ASSERT_EQUAL_UINT8(
+        static_cast<uint8_t>(RelayDisposition::ACCEPT),
+        disposition(state, command(21, CloudCommand::LEFT), UserActivity::MOVING));
+    TEST_ASSERT_EQUAL_UINT8(
+        static_cast<uint8_t>(RelayDisposition::ACCEPT),
+        disposition(state, command(22, CloudCommand::RIGHT), UserActivity::MOVING));
+    TEST_ASSERT_EQUAL_UINT8(
+        static_cast<uint8_t>(RelayDisposition::ACCEPT),
+        disposition(state, command(23, CloudCommand::AHEAD), UserActivity::MOVING));
+
+    // Bearing is the MOVING payload; standing at the stop suppresses it.
+    TEST_ASSERT_EQUAL_UINT8(
+        static_cast<uint8_t>(RelayDisposition::SUPPRESS),
+        disposition(state, command(24, CloudCommand::LEFT), UserActivity::STILL));
+    TEST_ASSERT_EQUAL_UINT8(
+        static_cast<uint8_t>(RelayDisposition::SUPPRESS),
+        disposition(state, command(25, CloudCommand::AHEAD), UserActivity::UNKNOWN));
+
+    // A suppressed bearing is consumed, not queued: it must not replay when
+    // activity later returns to MOVING.
+    TEST_ASSERT_EQUAL_UINT8(
+        static_cast<uint8_t>(RelayDisposition::UNCHANGED),
+        disposition(state, command(25, CloudCommand::AHEAD), UserActivity::MOVING));
+    TEST_ASSERT_EQUAL_UINT32(25, state.lastSeq);
+}
+
+void test_bearing_is_not_route_or_confidence_gated_like_number(void) {
+    RelaySequenceState state{};
+    consumeRelayCommand(state, command(20, CloudCommand::NONE), UserActivity::MOVING);
+
+    // The route/confidence gates exist to stop a false route-88 readout. A
+    // bearing carries neither, so an empty route and no confidence still render.
+    RelayCommand bearing = command(21, CloudCommand::RIGHT, "");
+    bearing.confidence = RelayConfidence::NO_CONFIDENCE;
+    TEST_ASSERT_EQUAL_UINT8(static_cast<uint8_t>(RelayDisposition::ACCEPT),
+                            disposition(state, bearing, UserActivity::MOVING));
+
+    RelayCommand mismatched = command(22, CloudCommand::LEFT, "87");
+    mismatched.confidence = RelayConfidence::LOW_CONFIDENCE;
+    TEST_ASSERT_EQUAL_UINT8(static_cast<uint8_t>(RelayDisposition::ACCEPT),
+                            disposition(state, mismatched, UserActivity::MOVING));
+
+    // The NUMBER gates are untouched by that.
+    TEST_ASSERT_EQUAL_UINT8(
+        static_cast<uint8_t>(RelayDisposition::ROUTE_MISMATCH),
+        disposition(state, command(23, CloudCommand::NUMBER, "87"),
+                    UserActivity::STILL));
+}
+
+void test_local_proximity_and_siren_outrank_accepted_cloud_commands(void) {
+    // Bearings are accepted in exactly the state where ToF proximity renders,
+    // so this precedence is what stops a bearing masking an obstacle.
+    TEST_ASSERT_TRUE(shouldRenderProximity(UserActivity::MOVING, true, true));
+
+    TEST_ASSERT_EQUAL_UINT8(
+        static_cast<uint8_t>(CommandGate::ALLOW),
+        gate(true, UserActivity::MOVING, CloudCommand::LEFT, false, false));
+    TEST_ASSERT_EQUAL_UINT8(
+        static_cast<uint8_t>(CommandGate::LOCAL_PROXIMITY),
+        gate(true, UserActivity::MOVING, CloudCommand::LEFT, true, false));
+    TEST_ASSERT_EQUAL_UINT8(
+        static_cast<uint8_t>(CommandGate::LOCAL_SIREN),
+        gate(true, UserActivity::MOVING, CloudCommand::AHEAD, false, true));
+    TEST_ASSERT_EQUAL_UINT8(
+        static_cast<uint8_t>(CommandGate::LOCAL_PROXIMITY),
+        gate(true, UserActivity::MOVING, CloudCommand::RIGHT, true, true));
+
+    // The STILL bus payload and the global ERROR keep the same subordination.
+    TEST_ASSERT_EQUAL_UINT8(
+        static_cast<uint8_t>(CommandGate::LOCAL_SIREN),
+        gate(true, UserActivity::STILL, CloudCommand::BUS, false, true));
+    TEST_ASSERT_EQUAL_UINT8(
+        static_cast<uint8_t>(CommandGate::LOCAL_SIREN),
+        gate(true, UserActivity::STILL, CloudCommand::ERROR, false, true));
+
+    // The emergency-stop latch outranks every source, local or cloud.
+    TEST_ASSERT_EQUAL_UINT8(
+        static_cast<uint8_t>(CommandGate::OUTPUT_STOPPED),
+        gate(false, UserActivity::MOVING, CloudCommand::LEFT, false, false));
+
+    // The activity gate is evaluated before local safety, so a STILL bearing
+    // reports the gate rather than a misleading proximity reason.
+    TEST_ASSERT_EQUAL_UINT8(
+        static_cast<uint8_t>(CommandGate::ACTIVITY_GATE),
+        gate(true, UserActivity::STILL, CloudCommand::LEFT, true, false));
+    TEST_ASSERT_EQUAL_UINT8(
+        static_cast<uint8_t>(CommandGate::ACTIVITY_GATE),
+        gate(true, UserActivity::MOVING, CloudCommand::INVALID, false, false));
 }
 
 void test_wrong_route_is_consumed_without_false_route_88_output(void) {
@@ -320,13 +476,18 @@ void test_entering_still_clears_rendered_proximity_but_moving_does_not(void) {
 
 int main(int, char**) {
     UNITY_BEGIN();
-    RUN_TEST(test_wire_command_parser_accepts_only_six_cloud_patterns);
+    RUN_TEST(test_wire_command_parser_accepts_the_nine_cloud_patterns);
+    RUN_TEST(test_command_names_round_trip_through_the_wire_vocabulary);
     RUN_TEST(test_activity_parser_is_closed_for_missing_or_invalid_values);
     RUN_TEST(test_confidence_parser_is_exact_and_closed);
     RUN_TEST(test_route_copy_is_bounded_and_only_exact_88_is_expected);
     RUN_TEST(test_first_command_is_a_non_rendering_baseline);
     RUN_TEST(test_moving_consumes_bus_information_without_render_or_replay);
     RUN_TEST(test_still_accepts_fresh_bus_information_and_error_is_global);
+    RUN_TEST(test_activity_gate_truth_table_is_exhaustive);
+    RUN_TEST(test_camera_bearing_renders_while_moving_and_is_suppressed_while_still);
+    RUN_TEST(test_bearing_is_not_route_or_confidence_gated_like_number);
+    RUN_TEST(test_local_proximity_and_siren_outrank_accepted_cloud_commands);
     RUN_TEST(test_wrong_route_is_consumed_without_false_route_88_output);
     RUN_TEST(test_low_confidence_route_88_is_consumed_without_output);
     RUN_TEST(test_duplicate_regressed_invalid_and_none_edges_do_not_render);

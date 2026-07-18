@@ -5,6 +5,13 @@
 
 inline constexpr uint32_t CLOUD_ACTIVITY_LEASE_MS = 120000;
 
+// Wire values are strings, never these ordinals. `parseCloudCommand()` and
+// `cloudCommandName()` are the only crossings, so members may be reordered.
+//
+// BUS/NUMBER/WAIT/UNKNOWN are the STILL payload: what the camera read at the
+// stop. LEFT/RIGHT/AHEAD are the MOVING payload: which side of the camera frame
+// the bus is on. That bearing is advisory and camera-derived; it is not a ToF
+// obstacle-avoidance instruction and never overrides the local safety paths.
 enum class CloudCommand : uint8_t {
     NONE = 0,
     BUS,
@@ -12,6 +19,9 @@ enum class CloudCommand : uint8_t {
     WAIT,
     UNKNOWN,
     ERROR,
+    LEFT,
+    RIGHT,
+    AHEAD,
     INVALID,
 };
 
@@ -94,6 +104,9 @@ inline CloudCommand parseCloudCommand(const char* value) {
     if (strcmp(value, "WAIT") == 0) return CloudCommand::WAIT;
     if (strcmp(value, "UNKNOWN") == 0) return CloudCommand::UNKNOWN;
     if (strcmp(value, "ERROR") == 0) return CloudCommand::ERROR;
+    if (strcmp(value, "LEFT") == 0) return CloudCommand::LEFT;
+    if (strcmp(value, "RIGHT") == 0) return CloudCommand::RIGHT;
+    if (strcmp(value, "AHEAD") == 0) return CloudCommand::AHEAD;
     return CloudCommand::INVALID;
 }
 
@@ -131,15 +144,49 @@ inline bool isExpectedRoute(const char* route) {
     return route != nullptr && strcmp(route, "88") == 0;
 }
 
+// Camera-derived bus bearing: which side of the frame the phone saw the bus on.
+inline bool isBearingCommand(CloudCommand command) {
+    return command == CloudCommand::LEFT || command == CloudCommand::RIGHT ||
+           command == CloudCommand::AHEAD;
+}
+
 inline bool acceptsRelayCommand(UserActivity activity, CloudCommand command) {
     if (command == CloudCommand::NONE || command == CloudCommand::ERROR) {
         return true;
+    }
+    if (isBearingCommand(command)) {
+        return activity == UserActivity::MOVING;
     }
     if (activity != UserActivity::STILL) {
         return false;
     }
     return command == CloudCommand::BUS || command == CloudCommand::NUMBER ||
            command == CloudCommand::WAIT || command == CloudCommand::UNKNOWN;
+}
+
+enum class CommandGate : uint8_t {
+    ALLOW = 0,
+    OUTPUT_STOPPED,
+    ACTIVITY_GATE,
+    LOCAL_PROXIMITY,
+    LOCAL_SIREN,
+};
+
+// Output arbitration for one cloud command, in precedence order. The local
+// safety paths outrank the cloud unconditionally: a command the activity gate
+// accepts is still dropped while ToF proximity or a siren alert owns the
+// buzzers. Bearing commands are accepted in exactly the state where proximity
+// may render, so this ordering is what keeps them from masking an obstacle.
+inline CommandGate evaluateCommandGate(bool outputEnabled,
+                                       UserActivity activity,
+                                       CloudCommand command,
+                                       bool proximityRendering,
+                                       bool sirenActive) {
+    if (!outputEnabled) return CommandGate::OUTPUT_STOPPED;
+    if (!acceptsRelayCommand(activity, command)) return CommandGate::ACTIVITY_GATE;
+    if (proximityRendering) return CommandGate::LOCAL_PROXIMITY;
+    if (sirenActive) return CommandGate::LOCAL_SIREN;
+    return CommandGate::ALLOW;
 }
 
 inline bool allowsProximityOutput(UserActivity activity) {
@@ -293,6 +340,9 @@ inline const char* cloudCommandName(CloudCommand command) {
         case CloudCommand::WAIT: return "WAIT";
         case CloudCommand::UNKNOWN: return "UNKNOWN";
         case CloudCommand::ERROR: return "ERROR";
+        case CloudCommand::LEFT: return "LEFT";
+        case CloudCommand::RIGHT: return "RIGHT";
+        case CloudCommand::AHEAD: return "AHEAD";
         case CloudCommand::INVALID: return "INVALID";
     }
     return "INVALID";

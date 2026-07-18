@@ -2,6 +2,8 @@
 
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
+> **⚠️ AUDIT IS AUTHORITATIVE:** `audit/speech-to-braille-wearable/` is the single source of truth. Where anything in this plan conflicts with an audit file, the audit file wins. The plan records original intent; the audit records what was physically verified and corrected. Always read the audit trail before implementing anything from this plan.
+
 **Goal:** Build a two-way communication wearable for Braille-literate deafblind people — a general-purpose device that turns any spoken utterance from a hearing person into a vibrotactile-Braille "gist" felt on the wrist, and lets the user pick an AI-drafted reply that the app speaks aloud.
 
 **Architecture:** Three cooperating parts, all reachable without a local phone↔device link. (1) A **Next.js web app on Vercel** (opened in the phone browser over HTTPS) captures the mic, proxies ElevenLabs + Anthropic through same-origin `/api/*` routes (keys in server env), and pushes a condensed keyword into an **Upstash Redis** relay. (2) The **ESP32-S3 (Axiometa Genesis Mini)** joins the phone's hotspot only for outbound internet, **polls Vercel** for new messages, and drives **2 ERM vibration motors** as Braille columns over timed beats. (3) The **AI loop** (inside the Vercel routes) cleans + condenses incoming speech and drafts reply suggestions with lightweight preference memory. Because the ESP32 only makes **outbound** calls to Vercel, there is no mixed-content problem and no hotspot client-isolation risk.
@@ -21,15 +23,15 @@ Every task's requirements implicitly include this section. Values are copied ver
 - **Throughput: buzz only a Claude-condensed keyword, hard cap 15 characters** (~48 s absolute worst case; aim ≤10 chars). Full verbatim is shown on screen only. This is mandatory — the channel runs ~3.4–4.4 words/min (Track 2 §3, Track 4 §7).
 - **Network (LOCKED): phone runs cellular + hotspot simultaneously; ESP32 joins the hotspot for outbound internet only; all traffic goes to Vercel.** No device-to-device link. iPhone: enable **Personal Hotspot → "Maximize Compatibility"** (ESP32 is 2.4 GHz-only) and keep the hotspot screen open during first connect.
 - **WiFi fallback ladder (LOCKED):** (1) phone hotspot → Vercel [primary]; (2) any other 2.4 GHz internet with no captive portal (Android hotspot, home router) → Vercel; (3) **local-only emergency:** ESP32 `softAP` mode serving a type-a-word page (no cloud AI, forward buzz only) — last resort, loses the AI pipeline (Track 4 §4).
-- **Pin map (LOCKED, from schematic — do NOT use the product-page Arduino example pin integers, which target the 8-port GENESIS One). Put the two motors on the two physically farthest-apart ports (diagonal corners of the central 2×2 cluster) to squeeze out the maximum separation the board allows — confirm the diagonal by eye; the default below assumes Port 1 & Port 4:**
-  | Function | Port (default) | Pin(s) → GPIO |
+- **Pin map (LOCKED — CORRECTED by `audit/speech-to-braille-wearable/20-enclosure-cad-consolidated.md §4`. Board photos + STEP geometry proved silk Ports 1 & 4 are ADJACENT, not diagonal. The true diagonal pairs are {1,3} and {2,4}. Motors are on the {1,3} diagonal for maximum separation. Do NOT use the old "Port 1 & Port 4" default — it is wrong):**
+  | Function | Port | Pin(s) → GPIO |
   |---|---|---|
-  | Motor A (left column) | Port 1 | Data = GPIO4 (IO0). GPIO3/IO1 floats — strapping-safe for a motor |
-  | Motor B (right column) | Port 4 (diagonal) | Data = GPIO1 (IO0) |
+  | Motor A (left column) | Port 1 | Data = GPIO4 (IO0) |
+  | Motor B (right column) | Port 3 **(diagonal to Port 1)** | Data = GPIO9 (IO0) |
   | LCD ST7735S (SPI) | Port 2 | CS=GPIO7, RST=GPIO6, DC=GPIO5 + shared MOSI=GPIO12, SCK=GPIO14, backlight BL |
-  | Rotary encoder | Port 3 | BT=GPIO9, CL/A=GPIO16, DT/B=GPIO15 |
+  | Rotary encoder | Port 4 **(corrected from Port 3)** | BT=GPIO1 (IO0), CL/A=GPIO17 (IO1), DT/B=GPIO18 (IO2) |
   | "Repeat last message" button | onboard | GPIO45 (no port cost) |
-  Full per-port GPIO (IO0/IO1/IO2) so any assignment maps cleanly: **P1=4/3/2 · P2=7/6/5 · P3=9/16/15 · P4=1/17/18**. Shared buses (all ports): MOSI12 / MISO13 / SCK14 / SDA10 / SCL11. I²C is unused in this build.
+  Full per-port GPIO (IO0/IO1/IO2): **P1=4/3/2 · P2=7/6/5 · P3=9/16/15 · P4=1/17/18**. Shared buses (all ports): MOSI12 / MISO13 / SCK14 / SDA10 / SCL11. I²C is unused in this build.
 - **Acceptance is scenario-agnostic and does NOT require a trained reader.** Success = for any spoken utterance in any face-to-face setting (retail, transit, service, workplace, social), the buzzed A/B beat sequence provably matches the on-screen caption checked against a printed Braille chart. The café is one example, never the scope.
 - **Pitch integrity (LOCKED):** claim "feel the **gist**," never "feel everything said." **Never** claim "world-first," "novel device," or "minimal training" — all are demolition targets (Track 1 §D). The honest, defensible novelty is the **LLM-suggested-reply loop** on commodity no-solder hardware.
 - **Serverless is stateless:** Vercel functions cannot persist a local file, so preference "memory" lives in Redis, not `memory.json` (correction to Track 4 §3).
@@ -307,17 +309,17 @@ Expected: `pull` shows `mode:"forward"`, `msg` a ≤15-char keyword, and a fresh
 
 - [ ] **Step 1: `pins.h`** — transcribe the LOCKED pin map verbatim:
 ```cpp
-#define MOTOR_L   4     // Port 1 IO0  — left column
-#define MOTOR_R   1     // Port 4 IO0  — right column (diagonal port = max on-board separation)
-#define LCD_CS    7     // Port 2 IO0
-#define LCD_RST   6     // Port 2 IO1
-#define LCD_DC    5     // Port 2 IO2
-#define LCD_MOSI  12    // shared
-#define LCD_SCLK  14    // shared
-#define ENC_BT    9     // Port 3 IO0
-#define ENC_CL    16    // Port 3 IO1  (channel A)
-#define ENC_DT    15    // Port 3 IO2  (channel B)
-#define BTN_REPEAT 45   // onboard user button
+#define MOTOR_L    4    // Port 1 IO0 — left Braille column (Motor A)
+#define MOTOR_R    9    // Port 3 IO0 — right Braille column (Motor B, diagonal to Port 1)
+#define LCD_CS     7    // Port 2 IO0
+#define LCD_RST    6    // Port 2 IO1
+#define LCD_DC     5    // Port 2 IO2
+#define LCD_MOSI   12   // shared SPI
+#define LCD_SCLK   14   // shared SPI
+#define ENC_BT     1    // Port 4 IO0 — encoder button
+#define ENC_CL     17   // Port 4 IO1 — channel A
+#define ENC_DT     18   // Port 4 IO2 — channel B
+#define BTN_REPEAT 45   // onboard user-45 button
 ```
 
 - [ ] **Step 2: WiFi join** (`net.cpp`) — `WiFi.mode(WIFI_STA); WiFi.begin(WIFI_SSID, WIFI_PASS);` loop until `WL_CONNECTED`; expose `String deviceIp()` = `WiFi.localIP().toString()`.

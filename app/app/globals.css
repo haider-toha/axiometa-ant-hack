@@ -1,0 +1,363 @@
+/*
+ * Speech-to-Braille companion app — global dark theme.
+ * Design source: audit/speech-to-braille-wearable/24-phase1a-ui-research.md
+ *  - bg #111, text #F5F5F5 (~17.3:1, clears WCAG 1.4.3 AA + 1.4.6 AAA)
+ *  - every non-text indicator (border / focus ring / RECORDING) clears 1.4.11 (>=3:1 on #111)
+ *  - AAA target size 2.5.5 (>=44x44 CSS px) enforced on every control
+ *  - reduced motion is the baseline; motion only under prefers-reduced-motion: no-preference
+ *  - single column, vertical-only -> Reflow 1.4.10 at 320px
+ */
+
+:root {
+  --bg: #111111;
+  --fg: #f5f5f5; /* primary text: ~17.3:1 on --bg */
+  --fg-muted: #d0d0d0; /* secondary text: still clears AAA 7:1 on --bg */
+  --border: #9a9a9a; /* non-text: ~6.7:1 on --bg (1.4.11 >= 3:1) */
+  --surface: #1a1a1a;
+  --surface-raised: #262626;
+  --accent: #ffd166; /* recording accent, amber; paired with shape + text, never hue-alone */
+  --focus: #f5f5f5; /* focus ring: near-white, high non-text contrast */
+  color-scheme: dark;
+}
+
+*,
+*::before,
+*::after {
+  box-sizing: border-box;
+}
+
+* {
+  margin: 0;
+  padding: 0;
+}
+
+html {
+  /* Never shrink below the 16px baseline (1A C4); allow user zoom / Dynamic Type. */
+  font-size: 100%;
+  -webkit-text-size-adjust: 100%;
+  text-size-adjust: 100%;
+}
+
+html,
+body {
+  min-height: 100%;
+  background-color: var(--bg);
+  color: var(--fg);
+  overflow-x: hidden; /* enforce single-axis scrolling (Reflow) */
+}
+
+body {
+  font-family:
+    -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial,
+    sans-serif;
+  line-height: 1.4;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+/*
+ * Visible focus indicator for every interactive element.
+ * >= 3px, >= 3:1 (near-white on #111), with offset so it never merges with a
+ * control's own border. Satisfies 2.4.7 Focus Visible.
+ */
+:focus-visible {
+  outline: 4px solid var(--focus);
+  outline-offset: 3px;
+  border-radius: 4px;
+}
+
+/* Only remove the default outline where we provide the :focus-visible one above. */
+:focus:not(:focus-visible) {
+  outline: none;
+}
+
+.visually-hidden {
+  position: absolute !important;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+  border: 0;
+}
+
+/* ---------- App shell ---------- */
+
+.app {
+  display: flex;
+  flex-direction: column;
+  min-height: 100vh;
+  min-height: 100dvh;
+  width: 100%;
+  max-width: 40rem;
+  margin: 0 auto;
+  padding: clamp(0.75rem, 3vw, 1.25rem);
+  gap: clamp(0.75rem, 2.5vh, 1.25rem);
+}
+
+.app__header {
+  display: flex;
+  flex-direction: column;
+  gap: 0.25rem;
+}
+
+.app__title {
+  font-size: clamp(1.25rem, 4vw, 1.5rem);
+  font-weight: 700;
+  letter-spacing: 0.01em;
+}
+
+.app__tagline {
+  font-size: 1rem;
+  color: var(--fg-muted);
+}
+
+/* ---------- Live regions ---------- */
+
+.statusRegion {
+  min-height: 1.5rem;
+  font-size: 1.125rem; /* >= 18px meta */
+  font-weight: 600;
+  color: var(--fg);
+}
+
+.alertRegion {
+  min-height: 0;
+  font-size: 1.125rem;
+  font-weight: 600;
+  color: var(--fg);
+}
+
+.alertRegion:not(:empty) {
+  padding: 0.75rem 1rem;
+  border: 3px solid var(--fg); /* non-text >= 3:1; error is text + shape, not color */
+  border-radius: 8px;
+  background: var(--surface);
+}
+
+/* ---------- Transcript / caption area (top, grows, scrolls internally) ---------- */
+
+.transcript {
+  flex: 1 1 auto;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  gap: clamp(0.75rem, 2.5vh, 1.25rem);
+  overflow-y: auto;
+}
+
+.captionRegion {
+  min-height: 2rem;
+}
+
+.caption {
+  font-size: clamp(1.75rem, 6vw, 2.5rem); /* 28-40px primary read */
+  font-weight: 600;
+  line-height: 1.25;
+  text-wrap: balance;
+}
+
+.buzzing {
+  margin-top: 0.5rem;
+  font-size: 1.125rem;
+  color: var(--fg-muted);
+}
+
+.buzzing__label {
+  font-weight: 700;
+  color: var(--fg);
+}
+
+.buzzing__word {
+  font-weight: 700;
+  color: var(--fg);
+}
+
+/* ---------- Suggestion cards ---------- */
+
+.cards {
+  display: flex;
+  flex-direction: column;
+  gap: 12px; /* >= 8px between targets (Material) */
+  list-style: none;
+}
+
+.cards__heading {
+  font-size: 1.125rem;
+  font-weight: 700;
+  margin-bottom: 0.25rem;
+}
+
+.card {
+  display: block;
+  width: 100%;
+  min-height: 64px; /* full-width card >= 64px tall (1A Part D) */
+  padding: 1rem 1.25rem;
+  font-size: clamp(1.25rem, 4vw, 1.5rem);
+  font-weight: 600;
+  text-align: left;
+  color: var(--fg);
+  background: var(--surface);
+  border: 2px solid var(--border); /* non-text >= 3:1 */
+  border-radius: 12px;
+  cursor: pointer;
+  font-family: inherit;
+}
+
+/* ---------- History ---------- */
+
+.history {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+}
+
+.history__title {
+  font-size: 1.125rem;
+  font-weight: 700;
+}
+
+.history__list {
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+  list-style: none;
+}
+
+.history__item {
+  padding: 0.75rem 1rem;
+  border: 2px solid var(--border);
+  border-radius: 10px;
+  background: var(--surface);
+}
+
+.history__line {
+  font-size: 1.0625rem;
+}
+
+.history__line + .history__line {
+  margin-top: 0.25rem;
+}
+
+.history__label {
+  font-weight: 700;
+}
+
+.history__reply {
+  color: var(--fg);
+}
+
+.history__heard {
+  color: var(--fg-muted);
+}
+
+/* ---------- Speak button (hero, anchored bottom, thumb zone) ---------- */
+
+.speakHelp {
+  font-size: 1.125rem;
+  color: var(--fg-muted);
+  text-align: center;
+}
+
+.speakButton {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 0.75rem;
+  width: 100%;
+  min-height: 28vh; /* full-width hero, ~25-30vh tall */
+  min-height: 28dvh;
+  padding: 1.5rem;
+  font-family: inherit;
+  color: var(--fg);
+  background: var(--surface);
+  border: 3px solid var(--border); /* non-text >= 3:1 */
+  border-radius: 20px;
+  cursor: pointer;
+  /* Make press-and-hold reliable: no scroll-steal, no long-press selection/callout. */
+  touch-action: none;
+  -webkit-user-select: none;
+  user-select: none;
+  -webkit-touch-callout: none;
+}
+
+.speakButton__label {
+  font-size: clamp(1.5rem, 5vw, 2rem);
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
+}
+
+/* Recording state: distinct by SHAPE + TEXT + colour together (never hue alone). */
+.speakButton--recording {
+  background: var(--surface-raised);
+  border-color: var(--fg); /* near-white, very high non-text contrast */
+  border-width: 5px;
+}
+
+.speakButton[aria-disabled="true"] {
+  cursor: default;
+  color: var(--fg-muted);
+}
+
+/* Non-text state indicator: idle = hollow circle, recording = filled square (stop). */
+.indicator {
+  width: 28px;
+  height: 28px;
+  border: 3px solid var(--fg);
+  border-radius: 50%;
+  background: transparent;
+}
+
+.speakButton--recording .indicator {
+  border-radius: 4px;
+  background: var(--accent);
+  border-color: var(--accent);
+}
+
+.speakButton__state {
+  font-size: 1.125rem;
+  font-weight: 600;
+  color: var(--fg);
+}
+
+/*
+ * Motion is OFF by default (reduced-motion baseline, 2.3.3).
+ * Enable transitions / the optional recording pulse ONLY when the user has not
+ * requested reduced motion.
+ */
+@media (prefers-reduced-motion: no-preference) {
+  .card,
+  .speakButton {
+    transition:
+      background-color 0.15s ease,
+      border-color 0.15s ease;
+  }
+
+  .speakButton--recording .indicator {
+    animation: pulse 1.4s ease-in-out infinite;
+  }
+
+  @keyframes pulse {
+    0%,
+    100% {
+      opacity: 1;
+    }
+    50% {
+      opacity: 0.55;
+    }
+  }
+}
+
+/* Hover feedback only on real hover/fine-pointer devices (not touch). */
+@media (hover: hover) and (pointer: fine) {
+  .card:hover {
+    background: var(--surface-raised);
+  }
+  .speakButton:hover:not([aria-disabled="true"]) {
+    background: var(--surface-raised);
+  }
+}

@@ -1,0 +1,353 @@
+.dashboard {
+  --left-channel: var(--category-teal-fg);
+  --left-channel-soft: var(--category-teal-bg);
+  --right-channel: var(--category-orange-fg);
+  --right-channel-soft: var(--category-orange-bg);
+  display: flex;
+  min-height: calc(100dvh - 3rem);
+  flex: 1;
+  flex-direction: column;
+  gap: 20px;
+  padding: 24px;
+  background: var(--background);
+  color: var(--foreground);
+}
+
+.header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 20px;
+}
+
+.eyebrow,
+.port {
+  margin: 0 0 4px;
+  color: var(--muted-foreground);
+  font-family: var(--font-mono);
+  font-size: 12px;
+  line-height: 1.2;
+  text-transform: uppercase;
+}
+
+.title {
+  margin: 0;
+  font-size: 24px;
+  font-weight: 600;
+  line-height: 1.2;
+}
+
+.connectionControls,
+.connectionStatus {
+  display: flex;
+  align-items: center;
+}
+
+.connectionControls {
+  gap: 16px;
+}
+
+.connectionStatus {
+  gap: 8px;
+  color: var(--muted-foreground);
+  font-size: 13px;
+  white-space: nowrap;
+}
+
+.statusDot {
+  width: 8px;
+  height: 8px;
+  border: 1px solid var(--neutral-9);
+  border-radius: 50%;
+  background: transparent;
+}
+
+.connectionStatus[data-connection="connected"] .statusDot {
+  border-color: var(--success);
+  background: var(--success);
+}
+
+.connectionStatus[data-connection="connecting"] .statusDot,
+.connectionStatus[data-connection="checking"] .statusDot {
+  border-color: var(--warning);
+  background: var(--warning);
+  animation: blink 1s ease-in-out infinite;
+}
+
+.connectionStatus[data-connection="error"] .statusDot,
+.connectionStatus[data-connection="unsupported"] .statusDot {
+  border-color: var(--destructive);
+  background: var(--destructive);
+}
+
+.notice,
+.error {
+  margin: -8px 0 0;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  padding: 10px 12px;
+  font-size: 13px;
+}
+
+.notice {
+  background: var(--category-yellow-bg);
+  color: var(--category-yellow-fg);
+}
+
+.error {
+  background: var(--category-red-bg);
+  color: var(--category-red-fg);
+}
+
+.channels {
+  display: grid;
+  min-height: 360px;
+  flex: 1;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+  gap: 16px;
+}
+
+.channel {
+  display: flex;
+  min-width: 0;
+  flex-direction: column;
+  justify-content: space-between;
+  overflow: hidden;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 20px;
+  background: var(--card);
+}
+
+.channelHeader {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 16px;
+}
+
+.channelHeader h2 {
+  margin: 0;
+  font-size: 36px;
+  font-weight: 600;
+  line-height: 1;
+}
+
+.channelState {
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  padding: 5px 7px;
+  color: var(--muted-foreground);
+  font-family: var(--font-mono);
+  font-size: 11px;
+}
+
+.left .channelState[data-state="active"] {
+  border-color: var(--left-channel);
+  background: var(--left-channel-soft);
+  color: var(--left-channel);
+}
+
+.right .channelState[data-state="active"] {
+  border-color: var(--right-channel);
+  background: var(--right-channel-soft);
+  color: var(--right-channel);
+}
+
+.actuatorStage {
+  display: grid;
+  min-height: 0;
+  flex: 1;
+  place-items: center;
+  padding: 12px 0;
+}
+
+.actuator {
+  position: relative;
+  display: grid;
+  width: min(29vh, 68%, 280px);
+  aspect-ratio: 1;
+  place-items: center;
+  border: 2px solid var(--neutral-7);
+  border-radius: 50%;
+  background: var(--neutral-3);
+  transition: border-color 120ms ease-out, background-color 120ms ease-out, transform 120ms ease-out;
+}
+
+.actuator::before,
+.actuator::after {
+  position: absolute;
+  content: "";
+  border: 1px solid var(--neutral-7);
+  border-radius: 50%;
+  opacity: 0.45;
+}
+
+.actuator::before {
+  inset: 14%;
+}
+
+.actuator::after {
+  inset: 29%;
+}
+
+.actuatorCore {
+  width: 22%;
+  aspect-ratio: 1;
+  border-radius: 50%;
+  background: var(--neutral-9);
+}
+
+.left .actuator[data-active="true"] {
+  border-color: var(--left-channel);
+  background: var(--left-channel-soft);
+  animation: actuatorPulse 420ms ease-in-out infinite alternate;
+}
+
+.right .actuator[data-active="true"] {
+  border-color: var(--right-channel);
+  background: var(--right-channel-soft);
+  animation: actuatorPulse 280ms ease-in-out infinite alternate;
+}
+
+.left .actuator[data-active="true"]::before,
+.left .actuator[data-active="true"]::after {
+  border-color: var(--left-channel);
+}
+
+.right .actuator[data-active="true"]::before,
+.right .actuator[data-active="true"]::after {
+  border-color: var(--right-channel);
+}
+
+.left .actuator[data-active="true"] .actuatorCore {
+  background: var(--left-channel);
+}
+
+.right .actuator[data-active="true"] .actuatorCore {
+  background: var(--right-channel);
+}
+
+.frequency {
+  margin: 0;
+  overflow-wrap: anywhere;
+  font-family: var(--font-mono);
+  font-size: 30px;
+  font-variant-numeric: tabular-nums;
+  line-height: 1;
+  text-align: center;
+}
+
+.history {
+  display: grid;
+  grid-template-columns: 150px minmax(0, 1fr);
+  align-items: center;
+  gap: 16px;
+  border-top: 1px solid var(--border);
+  padding-top: 16px;
+}
+
+.historyHeader h2,
+.historyHeader span {
+  margin: 0;
+}
+
+.historyHeader h2 {
+  font-size: 13px;
+  font-weight: 500;
+}
+
+.historyHeader span {
+  color: var(--muted-foreground);
+  font-size: 11px;
+}
+
+.historyTrack {
+  display: flex;
+  height: 42px;
+  min-width: 0;
+  align-items: stretch;
+  gap: 4px;
+  overflow: hidden;
+}
+
+.emptyHistory {
+  width: 100%;
+  border: 1px dashed var(--neutral-7);
+  border-radius: 4px;
+}
+
+.historyEvent {
+  display: grid;
+  min-width: 8px;
+  flex: 1;
+  grid-template-rows: 1fr 1fr;
+  gap: 2px;
+}
+
+.historyEvent > span {
+  border-radius: 2px;
+  background: var(--neutral-4);
+}
+
+.historyEvent > span[data-side="left"][data-active="true"] {
+  background: var(--left-channel);
+}
+
+.historyEvent > span[data-side="right"][data-active="true"] {
+  background: var(--right-channel);
+}
+
+@keyframes actuatorPulse {
+  from { transform: scale(0.97); }
+  to { transform: scale(1.02); }
+}
+
+@keyframes blink {
+  50% { opacity: 0.35; }
+}
+
+@media (max-width: 700px) {
+  .dashboard {
+    gap: 16px;
+    padding: 16px;
+  }
+
+  .header {
+    align-items: flex-start;
+    flex-direction: column;
+  }
+
+  .connectionControls {
+    width: 100%;
+    justify-content: space-between;
+  }
+
+  .channels {
+    grid-template-columns: 1fr;
+  }
+
+  .channel {
+    min-height: 330px;
+  }
+
+  .channelHeader h2 {
+    font-size: 28px;
+  }
+
+  .frequency {
+    font-size: 24px;
+  }
+
+  .history {
+    grid-template-columns: 1fr;
+    gap: 8px;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .actuator[data-active="true"],
+  .connectionStatus .statusDot {
+    animation: none;
+  }
+}

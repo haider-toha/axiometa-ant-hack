@@ -89,4 +89,18 @@ describe("OutputMonitor serial lifecycle", () => {
     expect(sessions[0].close).toHaveBeenCalledOnce();
     expect(screen.getByText("Disconnected")).toBeInTheDocument();
   });
+
+  it("can reconnect after a serial read error", async () => {
+    const port = {} as SerialPort;
+    serialMocks.getGrantedOutputPort.mockResolvedValue(port);
+    render(<OutputMonitor />);
+    await screen.findByText("USB connected");
+
+    act(() => handlers[0].onError("read failed"));
+    expect(screen.getByText("Connection error")).toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole("button", { name: "Connect device" }));
+    await waitFor(() => expect(serialMocks.openOutputSerialSession).toHaveBeenCalledTimes(2));
+    expect(screen.getByText("USB connected")).toBeInTheDocument();
+  });
 });

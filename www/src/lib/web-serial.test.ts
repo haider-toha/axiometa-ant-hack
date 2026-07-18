@@ -86,7 +86,7 @@ describe("Web Serial helpers", () => {
   });
 
   it("preserves a read error instead of replacing it with disconnected", async () => {
-    const { port, streamController } = createPort();
+    const { port, close, streamController } = createPort();
     const onDisconnect = vi.fn();
     const onError = vi.fn();
     const session = await openOutputSerialSession(port, {
@@ -100,6 +100,7 @@ describe("Web Serial helpers", () => {
 
     expect(onError).toHaveBeenCalledWith("read failed");
     expect(onDisconnect).not.toHaveBeenCalled();
+    expect(close).toHaveBeenCalledOnce();
   });
 
   it("provides an actionable message for a busy port", () => {

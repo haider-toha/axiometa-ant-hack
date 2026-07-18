@@ -86,6 +86,7 @@ export function OutputMonitor() {
           },
           onError: (message) => {
             if (generationRef.current !== generation) return;
+            sessionRef.current = null;
             setError(message);
             setConnection("error");
           },

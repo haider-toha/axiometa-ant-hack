@@ -1,9 +1,12 @@
 #include <Arduino.h>
+#include <math.h>
+#include <string.h>
 
 #include "audio.h"
 #include "haptic.h"
 #include "haptic_pure.h"
 #include "navigation_pure.h"
+#include "net.h"
 #include "patterns.h"
 #include "siren_runtime_pure.h"
 #include "tof.h"
@@ -13,7 +16,9 @@ namespace {
 constexpr uint16_t PROXIMITY_PULSE_ON_MS = 120;
 constexpr uint32_t READY_DELAY_MS = 1100;
 
-BoardMode boardMode = BoardMode::WAITING;
+ActivityControlState activityControl;
+RelaySequenceState relaySequence;
+UserActivity currentActivity = UserActivity::MOVING;
 PatternPlayer cloudPlayer;
 PatternPlayer sirenPlayer;
 OutputEnableLatch outputLatch;
@@ -31,15 +36,18 @@ uint32_t proximityClearingStartedMs = 0;
 uint32_t nextProximityTransitionMs = 0;
 bool readyPending = true;
 uint32_t readyEligibleAtMs = 0;
-
-const char* modeName(BoardMode mode) {
-    return mode == BoardMode::NAVIGATION ? "NAVIGATION" : "WAITING";
-}
+RelayTelemetry relayTelemetry;
+uint32_t lastTelemetryPublishMs = 0;
 
 void startSirenOutput(SirenDecision decision, uint32_t nowMs);
 
 bool sirenOutputActive() {
     return activeSirenOutput != SirenDecision::NONE;
+}
+
+bool proximityCanRender() {
+    return shouldRenderProximity(currentActivity, proximityActive,
+                                 proximityOutputAllowed);
 }
 
 const OutputPattern& patternForSirenDecision(SirenDecision decision) {
@@ -54,19 +62,53 @@ const OutputPattern& patternForSirenDecision(SirenDecision decision) {
 
 void stopCloudPattern() {
     stopPattern(cloudPlayer);
-    if (!proximityActive && !sirenOutputActive()) {
+    if (!proximityCanRender() && !sirenOutputActive()) {
         hapticStop();
     }
 }
 
-void setMode(BoardMode mode) {
-    if (boardMode == mode) {
-        Serial.printf("MODE unchanged=%s\n", modeName(mode));
+void refreshEffectiveActivity(uint32_t nowMs, const char* source) {
+    const UserActivity nextActivity = effectiveActivity(activityControl, nowMs);
+    if (currentActivity == nextActivity) {
         return;
     }
-    boardMode = mode;
-    stopCloudPattern();
-    Serial.printf("MODE changed=%s source=serial_phone_stub\n", modeName(mode));
+
+    const UserActivity previousActivity = currentActivity;
+    currentActivity = nextActivity;
+    stopPattern(cloudPlayer);
+    if (activityTransitionClearsProximity(previousActivity, currentActivity)) {
+        proximityToneOn = false;
+        proximityClearing = false;
+        if (!sirenOutputActive()) {
+            hapticStop();
+        }
+        Serial.printf("PROXIMITY output=cleared reason=activity_%s\n",
+                      userActivityName(currentActivity));
+    } else if (proximityCanRender() && !sirenOutputActive()) {
+        stopPattern(cloudPlayer);
+        proximityToneOn = false;
+        proximityClearing = true;
+        proximityClearingStartedMs = nowMs;
+        hapticStop();
+    }
+    Serial.printf("ACTIVITY changed=%s previous=%s source=%s\n",
+                  userActivityName(currentActivity),
+                  userActivityName(previousActivity), source);
+}
+
+void setServiceActivityMode(UserActivity activity) {
+    if (activity == UserActivity::UNKNOWN) {
+        return;
+    }
+    setServiceActivity(activityControl, activity);
+    refreshEffectiveActivity(millis(), "service_serial");
+    Serial.printf("ACTIVITY service_override=%s\n", userActivityName(activity));
+}
+
+void clearServiceActivityMode() {
+    clearServiceActivity(activityControl);
+    refreshEffectiveActivity(millis(), "relay_control");
+    Serial.println(F("ACTIVITY service_override=cleared source=relay"));
 }
 
 void submitCloudCommand(CloudCommand command, const char* name) {
@@ -74,16 +116,19 @@ void submitCloudCommand(CloudCommand command, const char* name) {
         Serial.printf("COMMAND dropped=%s reason=output_stopped\n", name);
         return;
     }
-    if (!acceptsCloudCommand(boardMode, command)) {
-        Serial.printf("COMMAND dropped=%s mode=%s reason=mode_gate\n", name, modeName(boardMode));
+    if (!acceptsRelayCommand(currentActivity, command)) {
+        Serial.printf("COMMAND dropped=%s activity=%s reason=activity_gate\n",
+                      name, userActivityName(currentActivity));
         return;
     }
-    if (proximityActive) {
-        Serial.printf("COMMAND dropped=%s mode=%s reason=local_proximity\n", name, modeName(boardMode));
+    if (proximityCanRender()) {
+        Serial.printf("COMMAND dropped=%s activity=%s reason=local_proximity\n",
+                      name, userActivityName(currentActivity));
         return;
     }
     if (sirenOutputActive()) {
-        Serial.printf("COMMAND dropped=%s mode=%s reason=local_siren\n", name, modeName(boardMode));
+        Serial.printf("COMMAND dropped=%s activity=%s reason=local_siren\n",
+                      name, userActivityName(currentActivity));
         return;
     }
     const OutputPattern* pattern = cloudPattern(command);
@@ -92,21 +137,44 @@ void submitCloudCommand(CloudCommand command, const char* name) {
         return;
     }
     startPattern(cloudPlayer, *pattern, millis());
-    Serial.printf("COMMAND accepted=%s mode=%s\n", name, modeName(boardMode));
+    Serial.printf("COMMAND accepted=%s activity=%s\n", name,
+                  userActivityName(currentActivity));
+}
+
+void submitServiceDirection(ServiceDirection direction, const char* name) {
+    if (!outputLatch.enabled) {
+        Serial.printf("CHANNEL_SIMULATION dropped=%s reason=output_stopped\n", name);
+        return;
+    }
+    if (currentActivity != UserActivity::MOVING) {
+        Serial.printf("CHANNEL_SIMULATION dropped=%s activity=%s reason=movement_only\n",
+                      name, userActivityName(currentActivity));
+        return;
+    }
+    if (proximityCanRender() || sirenOutputActive()) {
+        Serial.printf("CHANNEL_SIMULATION dropped=%s reason=local_priority\n", name);
+        return;
+    }
+    const OutputPattern* pattern = serviceDirectionPattern(direction);
+    if (pattern != nullptr) {
+        startPattern(cloudPlayer, *pattern, millis());
+        Serial.printf("CHANNEL_SIMULATION accepted=%s claim=concept_only\n", name);
+    }
 }
 
 void printHelp() {
     Serial.println();
-    Serial.println(F("=== Integrated board firmware: ToF + PDM siren + two runtime modes ==="));
-    Serial.println(F("n  phone MOVING stub -> NAVIGATION mode"));
-    Serial.println(F("s  phone STILL stub -> WAITING mode"));
-    Serial.println(F("l/r/a  LEFT, RIGHT, or AHEAD navigation command"));
-    Serial.println(F("b/w  BUS or WAIT predefined waiting-mode scenario"));
-    Serial.println(F("8/u/e  route 88, UNKNOWN, or ERROR waiting-mode scenario"));
+    Serial.println(F("=== Integrated board firmware: local sensing + relay gate ==="));
+    Serial.println(F("n/s  service override MOVING or STILL"));
+    Serial.println(F("c  clear service override and return activity control to relay"));
+    Serial.println(F("l/r/a  conceptual channel simulation only; no sensed direction"));
+    Serial.println(F("b/w  BUS or WAIT relay-scenario input"));
+    Serial.println(F("8/u/e  route 88, UNKNOWN, or ERROR relay-scenario input"));
     Serial.println(F("x  emergency stop all output; sensing continues"));
     Serial.println(F("o  resume board output after an emergency stop"));
     Serial.println(F("h  print this help"));
-    Serial.println(F("ToF and siren sensing run locally in both modes."));
+    Serial.println(F("ToF samples in both states but outputs only while MOVING."));
+    Serial.println(F("Siren sensing and output run locally in both states."));
     Serial.println();
 }
 
@@ -115,11 +183,12 @@ void handleSerial(char command) {
         command = static_cast<char>(command - 'A' + 'a');
     }
     switch (command) {
-        case 'n': setMode(BoardMode::NAVIGATION); break;
-        case 's': setMode(BoardMode::WAITING); break;
-        case 'l': submitCloudCommand(CloudCommand::LEFT, "LEFT"); break;
-        case 'r': submitCloudCommand(CloudCommand::RIGHT, "RIGHT"); break;
-        case 'a': submitCloudCommand(CloudCommand::AHEAD, "AHEAD"); break;
+        case 'n': setServiceActivityMode(UserActivity::MOVING); break;
+        case 's': setServiceActivityMode(UserActivity::STILL); break;
+        case 'c': clearServiceActivityMode(); break;
+        case 'l': submitServiceDirection(ServiceDirection::LEFT, "LEFT"); break;
+        case 'r': submitServiceDirection(ServiceDirection::RIGHT, "RIGHT"); break;
+        case 'a': submitServiceDirection(ServiceDirection::AHEAD, "AHEAD"); break;
         case 'b': submitCloudCommand(CloudCommand::BUS, "BUS"); break;
         case 'w': submitCloudCommand(CloudCommand::WAIT, "WAIT"); break;
         case '8': submitCloudCommand(CloudCommand::NUMBER, "NUMBER_88"); break;
@@ -138,7 +207,7 @@ void handleSerial(char command) {
             break;
         case 'o':
             resumeOutput(outputLatch);
-            if (proximityActive) {
+            if (proximityCanRender()) {
                 proximityToneOn = false;
                 proximityClearing = true;
                 proximityClearingStartedMs = millis();
@@ -161,17 +230,17 @@ void startSirenOutput(SirenDecision decision, uint32_t nowMs) {
                       sirenDecisionName(decision));
         return;
     }
-    if (!canStartSirenOutput(decision, activeSirenOutput, proximityActive)) {
+    if (!canStartSirenOutput(decision, activeSirenOutput, proximityCanRender())) {
         Serial.printf("SIREN_OUTPUT dropped=%s active=%s proximity=%u reason=priority\n",
                       sirenDecisionName(decision),
                       sirenDecisionName(activeSirenOutput),
-                      proximityActive ? 1 : 0);
+                      proximityCanRender() ? 1 : 0);
         return;
     }
 
     const bool preempting = patternOutput(cloudPlayer).active ||
                             patternOutput(sirenPlayer).active ||
-                            (proximityActive && proximityOutputAllowed);
+                            proximityCanRender();
     stopPattern(cloudPlayer);
     stopPattern(sirenPlayer);
     proximityToneOn = false;
@@ -203,6 +272,12 @@ void serviceAudio(uint32_t nowMs) {
 
     AudioTelemetry telemetry{};
     if (audioPollTelemetry(telemetry)) {
+        constexpr float BAND_BIN_COUNT =
+            SIREN_ENERGY_LAST_BIN - SIREN_ENERGY_FIRST_BIN + 1;
+        relayTelemetry.bandRms = sqrtf(telemetry.features.bandEnergy / BAND_BIN_COUNT);
+        relayTelemetry.peakHz = static_cast<uint16_t>(
+            telemetry.features.peakBin * SIREN_BIN_HZ);
+        relayTelemetry.trendRising = telemetry.decision == SirenDecision::DANGER;
         Serial.printf(
             "AUDIO frames=%lu partial=%lu errors=%lu dropped=%lu sigma=%.1f "
             "band=%.3e floor=%.3e peak_bin=%u peak_ratio=%.3f health=%s decision=%s\n",
@@ -221,14 +296,16 @@ void serviceAudio(uint32_t nowMs) {
 }
 
 void serviceReady(uint32_t nowMs) {
-    if (!readyPending || !outputLatch.enabled || proximityActive ||
+    if (!readyPending || !outputLatch.enabled || proximityCanRender() ||
         sirenOutputActive() || patternOutput(cloudPlayer).active ||
         static_cast<int32_t>(nowMs - readyEligibleAtMs) < 0) {
         return;
     }
     readyPending = false;
     startPattern(cloudPlayer, READY_PATTERN, nowMs);
-    Serial.println(F("READY mode=WAITING transport=serial_phone_stub tof=local mic=local"));
+    Serial.printf("READY activity=%s transport=%s tof=local mic=local\n",
+                  userActivityName(currentActivity),
+                  relayNetworkConfigured() ? "relay" : "offline_service");
 }
 
 void serviceSerial() {
@@ -243,43 +320,131 @@ void applyTofUpdate(const TofUpdate& update, uint32_t nowMs) {
     }
 
     const bool wasActive = proximityActive;
+    const bool wasRendering = proximityCanRender();
     proximityActive = update.proximity.active;
     proximityOutputAllowed = update.proximity.outputAllowed;
     proximityGapMs = update.proximity.pulseGapMs;
+    if (update.status == 0 && update.distanceMm > 0) {
+        relayTelemetry.tofMm = update.distanceMm;
+    }
 
     if (update.proximity.entered) {
-        stopPattern(cloudPlayer);
-        if (activeSirenOutput == SirenDecision::SIREN_WARNING) {
-            stopPattern(sirenPlayer);
-            activeSirenOutput = SirenDecision::NONE;
-            pendingSirenPattern = nullptr;
-            sirenClearing = false;
+        if (proximityCanRender()) {
+            stopPattern(cloudPlayer);
+            if (activeSirenOutput == SirenDecision::SIREN_WARNING) {
+                stopPattern(sirenPlayer);
+                activeSirenOutput = SirenDecision::NONE;
+                pendingSirenPattern = nullptr;
+                sirenClearing = false;
+            }
+            proximityToneOn = false;
+            if (!sirenOutputActive()) {
+                proximityClearing = true;
+                proximityClearingStartedMs = nowMs;
+                hapticStop();
+            }
         }
-        proximityToneOn = false;
-        if (!sirenOutputActive()) {
-            proximityClearing = true;
-            proximityClearingStartedMs = nowMs;
-            hapticStop();
-        }
-        Serial.printf("PROXIMITY entered mm=%u mode=%s\n",
+        Serial.printf("PROXIMITY entered mm=%u activity=%s output=%s\n",
                       update.distanceMm,
-                      modeName(boardMode));
+                      userActivityName(currentActivity),
+                      proximityCanRender() ? "enabled" : "suppressed");
     }
     if (update.proximity.exited) {
         proximityToneOn = false;
         proximityClearing = false;
-        if (!sirenOutputActive()) {
+        if (wasRendering && !sirenOutputActive()) {
             hapticStop();
         }
         Serial.println(F("PROXIMITY exited"));
     }
-    if (wasActive && !proximityOutputAllowed) {
+    if (wasActive && !proximityOutputAllowed &&
+        allowsProximityOutput(currentActivity)) {
         proximityToneOn = false;
-        hapticStop();
+        if (!sirenOutputActive()) {
+            hapticStop();
+        }
     }
     if (update.timedOut) {
         Serial.println(F("TOF invalid=range_timeout output=revoked"));
     }
+}
+
+void serviceRelay(uint32_t nowMs) {
+    RelayUpdate update{};
+    while (relayPollUpdate(update)) {
+        if (update.resetCommandBaseline) {
+            resetRelayControlAfterOutage(relaySequence, activityControl);
+            refreshEffectiveActivity(nowMs, "long_outage");
+            Serial.println(F("RELAY command=baseline_reset activity=invalidated reason=long_outage"));
+        }
+        if (update.hasActivity) {
+            if (update.activity == UserActivity::UNKNOWN) {
+                invalidateCloudActivity(activityControl);
+                Serial.printf("RELAY activity=invalidated override=%u\n",
+                              activityControl.serviceOverride ? 1 : 0);
+            } else {
+                applyCloudActivity(activityControl, update.activity, nowMs);
+                Serial.printf("RELAY activity=%s seq=%lu override=%u\n",
+                              userActivityName(update.activity),
+                              static_cast<unsigned long>(update.activitySeq),
+                              activityControl.serviceOverride ? 1 : 0);
+            }
+            refreshEffectiveActivity(nowMs, "relay");
+        }
+        if (!update.hasCommand) {
+            continue;
+        }
+
+        const RelayDecision decision = consumeRelayCommand(
+            relaySequence, update.command, currentActivity);
+        if (decision.sequenceGap) {
+            Serial.printf("RELAY command=gap seq=%lu missed=%lu\n",
+                          static_cast<unsigned long>(update.command.seq),
+                          static_cast<unsigned long>(decision.missedCount));
+        }
+        Serial.printf(
+            "RELAY command=%s pattern=%s seq=%lu activity=%s route=%s\n",
+            relayDispositionName(decision.disposition),
+            cloudCommandName(update.command.pattern),
+            static_cast<unsigned long>(update.command.seq),
+            userActivityName(currentActivity), update.command.route);
+
+        if (decision.disposition == RelayDisposition::ACCEPT) {
+            submitCloudCommand(update.command.pattern,
+                               cloudCommandName(update.command.pattern));
+        } else if (decision.disposition == RelayDisposition::NO_OUTPUT) {
+            stopCloudPattern();
+        }
+    }
+}
+
+const char* currentlyPlayingName() {
+    if (!outputLatch.enabled) {
+        return "NONE";
+    }
+    if (sirenOutputActive()) {
+        if (activeSirenOutput == SirenDecision::SIREN_WARNING) return "SIREN";
+        return sirenDecisionName(activeSirenOutput);
+    }
+    if (proximityCanRender()) {
+        return "PROXIMITY";
+    }
+    if (cloudPlayer.pattern == nullptr || !patternOutput(cloudPlayer).active) {
+        return "NONE";
+    }
+    if (cloudPlayer.pattern == &NUMBER_PATTERN) {
+        return "NUMBER";
+    }
+    return cloudPlayer.pattern->name;
+}
+
+void serviceRelayTelemetry(uint32_t nowMs) {
+    if (static_cast<uint32_t>(nowMs - lastTelemetryPublishMs) < 500) {
+        return;
+    }
+    lastTelemetryPublishMs = nowMs;
+    copyRelayRoute(relayTelemetry.playing, currentlyPlayingName());
+    relayPublishTelemetry(relayTelemetry);
 }
 
 void serviceOutput(uint32_t nowMs) {
@@ -300,7 +465,7 @@ void serviceOutput(uint32_t nowMs) {
         if (tickPattern(sirenPlayer, nowMs)) {
             activeSirenOutput = SirenDecision::NONE;
             hapticStop();
-            if (proximityActive) {
+            if (proximityCanRender()) {
                 proximityClearing = true;
                 proximityClearingStartedMs = nowMs;
             }
@@ -310,11 +475,7 @@ void serviceOutput(uint32_t nowMs) {
         hapticWrite(output.p1Hz, output.p3Hz);
         return;
     }
-    if (proximityActive) {
-        if (!proximityOutputAllowed) {
-            hapticStop();
-            return;
-        }
+    if (proximityCanRender()) {
         if (proximityClearing) {
             if (!clearingGapElapsed(nowMs, proximityClearingStartedMs)) {
                 hapticStop();
@@ -362,18 +523,25 @@ void setup() {
     if (!audioBegin()) {
         haltWithError("ERROR component=microphone reason=init_failed");
     }
+    if (!relayStart()) {
+        Serial.println(F("RELAY start=degraded local_sensing=active"));
+    }
 
     readyEligibleAtMs = millis() + READY_DELAY_MS;
-    Serial.println(F("BOOTING sensors=active acoustic_bootstrap_ms=1100"));
+    Serial.printf("BOOTING sensors=active activity=%s acoustic_bootstrap_ms=1100\n",
+                  userActivityName(currentActivity));
     printHelp();
 }
 
 void loop() {
     serviceSerial();
     const uint32_t nowMs = millis();
+    refreshEffectiveActivity(nowMs, "activity_lease");
+    serviceRelay(nowMs);
     serviceAudio(nowMs);
     applyTofUpdate(tofService(nowMs), nowMs);
     serviceReady(nowMs);
     serviceOutput(nowMs);
+    serviceRelayTelemetry(nowMs);
     delay(1);
 }

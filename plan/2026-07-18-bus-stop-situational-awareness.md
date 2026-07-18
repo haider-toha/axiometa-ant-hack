@@ -1,10 +1,10 @@
-# Bus-Stop Navigation and Situational Awareness — Implementation Plan
+# Bus-Stop Movement Safety and Situational Awareness — Implementation Plan
 
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
-**Goal:** Build the sensing, classification, navigation, relay, and output-pattern prototype for a wrist-worn DeafBlind navigation and situational-awareness product. The intended product uses purpose-built vibration motors; the hack hardware uses two passive buzzers only as audible proxies for those future vibration channels.
+**Goal:** Build a two-phase sensing, classification, relay, and output-pattern prototype for a wrist-worn DeafBlind situational-awareness product. The demo covers local obstacle/siren awareness while moving and bus arrival/route identification while still. It does not claim route guidance or camera-guided navigation. The intended product uses purpose-built vibration motors; the hack hardware uses two passive buzzers only as audible proxies for those future vibration channels.
 
-**Architecture:** Three sensor inputs and two simulated output channels. A PDM microphone feeds an on-device FFT that fires a shape-aware coarse local alert after about 0.5 s and a confirmed-siren classification after at least 1.02 s. A VL53L0CX ToF gives a purely local proximity reflex with no network in the path. A phone browser POSTs frames at 2 Hz to a Modal endpoint that runs YOLO26n, holds two seconds of detection history, latches exactly one `BUS_ARRIVED` event, crops the destination blind and asks Claude to read it under a strict JSON schema. The phone owns the `STILL`/`MOVING` interaction state and translates camera results into bus-information or LEFT/RIGHT/AHEAD navigation commands. Those commands reach the board through the existing Vercel + Upstash polling relay. P1 at 2350 Hz and P3 at 3050 Hz audibly simulate two future vibration channels. See the latest Revision note below.
+**Architecture:** Three sensor inputs and two simulated output channels. A PDM microphone feeds an on-device FFT that fires a shape-aware coarse local alert after about 0.5 s and a confirmed-siren classification after at least 1.02 s. A VL53L0CX ToF gives a purely local proximity reflex with no network in the path. A phone browser POSTs frames at 2 Hz to a Modal endpoint that runs YOLO26n, holds two seconds of detection history, latches exactly one `BUS_ARRIVED` event, crops the destination blind and asks Claude to read it under a strict JSON schema. Camera submission remains active independently of activity state. The relay exposes `STILL`/`MOVING`; the ESP32 receives camera-derived commands in both states but renders bus-arrival and route-reading output only while `STILL`. P1 at 2350 Hz and P3 at 3050 Hz audibly simulate two future vibration channels. See the latest Revision note below.
 
 **Tech Stack:** ESP32-S3-MINI-1 (Arduino-ESP32 3.x / ESP-IDF v5.x, FreeRTOS, LEDC in **tone** mode, I2S0 PDM→PCM, `arduinoFFT<float>`, `Adafruit_VL53L0X`, `ArduinoJson` v7) · 2× AX22-0018 passive buzzer (MLT-8530) as audio proxies, not haptic actuators · Modal 1.5.2 + Ultralytics YOLO26n on T4 · `anthropic` 0.117.0 with `output_config.format` structured outputs · Next.js 16.2.10 on Vercel + Upstash Redis · in-browser `getUserMedia` capture on the phone (Python/OpenCV survives only inside Modal, not on a laptop) · build123d via `cad/tests/fake_adsk` for CAD.
 
@@ -22,9 +22,33 @@
 
 ---
 
+## Revision 2026-07-18e — Two-phase demo and ESP-side camera-command gate
+
+This revision supersedes Revision 2026-07-18d's camera-guided LEFT/RIGHT/AHEAD scope and Revision 2026-07-18b's navigation experiment. The implemented experimental direction patterns may remain as dormant provenance, but they are not relay inputs, demo steps, or validated navigation.
+
+**1. The demo has two phases, not two kinds of navigation.** `MOVING` demonstrates supplementary local awareness on the way to the bus stop: ToF forward-clearance feedback plus local siren detection. The cane remains the primary mobility aid and the user chooses how to negotiate an obstacle. `STILL` demonstrates bus-stop situational awareness: BUS, WAIT, route NUMBER, UNKNOWN, and ERROR. The prototype does not guide the user toward the stop, around an obstacle, toward a detected bus, or toward a bus door.
+
+**2. Camera transport stays live.** The phone camera preview and the existing 2 Hz phone-to-Modal submission path may remain active while `MOVING`. Do not modify or pause that pipeline from the board workstream. The ESP32 continues polling, parsing, and advancing command sequence state in both phases.
+
+**3. The ESP32 gates output after reception.** While `MOVING`, camera-derived BUS, WAIT, NUMBER, and UNKNOWN commands are received and sequence-acknowledged but suppressed before output arbitration. While `STILL`, a fresh command may render. A command suppressed while moving is never replayed merely because activity later changes to still.
+
+**3a. Local sensing is state-aware without becoming network-dependent.** ToF sampling remains local and continuous for diagnostics, but its proximity output is permitted only in `MOVING`; entering `STILL` clears it so people and street furniture near a bus stop do not produce a nuisance alert. Siren detection and output remain local and active in both phases.
+
+**3b. Route 88 is guarded on the board.** The P6 waveform is hardcoded to mean route 88. A `NUMBER` command whose wire `route` is not exactly `"88"` or whose `conf` is not `"high"` is consumed without playing P6. This prevents a different or low-confidence reading from producing a confident false route-88 signal.
+
+**4. Activity and command edges are independent.** `/api/pull` exposes activity plus separate activity freshness/version fields. An activity heartbeat must not increment command `seq` or refresh a previous command's `ts`, because doing either could re-fire or make stale bus information appear fresh. Missing, invalid, or stale activity closes the bus-information output gate unless service Serial explicitly controls the bench test.
+
+**5. Demo order is locked.** Start in `MOVING`; demonstrate a ToF obstacle and then a siren. Switch to `STILL`; only then introduce the printed bus prop and deliver a fresh BUS → WAIT → NUMBER 88 sequence. The bus prop must not latch an arrival before the still transition unless the web producer explicitly resets/re-arms it.
+
+**6. Two output channels do not imply sensed directionality.** The single approximately 25-degree forward ToF zone cannot determine whether left or right is traversable. During the obstacle step, the user and cane choose the bypass; the ToF pulse cadence slows and stops as the forward zone clears. Existing P1/P3 LEFT/RIGHT service tones may be shown separately as a conceptual future-channel simulation, but they are not relay commands and must not be described as an automatic obstacle-avoidance decision. Automated bypass guidance requires at least two independently aimed spatial zones or a validated depth/free-space model, plus real actuators and representative-user testing.
+
+---
+
 ## Revision 2026-07-18d — Navigation state and buttonless four-slot interaction
 
-This revision makes navigation a first-class feature rather than an appendix to bus-stop awareness.
+> **Historical revision. Revision 2026-07-18e supersedes its LEFT/RIGHT/AHEAD and bus-approach guidance.** Its four-slot hardware and buttonless boot decisions remain current.
+
+This revision previously made navigation a first-class feature rather than an appendix to bus-stop awareness.
 
 **1. The interaction model has two explicit states.** `STILL` is the waiting state: bus-arrival, route-reading, WAIT, and UNKNOWN commands are accepted. `MOVING` is the approach state: LEFT, RIGHT, and AHEAD commands are accepted as coarse guidance toward the detected bus/door target. Local ToF proximity and siren processing stay active in both states and always outrank cloud commands.
 
@@ -42,7 +66,7 @@ This revision supersedes every downstream statement that describes the AX22-0018
 
 **1. The tactile viability test failed.** The labelled 70/100/150/220 Hz sweep was audible but produced virtually no tactile movement [T5]. The AX22-0018 modules are rejected as haptic actuators for this prototype. Do not continue the blind tactile-discrimination test and do not describe the current output as haptic feedback.
 
-**2. The hack demo now uses an explicit audio simulation.** P1 / LEFT plays 2350 Hz and P3 / RIGHT plays 3050 Hz. This preserves the original 700 Hz separation while moving both tones close to the MLT-8530's 2.7 kHz resonance for better audibility in a noisy room. Patterns designated BOTH play both channel frequencies; patterns designated A or B remain on their assigned channel; alternating patterns alternate them. This preserves output routing, count, rhythm, duration, and semantic integration for demonstration, but proves nothing about tactile perception or spatial localization.
+**2. The hack demo now uses an explicit audio simulation.** P1 plays 2350 Hz and P3 plays 3050 Hz. This preserves the original 700 Hz separation while moving both tones close to the MLT-8530's 2.7 kHz resonance for better audibility in a noisy room. Patterns designated BOTH play both channel frequencies; patterns designated A or B remain on their assigned channel; alternating patterns alternate them. This preserves output routing, count, rhythm, duration, and semantic integration for demonstration, but proves nothing about tactile perception or spatial localization.
 
 **3. Product direction still assumes real vibration hardware.** A future build would replace both buzzers with purpose-built ERM or LRA actuators and adapt the vocabulary to their actual amplitude and waveform controls. That is a documented product assumption, not a current result. It remains unvalidated until tested on real actuators with representative users.
 
@@ -52,7 +76,7 @@ This revision supersedes every downstream statement that describes the AX22-0018
 
 ## Revision 2026-07-18b — Actuator swap, mobile capture, L/R navigation attempt
 
-> **Historical revision. Revision 2026-07-18c supersedes its tactile and wear-test proposals after the bench result.** Its camera decision and electrical facts remain current.
+> **Historical revision. Revision 2026-07-18c supersedes its tactile and wear-test proposals; Revision 2026-07-18e supersedes its LEFT/RIGHT/AHEAD proposal.** Its camera-host and electrical facts remain current.
 
 This revision overrides earlier rulings where they conflict. Three changes, all landing after the first four audit tracks were written. Downstream mentions must now also be read through Revision 2026-07-18c and T5.
 
@@ -71,10 +95,10 @@ Every task's requirements implicitly include this section.
 1. **Today is 2026-07-18. The hack ends 2026-07-19. Roughly 1.5 days remain.** Sequencing beats completeness. The Cut List near the end is binding when the clock runs out.
 2. **Hardcoding is sanctioned.** Route **88**, destination **Clapham Common**. No configuration knobs, no generality, no "make this pluggable".
 3. **No soldering. All modules are AX22 snap-in. No extension kit, no ribbon leads, no purchased extras.** All four ports are occupied and every part is in hand.
-4. **The two buzzers are audio proxies, not tactile actuators** [T5]. P1 / LEFT uses 2350 Hz and P3 / RIGHT uses 3050 Hz to make the conceptual channels audible. Their 33.941 mm physical separation carries no validated meaning in the current demo. Do not claim spatial or tactile left/right discrimination.
+4. **The two buzzers are audio proxies, not tactile actuators** [T5]. P1 uses 2350 Hz and P3 uses 3050 Hz to make the two conceptual channels audible. Their 33.941 mm physical separation carries no validated directional meaning in the current demo. Do not claim spatial or tactile left/right discrimination.
 5. **Buzzer Signal pins drive from Port 1 and Port 3.** The AX22-0018 header is `G / Vin / S` — a single Signal line per buzzer plus power and ground; there is no second drive channel. Working assumption: Signal → **GPIO3 (Port 1)** and **GPIO16 (Port 3)**, reusing the ERM diagonal. **Confirm the Signal-pin-to-IO mapping against `parts/Axiometa Genesis Mini - Starter Kit/passive-buzzer/files/SCH_AX22-0018.pdf` and the module silk before first drive** — it was derived for the ERM (AX22-0013), not this part. The committed `firmware/braille_wearable/src/pins.h:9-10` says GPIO4/GPIO9 and is **wrong** for either part; with those pins nothing sounds and it looks like dead hardware.
 6. **The microphone binds to `I2S_NUM_0`. Never `I2S_NUM_1`, never `I2S_NUM_AUTO`.** The PDM-to-PCM converter exists on I2S0 only, and binding I2S1 fails silently by yielding a raw bitstream [T3 §PDM capture, T4 §TRAP 1].
-7. **The ToF → output reflex and siren → output reflex are fully local.** No network in either path. In the hack demo the output is an audible proxy; the product intent is local vibration output.
+7. **The ToF → output reflex and siren → output reflex are fully local.** No network in either path. ToF output is enabled only in `MOVING`, while siren output remains enabled in both phases. In the hack demo the output is an audible proxy; the product intent is local vibration output.
 8. **Power: a ≥1 A (≥5 W) USB-C source — kept for margin, but its old binding reason is gone.** That constraint was 2 × ERM inrush [T1 §Old Global Constraints row 3]. Two MLT-8530 buzzers draw on the order of ~30 mA each with no inertial inrush, so the rail is comfortable now; ESP32-S3 + Wi-Fi transients dominate. Keep ≥1 A anyway — headroom is free.
 9. **The ESP32 is outbound-only.** It polls `https://bus-stop-awareness.vercel.app/api/pull` every 300 ms and never accepts an inbound connection.
 10. **Serverless is stateless; all shared state lives in Upstash Redis.** The one exception is the Modal container's own arrival state machine, which is safe only because `max_containers=1` pins it to a single process.
@@ -175,7 +199,7 @@ The directory keeps its legacy name to avoid churning PlatformIO paths. Nothing 
 | `test/test_braille/` | **DELETE (content) / REUSE (technique)** | It proves `[env:native]` works and demonstrates re-deriving the table under test rather than copying it (`:33-48`). Mirror that technique |
 | `src/haptic_pure.h` | **NET-NEW** | Arduino-free sequencer + arbitration. Host-testable |
 | `src/haptic_route_pure.h` | **NET-NEW** | Quinary route encoder. Host-testable |
-| `src/patterns.h` | **NET-NEW** | The 11 base pattern tables + the 3 experimental nav patterns (P11–P13). Each step is a `(freq, on/off)` pair, not a duty. Host-testable |
+| `src/patterns.h` | **REUSE** | The 11 demo pattern tables are current. The already-implemented P11–P13 direction experiments are dormant provenance and must not be exposed through the relay or demo controls. Each step is a `(freq, on/off)` pair, not a duty. Host-testable |
 | `src/siren_pure.h` | **NET-NEW** | Siren decision logic over a magnitude array. Host-testable |
 | `src/haptic.cpp` · `src/haptic.h` | **NET-NEW** | LEDC **tone** glue (`ledcAttach(pin, freq, res)` + `ledcWriteTone(pin, hz)`, or `ledcWrite` at 50 % duty for a given freq) + `hapticTask`. No duty-amplitude control — steps set a frequency or 0 |
 | `src/audio.cpp` · `src/audio.h` | **NET-NEW** | I2S0 PDM capture + FFT + `audioTask` |
@@ -188,10 +212,10 @@ The directory keeps its legacy name to avoid churning PlatformIO paths. Nothing 
 |---|---|---|
 | `www/src/lib/redis.ts` | **REUSE (implemented)** | Preserve the **MSET-before-INCR** ordering. It prevents readers from observing a new sequence with the previous payload |
 | `www/src/app/api/pull/route.ts` | **REUSE (implemented)** | Outbound board polling plus telemetry; preserve no-store/CORS behavior |
-| `www/src/app/api/event/route.ts` | **REUSE (implemented; George extends contract)** | Sanitises cloud commands and writes relay state |
-| `www/src/lib/contract.ts` | **MODIFY by George** | Add `UserActivity` and LEFT/RIGHT/AHEAD from Contract B while preserving one shared source of truth |
+| `www/src/app/api/event/route.ts` | **REUSE (implemented)** | Sanitises camera-derived bus commands and writes relay state; do not add direction commands |
+| `www/src/lib/contract.ts` | **MODIFY by George** | Add independent `UserActivity`, `activitySeq`, and `activityTs` fields while preserving the existing six-value `CloudPattern` |
 | `www/src/app/page.tsx` | **REUSE (implemented)** | Device/relay monitor |
-| `www/src/app/capture/page.tsx` | **MODIFY by George** | Existing camera host; add `STILL`/`MOVING` interaction and navigation command translation |
+| `www/src/app/capture/page.tsx` | **REUSE for capture/Modal submission** | Existing camera host remains active in both phases. A separate activity setter may be added, but do not gate frame submission or translate target bearing into device commands |
 | `www/package.json` · `www/pnpm-lock.yaml` | **REUSE** | Active Next.js 16 dependency surface |
 | Vercel project link + Upstash env | **REUSE unchanged** | `haider-projects/bus-stop-awareness`, stable alias `bus-stop-awareness.vercel.app`, `UPSTASH_*` already set at Production scope |
 | `www/src/app/api/state/route.ts` · `api/detector/route.ts` | **REUSE (implemented)** | Debug-screen state surfaces |
@@ -296,21 +320,16 @@ export type PatternId =
   | "WAIT"      // P7  request in flight
   | "UNKNOWN"   // P8  could not read / low confidence
   | "ACK"       // P9  button feedback                     (device-local; never sent)
-  | "ERROR"     // P10 degraded
-  | "LEFT"      // P11 navigate toward frame left
-  | "RIGHT"     // P12 navigate toward frame right
-  | "AHEAD";    // P13 target is centred
+  | "ERROR";    // P10 degraded
 
 /** Cloud-originated commands only. Local safety patterns never cross the wire. */
 export type CloudPattern =
-  | "NONE" | "BUS" | "NUMBER" | "WAIT" | "UNKNOWN" | "ERROR"
-  | "LEFT" | "RIGHT" | "AHEAD";
+  | "NONE" | "BUS" | "NUMBER" | "WAIT" | "UNKNOWN" | "ERROR";
 
 export type UserActivity = "STILL" | "MOVING";
 
 export interface EventRequest {
   pattern:   CloudPattern;
-  activity?: UserActivity;            // omitted by old clients => STILL
   route:     string;                 // "" unless pattern === "NUMBER"
   dest:      string;                 // debug screen ONLY — the device ignores this field
   conf:      "high" | "low" | "";
@@ -321,6 +340,8 @@ export interface DeviceCommand {
   seq:       number;                 // monotonic; the device's edge-trigger
   pattern:   CloudPattern;
   activity:  UserActivity;
+  activitySeq: number;               // changes only on MOVING/STILL transition
+  activityTs: number;                // independent freshness for the activity gate
   route:     string;
   dest:      string;
   conf:      "high" | "low" | "";
@@ -351,28 +372,26 @@ export const ROUTE_MAX_DIGITS = 3;
 /** Quinary encoding covers digits only. A route containing a letter is rejected server-side. */
 export const ROUTE_RE = /^[0-9]{1,3}$/;
 export const CLOUD_PATTERNS: readonly CloudPattern[] =
-  ["NONE", "BUS", "NUMBER", "WAIT", "UNKNOWN", "ERROR",
-   "LEFT", "RIGHT", "AHEAD"] as const;
+  ["NONE", "BUS", "NUMBER", "WAIT", "UNKNOWN", "ERROR"] as const;
 ```
 
 **The locked demo, in order, literally.**
 
 ```jsonc
+// Before the prop enters frame, activity changes independently to STILL.
+// This updates activity/activitySeq/activityTs but does NOT change command seq or ts.
+
 // t = 0.00 s   browser → POST /api/event      (YOLO latched arrival_id 1)
-{ "pattern":"BUS", "activity":"STILL", "route":"", "dest":"", "conf":"", "arrivalId":1 }
+{ "pattern":"BUS", "route":"", "dest":"", "conf":"", "arrivalId":1 }
 // ← 200 {"seq":7}
 
 // t = 0.10 s   browser → POST /api/event      (Claude in flight)
-{ "pattern":"WAIT", "activity":"STILL", "route":"", "dest":"", "conf":"", "arrivalId":1 }
+{ "pattern":"WAIT", "route":"", "dest":"", "conf":"", "arrivalId":1 }
 // ← 200 {"seq":8}
 
 // t = 2.60 s   browser → POST /api/event      (3 concurrent votes agreed on "88")
-{ "pattern":"NUMBER", "activity":"STILL", "route":"88", "dest":"Clapham Common", "conf":"high", "arrivalId":1 }
+{ "pattern":"NUMBER", "route":"88", "dest":"Clapham Common", "conf":"high", "arrivalId":1 }
 // ← 200 {"seq":9}
-
-// t = 5.00 s   phone enters approach mode; target is left of frame centre
-{ "pattern":"LEFT", "activity":"MOVING", "route":"", "dest":"", "conf":"high", "arrivalId":1 }
-// ← 200 {"seq":10}
 ```
 
 ### Contract C — ESP32 ↔ Vercel
@@ -382,9 +401,10 @@ export const CLOUD_PATTERNS: readonly CloudPattern[] =
 { "bandRms":312.4, "peakHz":940, "modIdx":0.62, "trend":"rising",
   "playing":"NUMBER", "tofMm":842, "upMs":93000, "rssi":-58 }
 
-// ← 200 response = the command. 131 bytes for this example.
-{ "seq":9, "pattern":"NUMBER", "activity":"STILL", "route":"88", "dest":"Clapham Common",
-  "conf":"high", "arrivalId":1, "ts":1784419200123 }
+// ← 200 response = command state plus independently-versioned activity state.
+{ "seq":9, "pattern":"NUMBER", "route":"88", "dest":"Clapham Common",
+  "conf":"high", "arrivalId":1, "ts":1784419200123,
+  "activity":"STILL", "activitySeq":4, "activityTs":1784419199000 }
 ```
 
 `GET /api/pull` stays implemented (same handler, empty telemetry) purely so the endpoint remains `curl`-able — that is how the existing relay was smoke-tested and it is worth six extra lines.
@@ -394,12 +414,13 @@ What the board actually holds:
 ```c
 // src/net.h — REPLACES struct PullResult (net.h:10-15)
 enum : uint8_t { CONF_NONE = 0, CONF_LOW, CONF_HIGH };
-enum : uint8_t { ACT_STILL = 0, ACT_MOVING };
+enum : uint8_t { ACT_UNKNOWN = 0, ACT_MOVING, ACT_STILL };
 
 struct DeviceCommand {
     long    seq       = 0;
     uint8_t pattern   = PAT_NONE;   // string → enum ONCE, at parse time
-    uint8_t activity  = ACT_STILL;  // omitted/unknown input defaults to STILL
+    uint8_t activity  = ACT_UNKNOWN; // only fresh ACT_STILL opens bus output gate
+    long    activitySeq = 0;
     char    route[8]  = {0};        // "88" · "205" · longest UK route "N550" is 4 chars
     uint8_t conf      = CONF_NONE;
     long    arrivalId = 0;
@@ -422,8 +443,9 @@ static const size_t PULL_BODY_MAX = 512;   // reject anything larger BEFORE pars
 ```jsonc
 // GET /api/state  — browser only, ~700 B, polled at 500 ms by the Next.js page
 { "seq": 9,
-  "device":    { "pattern":"NUMBER","activity":"STILL","route":"88","dest":"Clapham Common",
-                 "conf":"high","arrivalId":1,"ts":1784419200123 },
+  "device":    { "pattern":"NUMBER","route":"88","dest":"Clapham Common",
+                 "conf":"high","arrivalId":1,"ts":1784419200123,
+                 "activity":"STILL","activitySeq":4,"activityTs":1784419199000 },
   "detector":  { "event":"NONE","present":true,"confidence":0.85,"arrivalId":1,
                  "route":"88","destination":"Clapham Common","readingConf":"high",
                  "votes":["88","88","88"] },
@@ -443,7 +465,7 @@ Two AX22-0018 passive buzzers now render the vocabulary as an **audible simulati
 
 ### Design rules
 
-1. **Default patterns are L/R-agnostic; navigation uses conceptual channels.** P11–P13 may remain in the demo to show LEFT/RIGHT/AHEAD routing, but they are audio labels, not evidence that future body-worn actuators will be spatially distinguishable.
+1. **All demo patterns are direction-agnostic.** The two channels demonstrate output routing and rhythm only. Dormant P11–P13 experiments are not relay inputs or demo steps and provide no evidence that future body-worn actuators will be spatially distinguishable.
 2. **BOTH channels = the world. ONE channel = the device.** External events fire both proxy tones; internal state fires one. This demonstrates software routing only. The future motor implementation must validate whether simultaneity or amplitude provides a usable tactile distinction.
 3. **Frequency is the primary channel; loudness is not.** Usable design: a **buzz band ≈ 60–120 Hz** and an **alert band ≈ 180–250 Hz**, both felt as coarse "low" vs "high" texture, plus plain on/off gating. Do not design meaning onto fine amplitude steps — the buzzer cannot deliver them.
 4. **Proven timing primitives reused, not reinvented** (`firmware/braille_wearable/src/braille.cpp:12-16`): buzz 400 ms · beat gap 300 ms · letter gap 800 ms (reused as the inter-digit gap). The both-fire stagger is retained at 30 ms only for onset legibility, not electrical reasons (see rule 5).
@@ -477,23 +499,7 @@ Notation: `A` = Port 1 buzzer, `B` = Port 3 buzzer, `BOTH` = both (optional 30 m
 
 **Reading the table for buzzers:** the **Motors** column (A / B / BOTH) is unchanged in *routing* — A = Port 1 buzzer, B = Port 3 buzzer. The **Intensity** column is now a **drive-frequency** column: read "100 %" as *buzz band (~60–120 Hz)*, "65 %" as a quieter/shorter gate of the same band, and any ramp as a short frequency glide within the buzz band. No pattern depends on a precise amplitude level.
 
-**Partially uncut:** LEFT, RIGHT and AHEAD return as the experimental Navigation block below (Revision §3). **Still cut:** STOP and MOVE OVER — no trigger produces them in this build. **Still deliberately not added:** any TURN pattern. A rotation instruction the user cannot verify they executed correctly is worse than no instruction — it produces a user who has turned an unknown amount in an unknown direction and now believes the device has seen something. On insufficient information the device fires **P8 UNKNOWN** [T3 D2].
-
-### Navigation block — AUDIO SIMULATION (P11–P13)
-
-These three demonstrate the software path for "steer toward the bus door." LEFT is the 2350 Hz P1 proxy, RIGHT is the 3050 Hz P3 proxy, and AHEAD is both. They do not establish that a wearer can localize or distinguish future vibration motors.
-
-| # | Pattern | Buzzer | Drive | Timing spec | Repeats | Class | Trigger |
-|---|---|---|---|---|---|---|---|
-| **P11** | **LEFT** | A only | **2350 Hz audio proxy** | `(200 on / 200 off) ×2` | ×1, re-postable | INFORMATION | Detector says the bus door / target is to the user's left |
-| **P12** | **RIGHT** | B only | **3050 Hz audio proxy** | `(200 on / 200 off) ×2` | ×1, re-postable | INFORMATION | Target is to the user's right |
-| **P13** | **AHEAD** | BOTH | both proxy tones together | `400 on / 200 off / 400 on` | ×1 | INFORMATION | Target is roughly centred — proceed forward |
-
-**Design honesty for P11–P13:**
-- **Redundant coding is the whole point.** Side is signalled *three* ways at once — which buzzer fires (spatial, weak at 33.9 mm), the pitch band (frequency, the load-bearing cue), and, if kept, a habitual mental "low = left / high = right" mapping the user is taught. Any one working is enough.
-- **This is not verified navigation.** As with the cut TURN pattern, the device cannot confirm the user moved correctly. P11–P13 are advisory nudges toward a *dwelling* bus (15–30 s), not turn-by-turn guidance. On low detector confidence, fire **P8 UNKNOWN**, never a guessed direction.
-- **"We have not validated this with DeafBlind users"** applies with double force here — frequency-coded laterality on a repurposed buzzer is the least-grounded idea in the build. It ships flagged as an experiment, or not at all.
-- **Triggering** needs the detector to emit a coarse left/centre/right for the bus box (its horizontal centroid vs frame thirds). The relay may carry it as a `CloudPattern` for the audio simulation; future haptic use remains conditional on motor validation.
+**Directionality is cut.** LEFT, RIGHT, AHEAD, STOP, MOVE OVER, and TURN have no relay trigger or demo step. Existing P11–P13 source and tests may remain as dormant provenance so completed work is not destroyed, but runtime relay parsing, public controls, telemetry vocabulary, and stage claims must use only P0–P10. The MOVING phase demonstrates obstacle and siren awareness, not route guidance or bus-door approach.
 
 ### Discriminability analysis
 
@@ -546,14 +552,14 @@ Assessed as felt through a sleeve on the volar wrist, where amplitude is attenua
 
 | Input/state | Board behavior | Output scope |
 |---|---|---|
-| Boot | Start local ToF and siren sensing; begin outbound relay polling | P0 once ready; no arming step |
-| Phone `STILL` | Accept BUS, WAIT, NUMBER, UNKNOWN, and ERROR | Bus-stop awareness and route reading |
-| Phone `MOVING` | Accept LEFT, RIGHT, AHEAD, and ERROR | Coarse approach navigation |
+| Boot | Start local ToF and siren sensing; begin outbound relay polling with the bus-information gate closed | P0 once ready; no arming step |
+| Phone `STILL` | Accept fresh BUS, WAIT, NUMBER, UNKNOWN, and ERROR; continue ToF sampling but clear/suppress proximity output; keep siren active | Bus-stop awareness and route reading without nuisance proximity alerts from nearby people or street furniture |
+| Phone `MOVING` | Receive and sequence-acknowledge camera-derived bus commands, but suppress BUS, WAIT, NUMBER, and UNKNOWN before output arbitration; enable local ToF and siren output; cane remains primary | Supplementary forward-clearance and siren awareness while travelling toward the stop |
 | Phone mute | Suspend HAZARD through STATUS for 60 s | SAFETY remains active |
 | Service Serial `x` | Stop all output immediately during bench work | Test and emergency bring-up control |
 | Onboard user button | No required behavior until GPIO/polarity is verified | Optional later fallback; consumes no slot |
 
-The capture page is the primary interaction surface. It defaults to `STILL`, exposes a manual `STILL`/`MOVING` control, and may automate the same field from phone motion sensors later. The ESP32 receives that state through the existing relay; it does not need a direct USB data connection to the phone. A stale or missing activity value resolves to `STILL`, and a navigation command received while `STILL` (or a route-reading command received while `MOVING`) is dropped with a diagnostic rather than guessed.
+The capture page remains the camera host and may keep previewing and submitting frames to Modal in both phases. Activity is an independent relay field. The ESP32 receives camera-derived command state in both phases, but only a fresh `STILL` activity opens the bus-information output gate. Missing, invalid, or stale activity keeps that gate closed. A bus command observed while `MOVING` is logged and sequence-acknowledged but never queued or replayed after a later mode change.
 
 ---
 
@@ -726,7 +732,7 @@ There is also a latency floor. A warm T4 running YOLO-nano returns a box in ~10 
 
 ### Camera and transport
 
-**Camera host: the `www/` mobile web app on the phone (Revision §2 — this reverses [T4 §Decision 1]).** `www/src/app/capture/page.tsx` already implements rear-camera `getUserMedia`, canvas JPEG capture, Modal ingestion, and edge-triggered `/api/event` delivery. George owns this surface. Add the `STILL`/`MOVING` control and navigation translation there, not in the retired web tree. **Rehearse the permission grant on the actual demo phone/browser** — the one failure mode that still bites is a denied or reset camera permission mid-demo. The laptop `cv2.VideoCapture` client (`vision/bus_client.py`) is cut.
+**Camera host: the `www/` mobile web app on the phone (Revision §2 — this reverses [T4 §Decision 1]).** `www/src/app/capture/page.tsx` already implements rear-camera `getUserMedia`, canvas JPEG capture, Modal ingestion, and edge-triggered `/api/event` delivery. George owns this surface. Keep capture and Modal submission unchanged in both activity phases; expose activity independently and let the ESP32 gate bus output. Do not translate target bearing into device commands. **Rehearse the permission grant on the actual demo phone/browser** — the one failure mode that still bites is a denied or reset camera permission mid-demo. The laptop `cv2.VideoCapture` client (`vision/bus_client.py`) is cut.
 
 **Transport: the existing Vercel + Upstash polling relay**, ESP32 outbound-only at 300 ms. It is already built, deployed and smoke-tested green end-to-end; `net.cpp` already implements TLS join, poll, `seq` gate and JSON POST; `/api/pull` already sets `Access-Control-Allow-Origin: *` so the debug screen reads the same state from the same place for free.
 

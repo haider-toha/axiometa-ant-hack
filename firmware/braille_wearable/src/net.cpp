@@ -1,84 +1,312 @@
 #include <Arduino.h>
+#include <ArduinoJson.h>
+#include <HTTPClient.h>
 #include <WiFi.h>
 #include <WiFiClientSecure.h>
-#include <HTTPClient.h>
-#include <ArduinoJson.h>          // v7: use JsonDocument (NOT StaticJsonDocument)
-#include "secrets.h"
+
 #include "net.h"
+#include "network_config.h"
 
-// One reused TLS client (insecure for the demo: skip cert validation) and the
-// seq gate. setInsecure() is called once in wifiJoin(), after the link is up.
-static WiFiClientSecure s_tls;
-static long             s_lastSeq = 0;
+namespace {
 
-bool wifiJoin() {
-    WiFi.mode(WIFI_STA);
-    WiFi.begin(WIFI_SSID, WIFI_PASS);
-    uint32_t start = millis();
-    while (WiFi.status() != WL_CONNECTED && millis() - start < 20000) {
-        delay(250);
-        Serial.print('.');
+constexpr uint32_t HEALTHY_POLL_MS = 300;
+constexpr uint32_t LONG_OUTAGE_MS = 10000;
+constexpr uint32_t JOIN_WINDOW_MS = 10000;
+constexpr uint32_t BACKOFF_MS[] = {1000, 2000, 4000, 8000};
+constexpr size_t MAX_RESPONSE_BYTES = 768;
+constexpr UBaseType_t UPDATE_QUEUE_LENGTH = 8;
+constexpr uint32_t NETWORK_TASK_STACK_BYTES = 12288;
+
+QueueHandle_t updateQueue = nullptr;
+QueueHandle_t telemetryQueue = nullptr;
+TaskHandle_t networkTaskHandle = nullptr;
+
+WiFiClientSecure tlsClient;
+HTTPClient httpClient;
+JsonDocument responseDocument;
+char pullUrl[160] = {};
+
+bool commandObserved = false;
+uint32_t lastQueuedCommandSeq = 0;
+ActivityWireState activityWireState;
+
+bool enqueueUpdate(const RelayUpdate& update) {
+    if (xQueueSend(updateQueue, &update, 0) == pdTRUE) {
+        return true;
     }
-    Serial.println();
+    RelayUpdate discarded{};
+    xQueueReceive(updateQueue, &discarded, 0);
+    return xQueueSend(updateQueue, &update, 0) == pdTRUE;
+}
+
+void resetWireBaselines() {
+    commandObserved = false;
+    lastQueuedCommandSeq = 0;
+    activityWireState = ActivityWireState{};
+}
+
+bool joinHotspot(uint8_t& backoffIndex) {
+    WiFi.disconnect(false, false);
+    WiFi.begin(WIFI_SSID, WIFI_PASS);
+    const uint32_t startedMs = millis();
+    while (WiFi.status() != WL_CONNECTED &&
+           static_cast<uint32_t>(millis() - startedMs) < JOIN_WINDOW_MS) {
+        vTaskDelay(pdMS_TO_TICKS(250));
+    }
     if (WiFi.status() != WL_CONNECTED) {
-        Serial.println(F("WiFi join FAILED"));
+        Serial.printf("RELAY wifi=disconnected retry_ms=%lu\n",
+                      static_cast<unsigned long>(BACKOFF_MS[backoffIndex]));
+        vTaskDelay(pdMS_TO_TICKS(BACKOFF_MS[backoffIndex]));
+        if (backoffIndex + 1 < sizeof(BACKOFF_MS) / sizeof(BACKOFF_MS[0])) {
+            ++backoffIndex;
+        }
         return false;
     }
-    s_tls.setInsecure();                       // demo: accept any server cert
-    Serial.print(F("WiFi connected, IP="));
-    Serial.println(WiFi.localIP().toString());
+
+    backoffIndex = 0;
+    Serial.printf("RELAY wifi=connected ip=%s rssi=%ld\n",
+                  WiFi.localIP().toString().c_str(),
+                  static_cast<long>(WiFi.RSSI()));
     return true;
 }
 
-String deviceIp() {
-    if (WiFi.status() != WL_CONNECTED) return String("0.0.0.0");
-    return WiFi.localIP().toString();
+size_t buildTelemetryPayload(char* payload, size_t capacity,
+                             const RelayTelemetry& telemetry) {
+    JsonDocument document;
+    document["bandRms"] = telemetry.bandRms;
+    document["peakHz"] = telemetry.peakHz;
+    document["modIdx"] = telemetry.modIdx;
+    document["trend"] = telemetry.trendRising ? "rising" : "flat";
+    document["playing"] = telemetry.playing;
+    document["tofMm"] = telemetry.tofMm;
+    document["upMs"] = millis();
+    document["rssi"] = WiFi.status() == WL_CONNECTED ? WiFi.RSSI() : 0;
+    return serializeJson(document, payload, capacity);
 }
 
-bool pollPull(PullResult& out) {
-    if (WiFi.status() != WL_CONNECTED) return false;
+bool parseResponse(RelayUpdate& update) {
+    const int contentLength = httpClient.getSize();
+    if (contentLength > static_cast<int>(MAX_RESPONSE_BYTES)) {
+        Serial.printf("RELAY rejected=response_oversized bytes=%d\n", contentLength);
+        return false;
+    }
 
-    HTTPClient http;
-    String url = String("https://") + VERCEL_HOST + "/api/pull";
-    if (!http.begin(s_tls, url)) return false;
+    // Vercel commonly returns this route with Transfer-Encoding: chunked and no
+    // Content-Length. HTTPClient::getStream() exposes the raw chunk framing,
+    // which ArduinoJson quite correctly rejects as non-JSON. getString() goes
+    // through HTTPClient's bounded de-chunking path before we parse it.
+    const String responseBody = httpClient.getString();
+    if (responseBody.isEmpty()) {
+        Serial.println(F("RELAY rejected=empty_response"));
+        return false;
+    }
+    if (responseBody.length() > MAX_RESPONSE_BYTES) {
+        Serial.printf("RELAY rejected=response_oversized bytes=%u\n",
+                      static_cast<unsigned>(responseBody.length()));
+        return false;
+    }
 
-    int code = http.GET();
-    if (code != 200) { http.end(); return false; }
-    String body = http.getString();
-    http.end();
+    responseDocument.clear();
+    const DeserializationError error =
+        deserializeJson(responseDocument, responseBody);
+    if (error) {
+        Serial.printf("RELAY rejected=json error=%s\n", error.c_str());
+        return false;
+    }
 
-    JsonDocument d;                            // v7 elastic document
-    DeserializationError err = deserializeJson(d, body);
-    if (err) return false;
+    if (!responseDocument["seq"].is<uint32_t>() ||
+        !responseDocument["pattern"].is<const char*>()) {
+        Serial.println(F("RELAY rejected=missing_command_fields"));
+        return false;
+    }
 
-    long seq = d["seq"] | 0L;
-    if (seq <= s_lastSeq) return false;        // nothing new
-    s_lastSeq = seq;
+    const uint32_t seq = responseDocument["seq"].as<uint32_t>();
+    if (!commandObserved || seq != lastQueuedCommandSeq) {
+        update.hasCommand = true;
+        update.command.seq = seq;
+        update.command.pattern =
+            parseCloudCommand(responseDocument["pattern"].as<const char*>());
+        copyRelayRoute(update.command.route,
+                       responseDocument["route"] | "");
+        update.command.confidence =
+            parseRelayConfidence(responseDocument["conf"] | "");
+        update.command.arrivalId = responseDocument["arrivalId"] | 0U;
+        update.command.serverTs = responseDocument["ts"] | 0LL;
+        commandObserved = true;
+        lastQueuedCommandSeq = seq;
+    }
 
-    out.seq  = seq;
-    out.mode = d["mode"].as<String>();
-    out.msg  = d["msg"].as<String>();
-    out.replies.clear();
-    JsonArray arr = d["replies"].as<JsonArray>();
-    for (JsonVariant v : arr) out.replies.push_back(v.as<String>());
+    const bool activityFieldsComplete =
+        responseDocument["activity"].is<const char*>() &&
+        responseDocument["activitySeq"].is<uint32_t>() &&
+        responseDocument["activityTs"].is<int64_t>();
+    const UserActivity activity = activityFieldsComplete
+        ? parseUserActivity(responseDocument["activity"].as<const char*>())
+        : UserActivity::UNKNOWN;
+    const uint32_t activitySeq = activityFieldsComplete
+        ? responseDocument["activitySeq"].as<uint32_t>()
+        : 0;
+    const int64_t activityTs = activityFieldsComplete
+        ? responseDocument["activityTs"].as<int64_t>()
+        : 0;
+    const ActivityWireDecision activityDecision = observeActivitySnapshot(
+        activityWireState, activityFieldsComplete, activity, activitySeq,
+        activityTs);
+    if (activityDecision.disposition == ActivityWireDisposition::BASELINE) {
+        Serial.printf("RELAY activity=baseline seq=%lu value=%s\n",
+                      static_cast<unsigned long>(activitySeq),
+                      userActivityName(activity));
+    } else if (activityDecision.disposition == ActivityWireDisposition::APPLY) {
+        update.hasActivity = true;
+        update.activity = activityDecision.activity;
+        update.activitySeq = activitySeq;
+        update.activityTs = activityTs;
+    } else if (activityDecision.disposition ==
+               ActivityWireDisposition::INVALIDATE) {
+        update.hasActivity = true;
+        update.activity = UserActivity::UNKNOWN;
+        Serial.println(F("RELAY activity=invalidated reason=missing_invalid_or_stale"));
+    }
     return true;
 }
 
-bool postReply(int index, const char* text) {
-    if (WiFi.status() != WL_CONNECTED) return false;
+bool pollRelay(RelayUpdate& update, const RelayTelemetry& telemetry) {
+    char payload[384] = {};
+    const size_t payloadLength = buildTelemetryPayload(payload, sizeof(payload), telemetry);
+    if (payloadLength == 0 || payloadLength >= sizeof(payload) - 1) {
+        Serial.println(F("RELAY rejected=telemetry_oversized"));
+        return false;
+    }
 
-    HTTPClient http;
-    String url = String("https://") + VERCEL_HOST + "/api/reply";
-    if (!http.begin(s_tls, url)) return false;
-    http.addHeader("Content-Type", "application/json");
+    httpClient.setReuse(true);
+    httpClient.setConnectTimeout(4000);
+    httpClient.setTimeout(4000);
+    if (!httpClient.begin(tlsClient, pullUrl)) {
+        return false;
+    }
+    httpClient.addHeader("Content-Type", "application/json");
+    const int code = httpClient.POST(
+        reinterpret_cast<uint8_t*>(payload), payloadLength);
+    if (code != HTTP_CODE_OK) {
+        Serial.printf("RELAY http=%d\n", code);
+        httpClient.end();
+        return false;
+    }
+    const bool parsed = parseResponse(update);
+    httpClient.end();
+    return parsed;
+}
 
-    JsonDocument d;
-    d["index"] = index;
-    d["text"]  = text;
-    String payload;
-    serializeJson(d, payload);
+void networkTask(void*) {
+    WiFi.persistent(false);
+    WiFi.mode(WIFI_STA);
+    WiFi.setSleep(false);
+    tlsClient.setInsecure();
+    snprintf(pullUrl, sizeof(pullUrl), "https://%s/api/pull", VERCEL_HOST);
 
-    int code = http.POST(payload);
-    http.end();
-    return code == 200;
+    RelayTelemetry telemetry{};
+    uint8_t backoffIndex = 0;
+    uint8_t relayFailureIndex = 0;
+    uint32_t outageStartedMs = millis();
+    bool outageActive = true;
+
+    while (true) {
+        if (WiFi.status() != WL_CONNECTED) {
+            if (!joinHotspot(backoffIndex)) {
+                continue;
+            }
+        }
+
+        RelayTelemetry latest{};
+        while (xQueueReceive(telemetryQueue, &latest, 0) == pdTRUE) {
+            telemetry = latest;
+        }
+
+        RelayUpdate update{};
+        const uint32_t pollStartedMs = millis();
+        if (pollRelay(update, telemetry)) {
+            if (outageActive &&
+                static_cast<uint32_t>(pollStartedMs - outageStartedMs) > LONG_OUTAGE_MS) {
+                resetWireBaselines();
+                update = RelayUpdate{};
+                update.resetCommandBaseline = true;
+                if (!pollRelay(update, telemetry)) {
+                    tlsClient.stop();
+                    continue;
+                }
+            }
+            outageActive = false;
+            relayFailureIndex = 0;
+            if (update.resetCommandBaseline || update.hasActivity || update.hasCommand) {
+                if (!enqueueUpdate(update)) {
+                    Serial.println(F("RELAY dropped=queue_full"));
+                }
+            }
+            const uint32_t elapsedMs = millis() - pollStartedMs;
+            if (elapsedMs < HEALTHY_POLL_MS) {
+                vTaskDelay(pdMS_TO_TICKS(HEALTHY_POLL_MS - elapsedMs));
+            }
+            continue;
+        }
+
+        if (!outageActive) {
+            outageActive = true;
+            outageStartedMs = pollStartedMs;
+        }
+        tlsClient.stop();
+        const uint32_t retryMs = BACKOFF_MS[relayFailureIndex];
+        Serial.printf("RELAY poll=failed retry_ms=%lu\n",
+                      static_cast<unsigned long>(retryMs));
+        vTaskDelay(pdMS_TO_TICKS(retryMs));
+        if (relayFailureIndex + 1 < sizeof(BACKOFF_MS) / sizeof(BACKOFF_MS[0])) {
+            ++relayFailureIndex;
+        }
+    }
+}
+
+} // namespace
+
+bool relayStart() {
+    if (updateQueue == nullptr) {
+        updateQueue = xQueueCreate(UPDATE_QUEUE_LENGTH, sizeof(RelayUpdate));
+    }
+    if (telemetryQueue == nullptr) {
+        telemetryQueue = xQueueCreate(1, sizeof(RelayTelemetry));
+    }
+    if (updateQueue == nullptr || telemetryQueue == nullptr) {
+        Serial.println(F("RELAY start=failed reason=queue_allocation"));
+        return false;
+    }
+    if (!RELAY_NETWORK_CONFIGURED) {
+        Serial.println(F("RELAY configured=0 transport=offline_local_only"));
+        return true;
+    }
+    if (networkTaskHandle != nullptr) {
+        return true;
+    }
+    const BaseType_t result = xTaskCreatePinnedToCore(
+        networkTask, "netTask", NETWORK_TASK_STACK_BYTES, nullptr, 1,
+        &networkTaskHandle, 0);
+    if (result != pdPASS) {
+        networkTaskHandle = nullptr;
+        Serial.println(F("RELAY start=failed reason=task_allocation"));
+        return false;
+    }
+    Serial.printf("RELAY configured=1 host=%s cadence_ms=%lu\n", VERCEL_HOST,
+                  static_cast<unsigned long>(HEALTHY_POLL_MS));
+    return true;
+}
+
+bool relayPollUpdate(RelayUpdate& update) {
+    return updateQueue != nullptr && xQueueReceive(updateQueue, &update, 0) == pdTRUE;
+}
+
+void relayPublishTelemetry(const RelayTelemetry& telemetry) {
+    if (telemetryQueue != nullptr) {
+        xQueueOverwrite(telemetryQueue, &telemetry);
+    }
+}
+
+bool relayNetworkConfigured() {
+    return RELAY_NETWORK_CONFIGURED;
 }

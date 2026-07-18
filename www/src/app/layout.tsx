@@ -17,8 +17,12 @@ const geistMono = Geist_Mono({
 });
 
 export const metadata: Metadata = {
-  title: "Bus-stop relay",
+  title: "TACTA",
   description: "Camera capture + device relay for the wrist-worn situational-awareness device.",
+  icons: {
+    icon: [{ url: "/logo.png", type: "image/png" }],
+    apple: "/logo.png",
+  },
 };
 
 export default function RootLayout({

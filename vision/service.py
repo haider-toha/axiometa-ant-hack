@@ -86,8 +86,24 @@ VOTE_ROUNDS = 3  # concurrent Claude readings per arrival
 VOTES_NEEDED = 2  # agreeing high-confidence readings required to emit a route
 
 CLAUDE_MODEL = "claude-opus-4-8"
-# Faster/cheaper swap if the stage feels laggy — one string, nothing else:
-# CLAUDE_MODEL = "claude-haiku-4-5"
+# Faster/cheaper swap if the stage feels laggy. ⚠️ IT IS NOT ONE STRING.
+#
+# `output_config.effort` is REJECTED by claude-haiku-4-5 — it is supported on
+# the Opus 4.5+ tiers only, and the level does not save you: "low" errors too.
+# It is passed in TWO functions, `_one_vote` and `_prime_schema` (named rather
+# than line-numbered so this note cannot rot), and both must drop it in the
+# same edit. The `format`/json_schema half is fine on Haiku, which is why
+# dropping `effort` is the correct fix and not a workaround — the schema does
+# the work, `effort` is the optional sibling. Same conclusion the comment in
+# `_one_vote` already reaches; this is the trigger it was never wired to.
+#
+# Forget it and NOTHING TELLS YOU. `_prime_schema` swallows its own exception
+# and `_vote_all` passes return_exceptions=True, so three 400s collapse into an
+# empty vote list, the gate finds nothing to agree on, and every arrival takes
+# the UNREADABLE path. On stage that is BUS ARRIVING firing perfectly and the
+# route never arriving — for every bus, all night, visible only in Modal logs.
+#
+# CLAUDE_MODEL = "claude-haiku-4-5"   # ← and drop "effort" in BOTH functions
 
 # What the current demo target is expected to read as — used for logging only.
 #

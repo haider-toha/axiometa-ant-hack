@@ -41,6 +41,8 @@ const EMPTY_DETECTOR: DetectorState = {
   readingConf: "",
   votes: [],
   labels: [],
+  hazards: [],
+  targetBearing: "",
 };
 
 /**

@@ -4,7 +4,7 @@
 
 **Goal:** Add an isolated, uploadable Genesis Mini firmware target for scored navigation and stationary situational buzzer discrimination tests.
 
-**Architecture:** Keep pattern data in an Arduino-free header so native tests can verify semantics. A dedicated Arduino source owns LEDC tone output, balanced trial shuffling, Serial controls, scoring, and user feedback. A separate PlatformIO environment builds only that source, leaving the legacy application unchanged.
+**Architecture:** Keep pattern data and verified port mappings in an Arduino-free header so native tests can verify semantics. A dedicated Arduino source owns LEDC tone output, the P2 LED-button arm/stop control, balanced trial shuffling, Serial controls, scoring, and user feedback. A separate PlatformIO environment builds only that source, leaving the legacy application unchanged.
 
 **Tech Stack:** PlatformIO, Arduino-ESP32 3.x, ESP32-S3 LEDC tone API, Unity native tests, C++17.
 

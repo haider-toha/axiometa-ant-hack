@@ -15,6 +15,8 @@ The two buzzers snap into:
 
 The AX22-0018 schematic confirms that the buzzer driver uses IO1. The Genesis Mini schematic confirms Port 1 IO1 is GPIO3 and Port 3 IO1 is GPIO16. The module and board silk must still be checked before power-on.
 
+An AX22-0050 tactile LED button temporarily occupies Port 2 for this experiment. Its active-low switch uses IO1 / GPIO6 and its active-high LED uses IO2 / GPIO5. Port 4 remains empty. Port 2 must be returned to the ToF sensor when the full prototype is assembled.
+
 ## Approaches Considered
 
 1. **Dedicated PlatformIO environment and source file (chosen).** This is reproducible, cannot accidentally boot the legacy speech-to-braille application, and can be built and uploaded independently.
@@ -47,15 +49,19 @@ The operator enters EVENT or WAIT over Serial. Passing is at least 10 correct ou
 
 ## Controls
 
+- P2 button: press once to arm output; press again to stop and discard the active run.
+- P2 LED: on while output is armed; off while safe/disarmed and after completion.
 - `v`: run the labelled viability sweep.
 - `n`: start a navigation session.
 - `s`: start a stationary situational session.
 - `l` / `r`: submit a navigation guess.
 - `e` / `w`: submit a situational guess.
 - `p`: replay the current blind trial without revealing it.
+- `x`: stop and disarm from Serial.
 - `h`: print help.
 
 Each session contains exactly six trials of each class, shuffled on-device. The current trial remains replayable until a valid guess is entered.
+The button is serviced during pulse timing so a stop silences both buzzers without waiting for a complete pattern.
 
 ## Safety And Interpretation
 

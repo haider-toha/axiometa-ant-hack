@@ -6,6 +6,27 @@
 
 inline constexpr uint16_t HAPTIC_CLEARING_GAP_MS = 150;
 
+enum class OutputMode : uint8_t {
+    NIGHT,
+    AUDIBLE,
+};
+
+inline constexpr OutputMode DEFAULT_OUTPUT_MODE = OutputMode::NIGHT;
+
+struct HapticDrive {
+    uint16_t p1Hz;
+    uint16_t p3Hz;
+};
+
+inline constexpr HapticDrive hardwareDriveFor(HapticDrive requested,
+                                               OutputMode mode) {
+    return mode == OutputMode::NIGHT ? HapticDrive{0, 0} : requested;
+}
+
+inline constexpr const char* outputModeName(OutputMode mode) {
+    return mode == OutputMode::NIGHT ? "night" : "audible";
+}
+
 inline constexpr bool clearingGapElapsed(uint32_t nowMs, uint32_t startedMs) {
     return static_cast<uint32_t>(nowMs - startedMs) >= HAPTIC_CLEARING_GAP_MS;
 }

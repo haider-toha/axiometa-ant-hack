@@ -10,10 +10,16 @@ import type { DebugState } from "@/lib/contract";
 
 const POLL_MS = 500;
 const EMPTY = "–";
+// CLOUD_ACTIVITY_LEASE_MS in firmware/braille_wearable/src/relay_pure.h. Past
+// this the board discards cloud activity and falls back to MOVING, closing the
+// bus gate. The heartbeat exists to stop that happening; this readout is how we
+// SEE it working rather than assume it. [14 §Remaining delta]
+const ACTIVITY_LEASE_MS = 120_000;
 
 export default function DebugScreen() {
   const [state, setState] = useState<DebugState | null>(null);
   const [ageMs, setAgeMs] = useState<number | null>(null);
+  const [activityAgeMs, setActivityAgeMs] = useState<number | null>(null);
   const [online, setOnline] = useState(false);
   const inFlight = useRef(false);
 
@@ -30,6 +36,7 @@ export default function DebugScreen() {
         if (!cancelled) {
           setState(data);
           setAgeMs(data.device.ts ? Date.now() - data.device.ts : null);
+          setActivityAgeMs(data.device.activityTs ? Date.now() - data.device.activityTs : null);
           setOnline(true);
         }
       } catch {
@@ -84,8 +91,14 @@ export default function DebugScreen() {
                 {cmd.route}
               </span>
             )}
+            {/* The board gates the pattern above on this, so the two belong on
+                one line: read together they say whether the device will act at
+                all. MOVING accepts only NONE and ERROR. */}
+            <span className="font-mono text-sm text-muted-foreground">
+              {cmd?.activity ?? EMPTY}
+            </span>
           </div>
-          <dl className="mt-3 grid grid-cols-2 gap-3 sm:grid-cols-4">
+          <dl className="mt-3 grid grid-cols-2 gap-3 sm:grid-cols-3">
             <Field label="Destination" value={cmd?.dest || EMPTY} />
             <Field label="Confidence" value={cmd?.conf || EMPTY} />
             <Field label="Arrival" value={cmd?.arrivalId ?? EMPTY} num />
@@ -93,6 +106,16 @@ export default function DebugScreen() {
               label="Age"
               value={ageMs === null ? EMPTY : `${(ageMs / 1000).toFixed(1)}s`}
               num
+            />
+            <Field label="Activity seq" value={cmd?.activitySeq ?? EMPTY} num />
+            <Field
+              label="Activity age"
+              value={activityAgeMs === null ? EMPTY : `${(activityAgeMs / 1000).toFixed(1)}s`}
+              num
+              // Past the lease the board has already reverted to MOVING. Showing
+              // this in destructive colour turns a silent two-minute decay into
+              // something visible from the back of the room.
+              alert={activityAgeMs !== null && activityAgeMs > ACTIVITY_LEASE_MS}
             />
           </dl>
         </section>
@@ -160,15 +183,23 @@ function Field({
   label,
   value,
   num = false,
+  alert = false,
 }: {
   label: string;
   value: React.ReactNode;
   num?: boolean;
+  alert?: boolean;
 }) {
   return (
     <div className="flex flex-col gap-0.5">
       <dt className="text-xs text-muted-foreground">{label}</dt>
-      <dd className={`truncate text-sm ${num ? "font-mono tabular-nums" : ""}`}>{value}</dd>
+      <dd
+        className={`truncate text-sm ${num ? "font-mono tabular-nums" : ""} ${
+          alert ? "text-destructive" : ""
+        }`}
+      >
+        {value}
+      </dd>
     </div>
   );
 }

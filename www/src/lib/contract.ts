@@ -40,6 +40,89 @@ export function isCloudPattern(v: unknown): v is CloudPattern {
   return typeof v === "string" && (CLOUD_PATTERNS as readonly string[]).includes(v);
 }
 
+/**
+ * Which interaction phase the phone says the user is in.
+ *
+ * Wire values are EXACT and case-sensitive. The board does
+ * `strcmp(value, "MOVING")` / `strcmp(value, "STILL")` in `parseUserActivity()`
+ * (firmware/braille_wearable/src/relay_pure.h on Sebastian's branch) and maps
+ * everything else — including nullptr — to `UserActivity::UNKNOWN`, which closes
+ * the bus-information gate.
+ *
+ * NEVER serialise this as an integer. The firmware enum is
+ * `{ UNKNOWN = 0, MOVING, STILL }`; it was reordered when the enum moved out of
+ * navigation_pure.h, so STILL went from 0 to 2 [14 §navigation_pure.h delta].
+ */
+export type UserActivity = "STILL" | "MOVING";
+
+export function isUserActivity(v: unknown): v is UserActivity {
+  return v === "STILL" || v === "MOVING";
+}
+
+/**
+ * MOVING unless the input is exactly "STILL".
+ *
+ * The default is MOVING, **not** STILL. This inverts audit 11 and issue #5, both
+ * of which predate the firmware. `effectiveActivity()` in relay_pure.h returns
+ * `UserActivity::MOVING` when cloud activity is UNKNOWN or its 120 s lease has
+ * expired, and `acceptsRelayCommand(UNKNOWN, BUS)` is false. Missing activity
+ * therefore means "show nothing", not "show bus info" — and the relay has to
+ * fail in the same direction as the board, or the two disagree about what
+ * silence means. [14 §Conflict map]
+ *
+ * READ path only. POST /api/activity rejects an unrecognised value with 400
+ * rather than defaulting: the phone is the only client and a typo there must be
+ * loud, not silently resolved to MOVING.
+ */
+export function normActivity(v: unknown): UserActivity {
+  return isUserActivity(v) ? v : "MOVING";
+}
+
+/**
+ * ArduinoJson `is<uint32_t>()` ceiling. Above this the board skips the ENTIRE
+ * activity block with no error anywhere, and cloud activity is dead until the
+ * next reboot.
+ */
+export const ACTIVITY_SEQ_MAX = 4294967295;
+
+/**
+ * Coerce a stored activity sequence into something the board can actually read.
+ *
+ * `Date.now()` is ~1.78e12 and fails `is<uint32_t>()`. That is the single
+ * easiest way to silently disable this feature, which is why the ceiling is a
+ * named constant with a test asserting `Date.now() > ACTIVITY_SEQ_MAX`.
+ *
+ * Clamping at the ceiling rather than passing the value through is deliberate:
+ * both failure modes end with the board on its MOVING fallback after the lease,
+ * but a clamped value keeps the field TYPE-valid, so the shape stays debuggable
+ * over curl. Reaching the ceiling takes 4.29e9 INCRs — ~4,000 years at the 30 s
+ * heartbeat — so this is a guard, not a design constraint.
+ */
+export function normActivitySeq(v: unknown): number {
+  const n = typeof v === "number" ? v : Number(v);
+  if (!Number.isFinite(n)) return 0;
+  const i = Math.trunc(n);
+  if (i < 0) return 0;
+  return i > ACTIVITY_SEQ_MAX ? ACTIVITY_SEQ_MAX : i;
+}
+
+/**
+ * The independently versioned half of the /api/pull response.
+ *
+ * Split out as its own interface so the independence rule in AGENTS.md is
+ * visible in the type system: `writeCommand()` never produces one of these and
+ * `writeActivity()` never produces a command. An activity heartbeat must not
+ * increment command `seq` or refresh a previous command's `ts`.
+ */
+export interface ActivityState {
+  activity: UserActivity;
+  /** Independent edge-trigger. Small monotonic counter — NEVER a timestamp. */
+  activitySeq: number;
+  /** ms epoch of the activity write. Documented by firmware, never parsed by
+   *  it — for the debug screen and forward-compat only. [14 §activityTs] */
+  activityTs: number;
+}
+
 /** What the phone POSTs to /api/event (edge-triggered — send only on change). */
 export interface EventRequest {
   pattern: CloudPattern;
@@ -49,8 +132,19 @@ export interface EventRequest {
   arrivalId: number;
 }
 
-/** What the ESP32 receives from /api/pull. `seq` is its edge-trigger. */
-export interface DeviceCommand {
+/**
+ * What the ESP32 receives from /api/pull.
+ *
+ * Two independently versioned pieces of state in one flat JSON object: `seq`
+ * edge-triggers the cloud pattern, `activitySeq` edge-triggers the activity gate
+ * and refreshes its 120 s lease. Neither may move the other.
+ *
+ * The activity trio is serialised LAST, after `ts`, matching
+ * RELAY-FOR-FIRMWARE.md, the two-phase gating design spec, and the plan's
+ * Contract C JSON example. His parser is key-lookup based so order cannot break
+ * it; matching his doc keeps curl output diffable against the handoff spec.
+ */
+export interface DeviceCommand extends ActivityState {
   seq: number; // monotonic; the device's edge-trigger
   pattern: CloudPattern;
   route: string;

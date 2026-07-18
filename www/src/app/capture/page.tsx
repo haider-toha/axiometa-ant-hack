@@ -6,21 +6,47 @@
 // it to /api/event only on change. This is the only component that speaks both
 // the detector's vocabulary and the device's, so it owns the translation and
 // the edge-trigger.
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import Link from "next/link";
 import { Button } from "@/components/ui/button";
 import {
   detectorToEvent,
   sameEvent,
+  type ActivityState,
   type DetectorState,
   type EventRequest,
   type ModalDetection,
   type ModalResponse,
+  type UserActivity,
 } from "@/lib/contract";
+import {
+  initialMotionState,
+  requestMotionPermission,
+  step,
+  type MotionPermission,
+  type MotionState,
+} from "@/lib/motion";
 
 const CAPTURE_MS = 500; // 2 Hz – a bus pulling in is a multi-second event
 const JPEG_QUALITY = 0.85;
 const VISIBLE_LABELS = 6; // how many detections the list shows under the video
+
+/**
+ * Activity heartbeat, well under the board's CLOUD_ACTIVITY_LEASE_MS = 120000
+ * (firmware/braille_wearable/src/relay_pure.h).
+ *
+ * The board refreshes its activity lease ONLY when activitySeq advances, so a
+ * steady STILL that is never re-posted silently decays to MOVING after two
+ * minutes — reopening ToF proximity output and closing the bus gate on a user
+ * standing at a bus stop. Four beats per lease survives three consecutive failed
+ * posts. It also bounds post-reboot recovery: a board that reboots mid-demo
+ * takes the next value it sees as a non-rendering baseline and needs one more
+ * advance, so 30 s is the worst-case blind window. [14 §Remaining delta]
+ */
+const ACTIVITY_HEARTBEAT_MS = 30_000;
+/** How often the sensor diagnostics are copied into React state. The raw event
+ *  stream can be 60 Hz; re-rendering at 60 Hz from a sensor is a real bug. */
+const DIAG_MS = 500;
 
 // Inlined at build time by Next, so this is a constant and identical on both
 // server and client – no effect, no hydration dance, no query-string override.
@@ -35,6 +61,26 @@ const IDLE_EVENT: EventRequest = {
   conf: "",
   arrivalId: 0,
 };
+
+type ActivityMode = "off" | "manual" | "auto";
+
+/** Why a POST was issued — a bench readout needs to distinguish "the classifier
+ *  just changed its mind" from "the 30 s lease timer fired". */
+type PostReason = "manual" | "sensor" | "heartbeat";
+
+/** One row of the on-screen relay log. Purely diagnostic; nothing reads it. */
+interface PostLogEntry {
+  id: number;
+  t: number; // ms epoch when the POST was issued
+  activity: UserActivity;
+  reason: PostReason;
+  status: number | "ERR";
+  seq: number | null;
+  ms: number; // round-trip duration
+}
+
+/** Rows kept on screen. Enough to see a transition followed by heartbeats. */
+const POST_LOG_MAX = 6;
 
 /** Which overlay token a box is drawn in. Colour is the only thing separating
  *  the arrival target from a hazard from everything else. */
@@ -70,6 +116,197 @@ export default function CapturePage() {
   const [frames, setFrames] = useState(0);
   const [detections, setDetections] = useState<ModalDetection[]>([]);
   const [modal, setModal] = useState<ModalResponse | null>(null);
+
+  // --- activity relay ------------------------------------------------------
+  const [activity, setActivityState] = useState<UserActivity>("MOVING");
+  const [mode, setMode] = useState<ActivityMode>("off");
+  const [motionPermission, setMotionPermission] = useState<MotionPermission | null>(null);
+  const [lastWrite, setLastWrite] = useState<ActivityState | null>(null);
+  const [lastTransitionAt, setLastTransitionAt] = useState<number | null>(null);
+  const [relayError, setRelayError] = useState("");
+  const [diag, setDiag] = useState<MotionState>(initialMotionState);
+  const [postLog, setPostLog] = useState<PostLogEntry[]>([]);
+
+  /**
+   * Steps per minute across the peaks still inside the cadence window.
+   *
+   * This is the number to watch on a bench walk: the classifier fires on
+   * PERIODICITY, not magnitude, so "is it seeing me walk" is really "is this
+   * landing in the gait band". Normal walking is roughly 90–120 spm. A reading
+   * that swings wildly between samples means the peaks are noise, not steps —
+   * which is the failure the peak count alone cannot show you.
+   */
+  const cadenceSpm = useMemo(() => {
+    const p = diag.peaks;
+    if (p.length < 2) return null;
+    const span = p[p.length - 1] - p[0];
+    if (span <= 0) return null;
+    return ((p.length - 1) / span) * 60000;
+  }, [diag.peaks]);
+  /**
+   * Clock for the "Last change" readout, ticked on a timer rather than read
+   * during render.
+   *
+   * `Date.now()` in the render body is impure — react-hooks/purity rejects it —
+   * and it is also simply wrong here: the value would only refresh when
+   * something ELSE re-rendered the page, so the age would sit frozen at
+   * whatever it read on the last unrelated update. Driving it from an interval
+   * is what makes it a live diagnostic instead of a decorative one.
+   */
+  const [nowMs, setNowMs] = useState<number | null>(null);
+
+  const activityRef = useRef<UserActivity>("MOVING");
+  const modeRef = useRef<ActivityMode>("off");
+  const motionRef = useRef<MotionState>(initialMotionState());
+  const postInFlight = useRef(false);
+  const postPending = useRef<UserActivity | null>(null);
+  const beatRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const postRef = useRef<(a: UserActivity, why: PostReason) => void>(() => {});
+  const postLogId = useRef(0);
+
+  /**
+   * POST the activity and re-arm the heartbeat from the moment the POST
+   * COMPLETES, rather than running a free-running interval.
+   *
+   * A transition and a heartbeat issued milliseconds apart can land in Redis out
+   * of order, and the loser would win permanently: activitySeq only ever goes
+   * up, so the board honours whichever write got the higher counter, not
+   * whichever the user meant last. Serialising through an in-flight guard makes
+   * the last POST *issued* the last one stored.
+   */
+  const postActivity = useCallback(async (a: UserActivity, why: PostReason) => {
+    if (postInFlight.current) {
+      postPending.current = a;
+      return;
+    }
+    postInFlight.current = true;
+    // Captured before the await so the logged time is when the request was
+    // ISSUED, not when it happened to come back. On a bad hotspot those differ
+    // by seconds, and "when did the phone try" is the useful bench fact.
+    const issuedAt = Date.now();
+    let status: number | "ERR" = "ERR";
+    let seq: number | null = null;
+    try {
+      const res = await fetch("/api/activity", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ activity: a }),
+      });
+      status = res.status;
+      if (!res.ok) throw new Error(`relay returned ${res.status}`);
+      const written = (await res.json()) as ActivityState;
+      seq = written.activitySeq;
+      setLastWrite(written);
+      setRelayError("");
+    } catch {
+      // Do not retry here: at 30 s against a 120 s lease the next beat covers
+      // three consecutive failures. The diagnostics panel is what makes a dead
+      // relay visible instead of silent.
+      setRelayError("Activity relay unreachable. The board reverts to MOVING after 120s.");
+    } finally {
+      // Logged in BOTH outcomes. A log that only records successes cannot answer
+      // "is it sending?" — a silent failure looks identical to never firing.
+      const entry: PostLogEntry = {
+        id: postLogId.current++,
+        t: issuedAt,
+        activity: a,
+        reason: why,
+        status,
+        seq,
+        ms: Date.now() - issuedAt,
+      };
+      setPostLog((rows) => [entry, ...rows].slice(0, POST_LOG_MAX));
+      postInFlight.current = false;
+      if (beatRef.current) clearTimeout(beatRef.current);
+      beatRef.current = setTimeout(
+        () => postRef.current(activityRef.current, "heartbeat"),
+        ACTIVITY_HEARTBEAT_MS,
+      );
+      const queued = postPending.current;
+      postPending.current = null;
+      if (queued !== null && queued !== a) postRef.current(queued, why);
+    }
+  }, []);
+
+  useEffect(() => {
+    postRef.current = (a, why) => void postActivity(a, why);
+  }, [postActivity]);
+
+  /** The single setter. The classifier and the manual buttons both go through
+   *  it, so the sensor can be switched off on stage without touching the relay. */
+  const applyActivity = useCallback((a: UserActivity, source: "manual" | "sensor") => {
+    if (source === "sensor" && modeRef.current !== "auto") return;
+    // Below ~10 Hz delivered, peak detection is operating on unusable data and
+    // the derived state is noise. Audit 10 §4: "declare the sensor degraded and
+    // fall back to manual rather than emitting a state derived from unusable
+    // data." The classifier still transitions — it reports, we decide — but a
+    // degraded transition must not reach the relay and flip the board.
+    if (source === "sensor" && motionRef.current.degraded) return;
+    activityRef.current = a;
+    setActivityState(a);
+    // Both clocks are seeded here, in a callback, so the readout starts at
+    // "0s ago" rather than showing "–" until the first interval fires — and so
+    // neither Date.now() call lands in a render body or an effect body.
+    const at = Date.now();
+    setLastTransitionAt(at);
+    setNowMs(at);
+    postRef.current(a, source);
+  }, []);
+
+  const setManual = useCallback(
+    (a: UserActivity) => {
+      modeRef.current = "manual";
+      setMode("manual");
+      applyActivity(a, "manual");
+    },
+    [applyActivity],
+  );
+
+  const resumeSensor = useCallback(() => {
+    modeRef.current = "auto";
+    setMode("auto");
+    motionRef.current = initialMotionState();
+  }, []);
+
+  // Feed devicemotion into the pure fold. Only a genuine activity CHANGE posts;
+  // everything else is diagnostics, sampled at DIAG_MS so React never re-renders
+  // at sensor rate.
+  useEffect(() => {
+    if (motionPermission !== "granted") return;
+    const onMotion = (e: DeviceMotionEvent) => {
+      const prev = motionRef.current;
+      const next = step(prev, {
+        t: e.timeStamp,
+        acceleration: e.acceleration,
+        accelerationIncludingGravity: e.accelerationIncludingGravity,
+        rotationRate: e.rotationRate,
+      });
+      motionRef.current = next;
+      if (next.activity !== prev.activity) applyActivity(next.activity, "sensor");
+    };
+    window.addEventListener("devicemotion", onMotion);
+    const diagId = setInterval(() => setDiag(motionRef.current), DIAG_MS);
+    return () => {
+      window.removeEventListener("devicemotion", onMotion);
+      clearInterval(diagId);
+    };
+  }, [motionPermission, applyActivity]);
+
+  // Runs whether or not the sensor is granted: a manual transition sets
+  // lastTransitionAt too, and its age has to keep counting. applyActivity has
+  // already seeded nowMs, so this effect only owns the interval.
+  useEffect(() => {
+    if (lastTransitionAt === null) return;
+    const id = setInterval(() => setNowMs(Date.now()), DIAG_MS);
+    return () => clearInterval(id);
+  }, [lastTransitionAt]);
+
+  useEffect(
+    () => () => {
+      if (beatRef.current) clearTimeout(beatRef.current);
+    },
+    [],
+  );
 
   const grabFrameB64 = useCallback((): string | null => {
     const video = videoRef.current;
@@ -220,6 +457,19 @@ export default function CapturePage() {
 
   const start = useCallback(async () => {
     setError("");
+
+    // 1. MOTION FIRST. It is the only one of the two that needs the gesture, and
+    //    requestPermission() is issued synchronously inside requestMotionPermission
+    //    before its own first await, so the API call lands in the same task as
+    //    the click. Awaiting getUserMedia first would burn WebKit's ~1 s
+    //    activation window on a human-answered camera dialog and make this
+    //    reject with NotAllowedError. [10 §2]
+    const permission = await requestMotionPermission();
+    setMotionPermission(permission);
+    if (permission === "granted") resumeSensor();
+
+    // 2. CAMERA SECOND. getUserMedia requires a secure context and permission
+    //    but not transient activation, so it is safe after the await above.
     try {
       const stream = await navigator.mediaDevices.getUserMedia({
         video: { facingMode: "environment" },
@@ -239,7 +489,7 @@ export default function CapturePage() {
           : "The camera could not start. Allow camera access for this site, then try again.",
       );
     }
-  }, []);
+  }, [resumeSensor]);
 
   const stop = useCallback(() => {
     streamRef.current?.getTracks().forEach((t) => t.stop());
@@ -349,6 +599,189 @@ export default function CapturePage() {
               )}
             </section>
 
+            {/* The manual control is ALWAYS visible and is the primary control,
+                not a fallback. A perfectly periodic camera pan near 0.8 Hz folds
+                through the one-sided magnitude to 1.6 Hz — squarely inside the
+                gait band — so no cadence classifier can separate it from
+                walking. Every sensor failure mode degrades to exactly these two
+                buttons. [15 §finding 4] */}
+            <section className="rounded-lg border border-border bg-card p-4 text-card-foreground">
+              <div className="flex items-baseline justify-between gap-3">
+                <h2 className="text-sm font-medium">Activity</h2>
+                <span className="font-mono text-xs tabular-nums text-muted-foreground">
+                  {mode === "auto" ? "sensor" : mode === "manual" ? "manual" : "off"}
+                  {lastWrite ? ` · seq ${lastWrite.activitySeq}` : ""}
+                </span>
+              </div>
+
+              {/* Bench readout. Two rows deliberately: what the SENSOR thinks,
+                  and what the RELAY actually holds. They diverge whenever the
+                  manual override is in play or a POST failed, and collapsing
+                  them into one number would hide exactly the case you are
+                  checking for. */}
+              <div className="mt-3 grid grid-cols-2 gap-2">
+                <div className="rounded-md border border-border p-3">
+                  <div className="text-xs text-muted-foreground">Sensor sees</div>
+                  <div
+                    className={`font-mono text-xl font-medium tabular-nums ${
+                      motionPermission !== "granted" || diag.degraded
+                        ? "text-muted-foreground"
+                        : diag.activity === "MOVING"
+                          ? "text-emerald-600 dark:text-emerald-400"
+                          : ""
+                    }`}
+                  >
+                    {motionPermission !== "granted"
+                      ? "—"
+                      : diag.activity === "MOVING"
+                        ? "WALKING"
+                        : "STILL"}
+                  </div>
+                  <div className="mt-0.5 font-mono text-xs tabular-nums text-muted-foreground">
+                    {cadenceSpm === null ? "no cadence" : `${cadenceSpm.toFixed(0)} spm`}
+                    {` · ${diag.peaks.length} peak${diag.peaks.length === 1 ? "" : "s"}`}
+                  </div>
+                </div>
+                <div className="rounded-md border border-border p-3">
+                  <div className="text-xs text-muted-foreground">Relay holds</div>
+                  <div className="font-mono text-xl font-medium tabular-nums">{activity}</div>
+                  <div className="mt-0.5 font-mono text-xs tabular-nums text-muted-foreground">
+                    {lastWrite ? `seq ${lastWrite.activitySeq}` : "never written"}
+                    {mode === "manual" ? " · manual" : mode === "auto" ? " · sensor" : ""}
+                  </div>
+                </div>
+              </div>
+
+              <div className="mt-3 flex flex-wrap items-center gap-2">
+                <Button
+                  size="sm"
+                  variant={activity === "STILL" ? "default" : "outline"}
+                  onClick={() => setManual("STILL")}
+                >
+                  Still
+                </Button>
+                <Button
+                  size="sm"
+                  variant={activity === "MOVING" ? "default" : "outline"}
+                  onClick={() => setManual("MOVING")}
+                >
+                  Moving
+                </Button>
+                {motionPermission === "granted" && mode === "manual" && (
+                  <Button size="sm" variant="outline" onClick={resumeSensor}>
+                    Resume sensor
+                  </Button>
+                )}
+              </div>
+
+              {/* Diagnostics — issue #5 requires permission state, sensor
+                  availability, derived activity and last transition time. The
+                  measured rate is the one that matters most: browsers have been
+                  reported dropping to 1 Hz, which kills peak detection silently
+                  and freezes the state at whatever it last held. [10 §4] */}
+              <dl className="mt-3 grid grid-cols-2 gap-3 sm:grid-cols-3">
+                <Diag label="Permission" value={motionPermission ?? "not asked"} />
+                <Diag
+                  label="Sensor"
+                  value={
+                    motionPermission !== "granted"
+                      ? "unavailable"
+                      : diag.sensorUnavailable
+                        ? "null samples"
+                        : diag.usingGravityFallback
+                          ? "gravity fallback"
+                          : "ok"
+                  }
+                />
+                <Diag
+                  label="Rate"
+                  value={diag.rateHz === null ? "–" : `${diag.rateHz.toFixed(0)} Hz`}
+                  alert={diag.degraded}
+                />
+                <Diag label="Peaks / window" value={String(diag.peaks.length)} />
+                <Diag
+                  label="Last change"
+                  value={
+                    lastTransitionAt === null || nowMs === null
+                      ? "–"
+                      : `${(Math.max(0, nowMs - lastTransitionAt) / 1000).toFixed(0)}s ago`
+                  }
+                />
+                {/* Rotation is shown because it is the classic false positive:
+                    a big spin reads as violent motion but is NOT walking, and
+                    the classifier deliberately ignores it. Seeing this spike
+                    while "Sensor sees" stays STILL is the gyro-spike rule
+                    working, not a bug. Issue #5: "Do not equate a single gyro
+                    spike with MOVING." */}
+                <Diag label="Rotation" value={`${diag.rotationMagnitude.toFixed(0)}°/s`} />
+              </dl>
+
+              {/* Proof the request actually left the phone. Without this, a dead
+                  relay and a classifier that never fires look identical from the
+                  outside — both are simply "nothing happening". */}
+              <div className="mt-4">
+                <div className="flex items-baseline justify-between gap-3">
+                  <h3 className="text-xs font-medium text-muted-foreground">
+                    POST /api/activity
+                  </h3>
+                  <span className="font-mono text-xs tabular-nums text-muted-foreground">
+                    {/* Total is derived from the newest id, not read off the
+                        ref: ids are monotonic from 0, and reading a ref during
+                        render is both lint-rejected and genuinely unreliable —
+                        it would not re-render when the count changed. */}
+                    {postLog.length === 0 ? "no requests yet" : `${postLog[0].id + 1} sent`}
+                  </span>
+                </div>
+                {postLog.length === 0 ? (
+                  <p className="mt-2 text-xs text-muted-foreground">
+                    Nothing sent yet. Press Still or Moving, or start the camera to
+                    begin the 30s heartbeat.
+                  </p>
+                ) : (
+                  <ul className="mt-2 space-y-1">
+                    {postLog.map((r) => (
+                      <li
+                        key={r.id}
+                        className="flex items-center justify-between gap-2 font-mono text-xs tabular-nums"
+                      >
+                        <span className="text-muted-foreground">
+                          {new Date(r.t).toLocaleTimeString()}
+                        </span>
+                        <span className="flex-1 truncate">
+                          {r.activity}
+                          <span className="text-muted-foreground"> · {r.reason}</span>
+                        </span>
+                        <span className={r.status === 200 ? "" : "text-destructive"}>
+                          {r.status === "ERR" ? "failed" : r.status}
+                          {r.seq === null ? "" : ` · seq ${r.seq}`}
+                        </span>
+                        <span className="text-muted-foreground">{r.ms}ms</span>
+                      </li>
+                    ))}
+                  </ul>
+                )}
+              </div>
+
+              {diag.degraded && motionPermission === "granted" && (
+                <p className="mt-3 text-sm text-muted-foreground">
+                  The motion sensor is delivering below 10 Hz. Use the manual control — a state
+                  derived from this data is not trustworthy.
+                </p>
+              )}
+              {motionPermission !== null && motionPermission !== "granted" && (
+                <p className="mt-3 text-sm text-muted-foreground">
+                  Motion permission is {motionPermission}. Use the manual control. iOS removed the
+                  Settings toggle in iOS 13 — the only grant path is this page&apos;s prompt, over
+                  HTTPS.
+                </p>
+              )}
+              {relayError && (
+                <p className="mt-3 rounded-md border border-destructive/40 bg-destructive/10 p-3 text-sm text-destructive">
+                  {relayError}
+                </p>
+              )}
+            </section>
+
             <section className="rounded-lg border border-border bg-card p-4 text-card-foreground">
               <div className="flex items-baseline justify-between gap-3">
                 <h2 className="text-sm font-medium">Bus</h2>
@@ -380,5 +813,24 @@ export default function CapturePage() {
         )}
       </div>
     </main>
+  );
+}
+
+function Diag({
+  label,
+  value,
+  alert = false,
+}: {
+  label: string;
+  value: string;
+  alert?: boolean;
+}) {
+  return (
+    <div className="flex flex-col gap-0.5">
+      <dt className="text-xs text-muted-foreground">{label}</dt>
+      <dd className={`truncate font-mono text-sm tabular-nums ${alert ? "text-destructive" : ""}`}>
+        {value}
+      </dd>
+    </div>
   );
 }

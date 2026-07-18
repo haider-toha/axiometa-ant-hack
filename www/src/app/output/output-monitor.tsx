@@ -35,6 +35,7 @@ export function OutputMonitor() {
   const decoderRef = useRef(new OutputTelemetryDecoder());
   const sessionRef = useRef<OutputSerialSession | null>(null);
   const generationRef = useRef(0);
+  const connectingGenerationRef = useRef<number | null>(null);
   const historyIdRef = useRef(0);
   const webSerialSupported = useSyncExternalStore(
     subscribeToBrowserCapability,
@@ -68,7 +69,9 @@ export function OutputMonitor() {
 
   const connectPort = useCallback(
     async (port: SerialPort) => {
+      if (sessionRef.current || connectingGenerationRef.current !== null) return;
       const generation = ++generationRef.current;
+      connectingGenerationRef.current = generation;
       setConnection("connecting");
       setError(null);
       decoderRef.current.reset();
@@ -98,6 +101,10 @@ export function OutputMonitor() {
         if (generationRef.current !== generation) return;
         setError(serialErrorMessage(caught));
         setConnection("error");
+      } finally {
+        if (connectingGenerationRef.current === generation) {
+          connectingGenerationRef.current = null;
+        }
       }
     },
     [consumeText],
@@ -105,7 +112,8 @@ export function OutputMonitor() {
 
   const connect = useCallback(async () => {
     try {
-      await connectPort(await requestOutputPort());
+      const port = (await getGrantedOutputPort()) ?? (await requestOutputPort());
+      await connectPort(port);
     } catch (caught) {
       setError(serialErrorMessage(caught));
       setConnection(caught instanceof DOMException && caught.name === "NotFoundError" ? "disconnected" : "error");
@@ -114,6 +122,7 @@ export function OutputMonitor() {
 
   const disconnect = useCallback(() => {
     generationRef.current += 1;
+    connectingGenerationRef.current = null;
     const session = sessionRef.current;
     sessionRef.current = null;
     decoderRef.current.reset();
@@ -133,6 +142,19 @@ export function OutputMonitor() {
     if (!webSerialSupported) return;
 
     let cancelled = false;
+    const reconnectGrantedPort = () => {
+      if (cancelled || sessionRef.current || connectingGenerationRef.current !== null) return;
+      void getGrantedOutputPort()
+        .then((port) => {
+          if (!cancelled && port) return connectPort(port);
+        })
+        .catch((caught) => {
+          if (cancelled) return;
+          setError(serialErrorMessage(caught));
+          setConnection("error");
+        });
+    };
+    navigator.serial.addEventListener("connect", reconnectGrantedPort);
     void getGrantedOutputPort()
       .then((port) => {
         if (cancelled) return;
@@ -147,7 +169,9 @@ export function OutputMonitor() {
 
     return () => {
       cancelled = true;
+      navigator.serial.removeEventListener("connect", reconnectGrantedPort);
       generationRef.current += 1;
+      connectingGenerationRef.current = null;
       const session = sessionRef.current;
       sessionRef.current = null;
       void session?.close();

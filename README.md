@@ -13,6 +13,8 @@ pulled in?* — delivering both as haptic patterns on the wrist.
 That file is the single authoritative source for what is being built. If anything anywhere else in
 this repo contradicts it, **the plan wins** — with one exception noted below.
 
+> ⚠️ `app/` is the stale legacy Next.js app from the old braille idea — do not use, edit, or reference it. The active web app lives in `www/`.
+
 **Its evidence base is [`audit/bus-stop-situational-awareness/`](audit/bus-stop-situational-awareness/)** —
 four research tracks that measured the hardware, verified the APIs against live documentation, and
 reconciled the design against the meeting transcript. Where the audit records a *measurement* and the
@@ -30,7 +32,7 @@ archived, not deleted — but **do not build from it.**
 | [`plan/archive/`](plan/archive/) | The superseded plans. Each carries a header explaining what replaced it and which of its specific claims were later disproved. |
 | [`audit/speech-to-braille-wearable/`](audit/speech-to-braille-wearable/) | 48 research files for the abandoned braille idea. **Historical record — closed. Add nothing here.** Some findings remain true and were carried forward; the new audit folder cites them where it did. |
 | `firmware/braille_wearable/` | Firmware for the old idea. The Wi-Fi/network layer is reusable; the braille encoding and the LCD/encoder drivers are not. |
-| `app/` | Next.js app for the old idea. The Vercel + Upstash relay (`api/push`, `api/pull`) is reusable as the device transport; the speech routes are not. |
+| `app/` | ⛔ Stale legacy Next.js app for the old idea — **do not use, edit, or reference it.** Its Vercel + Upstash relay (`api/push`, `api/pull`) informed the design; new web work lives in `www/`. |
 | `cad/` | Parametric enclosure, dimensioned for the old component set (LCD + rotary encoder). Being adapted, not rebuilt — see the plan. |
 
 ### The pivot in one line
@@ -51,7 +53,8 @@ the wrist and the haptics, and changes what they carry.
 | `audit/speech-to-braille-wearable/` | ⛔ Closed historical record — 48 files |
 | `parts/` | Sourced hardware: Genesis Mini starter kit, VL53L0CX ToF, ERM motors. **`parts/` mirrors the vendor catalogue, not the shelf** — a part being absent here does not mean it is absent from the room. The PDM microphone (AX22-0044) is in hand but has no folder, because it is too new to be catalogued. |
 | `firmware/` | PlatformIO project (ESP32-S3) |
-| `app/` | Next.js app, deploy target Vercel |
+| `www/` | 🟢 Active Next.js app (design-studio taste system), deploy target Vercel |
+| `app/` | ⛔ Stale legacy Next.js app — ignore (see `AGENTS.md`) |
 | `cad/` | Parametric CAD (build123d; builds headless — Fusion 360 is not required) |
 | `renders/` | Generated images |
 

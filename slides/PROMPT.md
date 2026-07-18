@@ -53,6 +53,34 @@ CAD models to be used for animation:
 /Users/haidertoha/Code/axiometa-ant-hack/slides/models/mic-AX22-0009.step
 ```
 
+### Local tooling (already installed — verify before Blender work)
+
+Blender, Flue (CLI bridge so agents can drive Blender), and ffmpeg are already installed on this machine. Do **not** reinstall them unless a verify command fails. Before Sub-agent A starts rendering, run these checks:
+
+```bash
+# Blender binary
+blender --version
+
+# Flue CLI + live bridge (Blender GUI must be open with the Creative Adapter Bridge addon enabled)
+flue version
+flue test blender
+
+# ffmpeg for image-sequence → video if needed
+ffmpeg -version
+which ffmpeg ffprobe
+```
+
+Expected: Blender **5.2.x**, Flue **1.0.x+**, `flue test blender` returns JSON with `"ok": true`, ffmpeg on PATH at `/opt/homebrew/bin/ffmpeg`.
+
+If `flue test blender` fails:
+1. Open Blender (`open -a Blender`).
+2. Confirm Preferences → Add-ons → **Creative Adapter Bridge** is enabled (addon file lives at `~/Library/Application Support/Blender/5.2/scripts/addons/creative_adapter_bridge.py`).
+3. Retry `flue test blender`. Session file should appear at `~/creative-adapters/blender.json`.
+
+**STEP import note:** Blender cannot open `.step` natively. Convert STEP → glTF/STL first with the project venv (`build123d` / OCP already available at `.venv`), then import the mesh into Blender via Flue. Do not install FreeCAD unless conversion fails.
+
+Flue skill docs after setup: `~/.claude/skills/flue/` (also mirrored under `~/.cursor/skills/flue/` and `~/.agents/skills/flue/`). Blender adapter notes: `adapters/blender/APP.md` inside those trees. Repo bootstrap skill: `.claude/skills/blender/SKILL.md`.
+
 ---
 
 ## PROJECT CONTEXT
@@ -215,7 +243,7 @@ Proposed output directory: `slides/deck/` — a single self-contained HTML page 
 Execute the build plan from Phase 3. Use sub-agents for parallelism where tasks are independent. Specifically:
 
 ### Sub-agent A — Blender rendering
-Render image sequence frames for each CAD beat. Read the blender skill first. Produce:
+Render image sequence frames for each CAD beat. Read the blender skill first. Re-run the **Local tooling** verify block from STEP 0 (`blender --version`, `flue test blender`, `ffmpeg -version`) before importing; keep Blender open while Flue drives it. Produce:
 - `slides/deck/frames/explode/0001.jpg` … `0090.jpg` — board assembly explode (90 frames)
 - `slides/deck/frames/orbit/0001.jpg` … `0080.jpg` — single-module orbit (80 frames)
 - `slides/deck/frames/detail/0001.jpg` … `0060.jpg` — contact/sensor close-up (60 frames)

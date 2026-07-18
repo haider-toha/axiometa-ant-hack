@@ -15,9 +15,10 @@ isolated buzzer and ToF runners for combined testing.
 The firmware boots operationally without a button. The buzzers simulate future
 vibration channels; they are not tactile actuators.
 
-Sensor servicing starts immediately. The READY tone is deferred for about 1.1
-seconds so the microphone can bootstrap its acoustic reference without blocking
-the ToF loop.
+Sensor servicing starts immediately. The firmware boots in `NIGHT` output mode:
+logical patterns and `TACTA_OUTPUT` telemetry continue, but both buzzer GPIO
+drives are held off. This also makes the deferred READY pattern silent. Use
+service Serial `v` to opt into audible output for a daytime demo.
 
 ## Build And Upload
 
@@ -43,6 +44,8 @@ The board boots operationally with an effective `MOVING` fallback while the inde
 | `8` / `u` / `e` | NUMBER 88 / UNKNOWN / ERROR | Exercise route 88, unreadable, or global error output |
 | `x` | Service emergency stop | Stop all output immediately; sensing remains active |
 | `o` | Service resume | Re-enable output after `x` |
+| `q` | Service only | Enter `NIGHT` mode; mute both buzzer GPIOs while patterns, sensors, relay handling, and output telemetry continue |
+| `v` | Service only | Enter `AUDIBLE` mode; send the current logical pattern to the buzzers |
 | `h` | Service only | Print controls |
 
 The relay parser accepts exactly `NONE`, `BUS`, `NUMBER`, `WAIT`, `UNKNOWN`, and `ERROR`. It rejects `LEFT`, `RIGHT`, `AHEAD`, and unknown strings. The first command snapshot is a non-rendering baseline. Commands received while `MOVING` still advance sequence state, so switching to `STILL` cannot replay an earlier camera result. Activity requires a complete valid `activity`/`activitySeq`/`activityTs` snapshot; missing, invalid, regressed, or locally stale activity revokes cloud `STILL` and falls back to `MOVING`.
@@ -65,6 +68,12 @@ Serial telemetry reports capture health, FFT features, and classifier decisions.
 The service stop command `x` silences outputs without stopping either sensor,
 which is useful for environmental false-positive testing. On `o`, a siren that
 is still classified active is eligible to resume immediately.
+
+`q` is the safe overnight test mode. Unlike `x`, it does not stop logical output
+patterns: the laptop output view can still visualize their requested frequencies
+from `TACTA_OUTPUT`. The firmware does not attempt a "very quiet" PWM level,
+because these passive buzzer modules do not provide a calibrated volume control
+that can guarantee inaudibility.
 
 ## Remaining Board Work
 

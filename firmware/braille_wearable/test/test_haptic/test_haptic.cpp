@@ -82,6 +82,29 @@ void test_service_stop_latches_output_off_until_explicit_resume(void) {
     TEST_ASSERT_TRUE(latch.enabled);
 }
 
+void test_night_mode_mutes_hardware_without_changing_requested_output(void) {
+    const HapticDrive requested{2350, 3050};
+
+    const HapticDrive muted = hardwareDriveFor(requested, OutputMode::NIGHT);
+    TEST_ASSERT_EQUAL_UINT16(0, muted.p1Hz);
+    TEST_ASSERT_EQUAL_UINT16(0, muted.p3Hz);
+    TEST_ASSERT_EQUAL_UINT16(2350, requested.p1Hz);
+    TEST_ASSERT_EQUAL_UINT16(3050, requested.p3Hz);
+}
+
+void test_firmware_output_mode_defaults_to_night(void) {
+    TEST_ASSERT_EQUAL_INT(static_cast<int>(OutputMode::NIGHT),
+                          static_cast<int>(DEFAULT_OUTPUT_MODE));
+}
+
+void test_audible_mode_passes_requested_output_to_hardware(void) {
+    const HapticDrive requested{2350, 3050};
+
+    const HapticDrive audible = hardwareDriveFor(requested, OutputMode::AUDIBLE);
+    TEST_ASSERT_EQUAL_UINT16(2350, audible.p1Hz);
+    TEST_ASSERT_EQUAL_UINT16(3050, audible.p3Hz);
+}
+
 void test_local_siren_patterns_match_locked_timing_and_channels(void) {
     TEST_ASSERT_EQUAL_UINT16(250, outputPatternDurationMs(ATTENTION_PATTERN));
     TEST_ASSERT_EQUAL_UINT16(1400, outputPatternDurationMs(SIREN_WARNING_PATTERN));
@@ -103,6 +126,9 @@ int main(int, char**) {
     RUN_TEST(test_stop_immediately_clears_output);
     RUN_TEST(test_preemption_clearing_gap_is_exact_and_wrap_safe);
     RUN_TEST(test_service_stop_latches_output_off_until_explicit_resume);
+    RUN_TEST(test_night_mode_mutes_hardware_without_changing_requested_output);
+    RUN_TEST(test_firmware_output_mode_defaults_to_night);
+    RUN_TEST(test_audible_mode_passes_requested_output_to_hardware);
     RUN_TEST(test_local_siren_patterns_match_locked_timing_and_channels);
     return UNITY_END();
 }

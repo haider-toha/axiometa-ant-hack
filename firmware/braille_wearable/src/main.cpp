@@ -172,6 +172,7 @@ void printHelp() {
     Serial.println(F("8/u/e  route 88, UNKNOWN, or ERROR relay-scenario input"));
     Serial.println(F("x  emergency stop all output; sensing continues"));
     Serial.println(F("o  resume board output after an emergency stop"));
+    Serial.println(F("q/v  NIGHT hardware mute or AUDIBLE output mode"));
     Serial.println(F("h  print this help"));
     Serial.println(F("ToF samples in both states but outputs only while MOVING."));
     Serial.println(F("Siren sensing and output run locally in both states."));
@@ -216,6 +217,14 @@ void handleSerial(char command) {
                 startSirenOutput(detectedSiren, millis());
             }
             Serial.println(F("OUTPUT resumed=all"));
+            break;
+        case 'q':
+            hapticSetOutputMode(OutputMode::NIGHT);
+            Serial.println(F("NIGHT_MODE active=1 hardware=muted telemetry=active"));
+            break;
+        case 'v':
+            hapticSetOutputMode(OutputMode::AUDIBLE);
+            Serial.println(F("NIGHT_MODE active=0 hardware=enabled telemetry=active"));
             break;
         case 'h': printHelp(); break;
         case '\r':
@@ -528,8 +537,9 @@ void setup() {
     }
 
     readyEligibleAtMs = millis() + READY_DELAY_MS;
-    Serial.printf("BOOTING sensors=active activity=%s acoustic_bootstrap_ms=1100\n",
-                  userActivityName(currentActivity));
+    Serial.printf(
+        "BOOTING sensors=active activity=%s acoustic_bootstrap_ms=1100 output_mode=%s\n",
+        userActivityName(currentActivity), outputModeName(hapticOutputMode()));
     printHelp();
 }
 

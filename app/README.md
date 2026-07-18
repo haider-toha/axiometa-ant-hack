@@ -1,36 +1,72 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+# Bus-Stop Relay App
 
-## Getting Started
-
-First, run the development server:
+This is the Next.js 16 app for the bus-stop situational-awareness prototype. It currently contains a mostly legacy speech-to-braille implementation; treat the current plan as authoritative before editing:
 
 ```bash
-npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
+sed -n '1,220p' ../plan/2026-07-18-bus-stop-situational-awareness.md
 ```
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+## What Survives
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
+The current build reuses the Vercel + Upstash relay, not the speech product.
 
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
+- `app/api/pull/route.ts`: ESP32 polling endpoint. Keep it dynamic, uncached, CORS-open, and curlable.
+- `app/api/push/route.ts`: starting template for the new `app/api/event/route.ts`.
+- `app/lib/redis.ts`: keep payload writes before `seq` increments. The `seq` increment is the edge trigger for the device.
+- `app/lib/contract.ts`: replace the braille-era contract with the plan's `CloudPattern`, `EventRequest`, `DeviceCommand`, telemetry, detector, and debug-state types.
+- `app/page.tsx`: keep only useful browser idioms, especially guarded polling and `getUserMedia`; the new capture path is phone video, not microphone audio.
 
-## Learn More
+The current plan includes a first-hour buzzer wear test. The app should help expose the resulting states clearly on the debug screen once `/api/state` exists; do not hide the experimental left/right result behind generic "haptic OK" wording.
 
-To learn more about Next.js, take a look at the following resources:
+## Legacy Files
 
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
+Do not extend these old speech/braille surfaces. The plan says to delete or replace them during implementation:
 
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
+- `app/api/stt/route.ts`
+- `app/api/tts/route.ts`
+- `app/api/condense/route.ts`
+- `app/api/suggest/route.ts`
+- `app/api/reply/route.ts`
+- `app/api/reply-result/route.ts`
+- `app/lib/anthropic.ts`
+- `app/lib/braille.ts`
+- `app/lib/braille.test.ts`
+- `app/components/*`
 
-## Deploy on Vercel
+The stale UI title "Speech to Braille" is not a product requirement; it is leftover code.
 
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
+## Local Setup
 
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+```bash
+npm ci
+npm run dev
+```
+
+Open `http://localhost:3000`.
+
+Runtime relay calls require:
+
+- `UPSTASH_REDIS_REST_URL`
+- `UPSTASH_REDIS_REST_TOKEN`
+
+The production Vercel project already owns these env vars according to the current plan. Do not commit local `.env` files.
+
+## Verification
+
+Run these after app changes:
+
+```bash
+npm test
+npm run lint
+npm run build
+```
+
+`npm run build` may print Upstash missing-env warnings locally when the env vars are absent; that is acceptable only if the build completes successfully. Runtime relay smoke needs the env vars.
+
+With the dev server running and Upstash env configured:
+
+```bash
+curl -fsS http://localhost:3000/api/pull
+```
+
+After `app/api/event/route.ts` exists, smoke it with the exact `BUS`, `WAIT`, and `NUMBER` payloads from the current plan, then confirm `/api/pull` returns the incremented command.

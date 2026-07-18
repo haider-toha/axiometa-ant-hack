@@ -1,18 +1,29 @@
 "use client";
 
-// Phone camera capture page (the camera host). Grabs frames from the rear
-// camera at ~2Hz, POSTs each to the Modal detector, draws what came back over
-// the video, translates the detector response into a device command, and POSTs
-// it to /api/event only on change. This is the only component that speaks both
-// the detector's vocabulary and the device's, so it owns the translation and
-// the edge-trigger.
+// The phone page. Two jobs, and they are INDEPENDENT:
+//
+//   1. Am I walking? DeviceMotion → STILL/MOVING → /api/activity. This is the
+//      default behaviour and it does not need the camera. [defect 1]
+//   2. Where is the bus? Rear camera at ~2 Hz → Modal detector → the target
+//      box's bearing → LEFT/AHEAD/RIGHT → /api/event, edge-triggered.
+//
+// This is the only component that speaks both the detector's vocabulary and the
+// device's, so it owns the translation and the edge-trigger for both. All the
+// debounce policy is pure and lives in @/lib/motion; what is left here is
+// browser plumbing and the on-screen readouts that make the two paths legible
+// on a bench.
+//
+// Target platform is iPhone Safari. Layout, tap targets and ordering are for a
+// phone held in one hand; desktop is not a consideration.
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import Link from "next/link";
 import { Button } from "@/components/ui/button";
 import {
+  bearingToPattern,
   detectorToEvent,
   sameEvent,
   type ActivityState,
+  type Bearing,
   type DetectorState,
   type EventRequest,
   type ModalDetection,
@@ -20,9 +31,15 @@ import {
   type UserActivity,
 } from "@/lib/contract";
 import {
+  bearingFromBox,
+  BEARING_CONFIRM_FRAMES,
+  initialBearingVote,
   initialMotionState,
   requestMotionPermission,
   step,
+  voteBearing,
+  type BearingVote,
+  type MotionBearing,
   type MotionPermission,
   type MotionState,
 } from "@/lib/motion";
@@ -82,12 +99,65 @@ interface PostLogEntry {
 /** Rows kept on screen. Enough to see a transition followed by heartbeats. */
 const POST_LOG_MAX = 6;
 
+/**
+ * The three navigation patterns, taken from the contract's own signature rather
+ * than re-declared. If `bearingToPattern` is ever widened, this follows it.
+ */
+type NavPattern = ReturnType<typeof bearingToPattern>;
+
+/** Glyph only — contract.ts has no opinion on how a direction is drawn. */
+const BEARING_ARROW: Record<MotionBearing, string> = {
+  left: "←",
+  center: "↑",
+  right: "→",
+};
+
+/** Everything the navigation card shows about the current frame. */
+interface NavView {
+  /** This frame's bearing under the widened AHEAD band; null = no target. */
+  observed: MotionBearing | null;
+  /** Horizontal centroid of the target box, 0..1. Shown because it is the raw
+   *  number both bearings are derived from, so a disagreement is explicable. */
+  centroid: number | null;
+  /** What the DETECTOR called it, on its own hard thirds. Kept visible so the
+   *  widened band reads as a deliberate difference rather than a bug. */
+  detector: Bearing | "";
+  /** The confirmed bearing — what may be sent. */
+  confirmed: MotionBearing | null;
+  /** A change currently accumulating evidence, and how many frames of it. */
+  pending: MotionBearing | null;
+  streak: number;
+}
+
+const NAV_IDLE: NavView = {
+  observed: null,
+  centroid: null,
+  detector: "",
+  confirmed: null,
+  pending: null,
+  streak: 0,
+};
+
+/** The last direction that actually left the phone. */
+interface NavPost {
+  t: number;
+  pattern: NavPattern;
+  ok: boolean;
+}
+
 /** Which overlay token a box is drawn in. Colour is the only thing separating
  *  the arrival target from a hazard from everything else. */
 function detectionToken(d: ModalDetection): string {
   if (d.target) return "--detect-target";
   if (d.kind) return "--detect-hazard";
   return "--detect-other";
+}
+
+/** Horizontal centroid of a normalised box, or null if it is unusable. */
+function centroidX(box: number[] | undefined): number | null {
+  if (!box || box.length !== 4) return null;
+  const cx = (box[0] + box[2]) / 2;
+  return Number.isFinite(cx) ? cx : null;
 }
 
 export default function CapturePage() {
@@ -126,6 +196,11 @@ export default function CapturePage() {
   const [relayError, setRelayError] = useState("");
   const [diag, setDiag] = useState<MotionState>(initialMotionState);
   const [postLog, setPostLog] = useState<PostLogEntry[]>([]);
+
+  // --- bus bearing ---------------------------------------------------------
+  const [nav, setNav] = useState<NavView>(NAV_IDLE);
+  const [lastNav, setLastNav] = useState<NavPost | null>(null);
+  const bearingVoteRef = useRef<BearingVote>(initialBearingVote());
 
   /**
    * Steps per minute across the peaks still inside the cadence window.
@@ -262,11 +337,54 @@ export default function CapturePage() {
     [applyActivity],
   );
 
+  /**
+   * Enter automatic mode and immediately assert what the classifier believes.
+   *
+   * The assertion is not decoration. `applyActivity` only ever runs on a
+   * TRANSITION, and a freshly reset classifier already believes STILL — so a
+   * user who grants permission and then stands still produces no transition,
+   * no POST, no heartbeat, and a board that is never told anything at all.
+   * Meanwhile the on-screen state would sit on this component's initial
+   * `MOVING`, which is the wire contract's fail-safe default for a MISSING
+   * value and not something anything measured. The page would read WALKING at
+   * a bus stop.
+   *
+   * Asserting STILL on entry is the honest claim: it is what the classifier
+   * concluded, it starts the 30 s lease heartbeat, and a real walk overrides it
+   * within ~2.5 s.
+   */
   const resumeSensor = useCallback(() => {
     modeRef.current = "auto";
     setMode("auto");
     motionRef.current = initialMotionState();
-  }, []);
+    applyActivity(motionRef.current.activity, "sensor");
+  }, [applyActivity]);
+
+  /**
+   * Start automatic walk detection — WITHOUT the camera.
+   *
+   * This is the page's primary control. Motion detection used to be reachable
+   * only through `start()`, i.e. the camera button, so opening this page and
+   * walking around did nothing at all and the manual buttons looked like the
+   * whole feature. It needs a real user gesture (iOS 13+ gates DeviceMotion on
+   * `requestPermission()`), but a gesture is all it needs — no camera, no
+   * detector, no `NEXT_PUBLIC_MODAL_URL`.
+   *
+   * `requestMotionPermission()` must stay the FIRST statement: it issues
+   * `requestPermission()` synchronously before its own first await, so the API
+   * call lands in the same task as the click that holds WebKit's ~1 s
+   * activation window. [10 §2]
+   */
+  const startMotion = useCallback(async (): Promise<MotionPermission> => {
+    const permission = await requestMotionPermission();
+    setMotionPermission(permission);
+    // Auto is the DEFAULT once permission exists. The one exception is a user
+    // who has already chosen the manual override — starting the camera should
+    // not silently overrule that — so this only claims the mode when nothing
+    // else has.
+    if (permission === "granted" && modeRef.current === "off") resumeSensor();
+    return permission;
+  }, [resumeSensor]);
 
   // Feed devicemotion into the pure fold. Only a genuine activity CHANGE posts;
   // everything else is diagnostics, sampled at DIAG_MS so React never re-renders
@@ -429,20 +547,70 @@ export default function CapturePage() {
         body: JSON.stringify(detector),
       }).catch(() => {});
 
+      // --- which way to the bus -------------------------------------------
+      // The detector already found the target box; all that is missing is
+      // turning its position into a direction and holding that direction still
+      // enough to be worth sending. Both rules are pure and tested in
+      // @/lib/motion — bearingFromBox widens the AHEAD band, voteBearing
+      // requires consecutive agreement before the answer is allowed to change.
+      const target = (m.detections ?? []).find((d) => d.target);
+      const observed = bearingFromBox(target?.box);
+      const vote = voteBearing(bearingVoteRef.current, observed);
+      bearingVoteRef.current = vote;
+      setNav({
+        observed,
+        centroid: centroidX(target?.box),
+        detector: target?.bearing ?? "",
+        confirmed: vote.emitted,
+        pending: vote.streak > 0 ? vote.candidate : null,
+        streak: vote.streak,
+      });
+
+      // Directions are the MOVING payload; bus information is the STILL
+      // payload. The board enforces the same split in acceptsRelayCommand, so
+      // this is the phone AGREEING with it rather than a second, independent
+      // gate — send the wrong half and the board simply drops it, which looks
+      // identical to a dead relay from the outside.
+      const navPattern: NavPattern | null =
+        vote.emitted && activityRef.current === "MOVING" ? bearingToPattern(vote.emitted) : null;
+
+      const event: EventRequest = navPattern
+        ? {
+            pattern: navPattern,
+            route: "",
+            dest: "",
+            conf: "",
+            // 0, NEVER m.arrival_id. sameEvent() compares arrivalId, so carrying
+            // a live arrival counter on a direction would re-POST an unchanged
+            // LEFT every time the detector re-latched an arrival — restarting
+            // the board's 800 ms pattern and truncating it. A direction is not
+            // about an arrival.
+            arrivalId: 0,
+          }
+        : detectorToEvent(m);
+
       // Translate to a device command, and POST only when the meaning changes.
-      const event = detectorToEvent(m);
       if (!sameEvent(event, lastEventRef.current)) {
         lastEventRef.current = event;
+        const issuedAt = Date.now();
         void fetch("/api/event", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify(event),
+        })
+          .then((r) => {
+            // `ok` and not just "it resolved": /api/event answers 400 for a
+            // pattern it does not know, which is exactly what a half-deployed
+            // relay looks like. Showing that on the phone beats silence.
+            if (navPattern) setLastNav({ t: issuedAt, pattern: navPattern, ok: r.ok });
+          })
           // Edge-triggered: this is the only POST that reaches the device, so a
           // dropped one is a missed pattern. Re-arm the diff on failure so the
           // next frame resends instead of assuming it landed.
-        }).catch(() => {
-          lastEventRef.current = IDLE_EVENT;
-        });
+          .catch(() => {
+            lastEventRef.current = IDLE_EVENT;
+            if (navPattern) setLastNav({ t: issuedAt, pattern: navPattern, ok: false });
+          });
       }
     } catch (e) {
       setError(
@@ -464,9 +632,7 @@ export default function CapturePage() {
     //    the click. Awaiting getUserMedia first would burn WebKit's ~1 s
     //    activation window on a human-answered camera dialog and make this
     //    reject with NotAllowedError. [10 §2]
-    const permission = await requestMotionPermission();
-    setMotionPermission(permission);
-    if (permission === "granted") resumeSensor();
+    await startMotion();
 
     // 2. CAMERA SECOND. getUserMedia requires a secure context and permission
     //    but not transient activation, so it is safe after the await above.
@@ -481,6 +647,10 @@ export default function CapturePage() {
         await videoRef.current.play();
       }
       lastEventRef.current = IDLE_EVENT;
+      // A new camera session must not inherit the last one's confirmed
+      // direction, or the first frame diffs against a bearing from minutes ago.
+      bearingVoteRef.current = initialBearingVote();
+      setNav(NAV_IDLE);
       setRunning(true);
     } catch (e) {
       setError(
@@ -489,13 +659,15 @@ export default function CapturePage() {
           : "The camera could not start. Allow camera access for this site, then try again.",
       );
     }
-  }, [resumeSensor]);
+  }, [startMotion]);
 
   const stop = useCallback(() => {
     streamRef.current?.getTracks().forEach((t) => t.stop());
     streamRef.current = null;
     setRunning(false);
     setDetections([]);
+    bearingVoteRef.current = initialBearingVote();
+    setNav(NAV_IDLE);
     const canvas = overlayRef.current;
     canvas?.getContext("2d")?.clearRect(0, 0, canvas.width, canvas.height);
   }, []);
@@ -510,20 +682,139 @@ export default function CapturePage() {
 
   const reading = modal?.reading;
 
+  // --- derived readouts (pure; no clock reads, no ref reads) ----------------
+  const sensorRunning = mode === "auto" && motionPermission === "granted";
+  const walking = activity === "MOVING";
+  const heroWord = mode === "off" ? "OFF" : walking ? "WALKING" : "STILL";
+  const heroHint =
+    mode === "off"
+      ? "Not detecting yet. This does not need the camera."
+      : mode === "manual"
+        ? "Manual override — automatic detection is paused."
+        : diag.degraded
+          ? "Sensor degraded — holding the last value, not trusting new ones."
+          : cadenceSpm === null
+            ? "Watching your steps. Walk a few paces."
+            : `Detected from your steps — ${cadenceSpm.toFixed(0)} steps/min.`;
+
+  // Only sent while MOVING, so the card can say why it is holding.
+  const navHeld = nav.confirmed !== null && !walking;
+
   return (
-    <main className="flex-1 bg-background px-6 py-8 font-sans text-foreground">
+    <main className="flex-1 bg-background px-4 py-6 font-sans text-foreground sm:px-6 sm:py-8">
       <div className="mx-auto flex w-full max-w-xl flex-col gap-4">
         <header className="flex items-center justify-between gap-4">
-          <h1 className="text-xl font-medium tracking-tight">Camera</h1>
+          <h1 className="text-xl font-medium tracking-tight">Capture</h1>
           <Button variant="outline" size="sm" nativeButton={false} render={<Link href="/" />}>
             Monitor
           </Button>
         </header>
 
+        {/* 1. ACTIVITY — first on the page and OUTSIDE the detector guard.
+            Walk detection needs neither a camera nor a deployed Modal service,
+            and burying it under both is what made it look like it did not
+            exist. */}
+        <section className="rounded-lg border border-border bg-card p-4 text-card-foreground">
+          <div className="flex items-baseline justify-between gap-3">
+            <h2 className="text-sm font-medium">Are you walking?</h2>
+            <span className="font-mono text-xs tabular-nums text-muted-foreground">
+              {mode === "auto" ? "auto" : mode === "manual" ? "override" : "off"}
+              {lastWrite ? ` · seq ${lastWrite.activitySeq}` : ""}
+            </span>
+          </div>
+
+          <div className="mt-3 flex items-center gap-3">
+            <span
+              className={`size-3 shrink-0 rounded-full ${
+                mode === "off"
+                  ? "bg-muted-foreground/40"
+                  : walking
+                    ? "bg-emerald-500 dark:bg-emerald-400"
+                    : "bg-muted-foreground"
+              }`}
+            />
+            <div className="min-w-0 flex-1">
+              <div
+                className={`font-mono text-3xl font-medium tracking-tight tabular-nums ${
+                  mode === "off"
+                    ? "text-muted-foreground"
+                    : walking
+                      ? "text-emerald-600 dark:text-emerald-400"
+                      : ""
+                }`}
+              >
+                {heroWord}
+              </div>
+              <p className="mt-1 text-sm text-muted-foreground">{heroHint}</p>
+            </div>
+          </div>
+
+          {mode === "off" && (
+            <Button size="lg" className="mt-4 w-full" onClick={() => void startMotion()}>
+              {motionPermission === null ? "Start motion detection" : "Try motion detection again"}
+            </Button>
+          )}
+
+          {/* The override, clearly labelled as one. It is not the primary
+              interface — auto is — but it cannot be removed either: a steady
+              ~0.8 Hz camera pan folds through the one-sided magnitude to 1.6 Hz,
+              squarely inside the gait band, so no cadence classifier can
+              separate it from walking. [15 §finding 4] */}
+          <div className="mt-4 border-t border-border pt-3">
+            <div className="flex items-center justify-between gap-3">
+              <span className="text-xs font-medium text-muted-foreground">Manual override</span>
+              {mode === "manual" && motionPermission === "granted" && (
+                <Button size="xs" variant="ghost" onClick={resumeSensor}>
+                  Resume auto
+                </Button>
+              )}
+            </div>
+            <div className="mt-2 flex flex-wrap items-center gap-2">
+              <Button
+                size="sm"
+                variant={mode === "manual" && activity === "STILL" ? "default" : "outline"}
+                onClick={() => setManual("STILL")}
+              >
+                Force still
+              </Button>
+              <Button
+                size="sm"
+                variant={mode === "manual" && activity === "MOVING" ? "default" : "outline"}
+                onClick={() => setManual("MOVING")}
+              >
+                Force moving
+              </Button>
+            </div>
+            <p className="mt-2 text-xs text-muted-foreground">
+              A steady ~0.8 Hz camera pan is indistinguishable from walking, so the override always
+              stays available.
+            </p>
+          </div>
+
+          {diag.degraded && sensorRunning && (
+            <p className="mt-3 text-sm text-muted-foreground">
+              The motion sensor is delivering below 10 Hz. Use the override — a state derived from
+              this data is not trustworthy.
+            </p>
+          )}
+          {motionPermission !== null && motionPermission !== "granted" && (
+            <p className="mt-3 text-sm text-muted-foreground">
+              Motion permission is {motionPermission}. Use the override. iOS removed the Settings
+              toggle in iOS 13 — the only grant path is this page&apos;s prompt, over HTTPS.
+            </p>
+          )}
+          {relayError && (
+            <p className="mt-3 rounded-md border border-destructive/40 bg-destructive/10 p-3 text-sm text-destructive">
+              {relayError}
+            </p>
+          )}
+        </section>
+
         {!MODAL_URL ? (
           <p className="rounded-md border border-destructive/40 bg-destructive/10 p-3 text-sm text-destructive">
-            No detector is configured. Set <code className="font-mono">NEXT_PUBLIC_MODAL_URL</code>{" "}
-            to the Modal endpoint and redeploy.
+            No detector is configured, so the camera half of this page is off. Set{" "}
+            <code className="font-mono">NEXT_PUBLIC_MODAL_URL</code> to the Modal endpoint and
+            redeploy. Walk detection above is unaffected.
           </p>
         ) : (
           <>
@@ -542,31 +833,103 @@ export default function CapturePage() {
             </div>
             <canvas ref={captureRef} className="hidden" />
 
-            <div className="flex flex-wrap items-center gap-3">
-              {!running ? (
-                <Button size="sm" onClick={start}>
-                  Start camera
+            {!running ? (
+              <Button size="lg" className="w-full" onClick={start}>
+                Start camera
+              </Button>
+            ) : (
+              <div className="flex flex-wrap items-center gap-3">
+                <Button variant="outline" size="sm" onClick={stop}>
+                  Stop
                 </Button>
-              ) : (
-                <>
-                  <Button variant="outline" size="sm" onClick={stop}>
-                    Stop
-                  </Button>
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    onClick={() => {
-                      forceNext.current = true;
-                    }}
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => {
+                    forceNext.current = true;
+                  }}
+                >
+                  Force reading
+                </Button>
+                <span className="text-sm text-muted-foreground">
+                  <span className="font-mono tabular-nums text-foreground">{frames}</span> frames
+                </span>
+              </div>
+            )}
+
+            {/* 2. DIRECTION TO THE BUS. Point the phone at a bus and watch it
+                decide: raw centroid → widened bearing → confirmation streak →
+                the command that left the phone. Every step is on screen because
+                "it isn't doing anything" and "it decided AHEAD" are otherwise
+                indistinguishable. */}
+            <section className="rounded-lg border border-border bg-card p-4 text-card-foreground">
+              <div className="flex items-baseline justify-between gap-3">
+                <h2 className="text-sm font-medium">Direction to the bus</h2>
+                <span className="font-mono text-xs tabular-nums text-muted-foreground">
+                  {walking ? "sending" : "held · needs MOVING"}
+                </span>
+              </div>
+
+              <div className="mt-3 flex items-center gap-4">
+                <span
+                  aria-hidden
+                  className={`font-mono text-4xl leading-none ${
+                    nav.confirmed === null || navHeld ? "text-muted-foreground/40" : ""
+                  }`}
+                >
+                  {nav.confirmed === null ? "·" : BEARING_ARROW[nav.confirmed]}
+                </span>
+                <div className="min-w-0 flex-1">
+                  <div
+                    className={`font-mono text-2xl font-medium tracking-tight ${
+                      nav.confirmed === null || navHeld ? "text-muted-foreground" : ""
+                    }`}
                   >
-                    Force reading
-                  </Button>
-                </>
-              )}
-              <span className="text-sm text-muted-foreground">
-                <span className="font-mono tabular-nums text-foreground">{frames}</span> frames
-              </span>
-            </div>
+                    {nav.confirmed === null ? "NO BUS" : bearingToPattern(nav.confirmed)}
+                  </div>
+                  <p className="mt-1 text-sm text-muted-foreground">
+                    {!running
+                      ? "Start the camera to look for a bus."
+                      : nav.confirmed === null && nav.observed === null
+                        ? "No bus in view."
+                        : nav.confirmed === null
+                          ? `Bus in view — confirming (${nav.streak}/${BEARING_CONFIRM_FRAMES}).`
+                          : navHeld
+                            ? "Directions are only sent while you are MOVING."
+                            : nav.streak > 0 && nav.pending !== null
+                              ? `Sent. Checking a change to ${bearingToPattern(nav.pending)} (${nav.streak}/${BEARING_CONFIRM_FRAMES}).`
+                              : nav.streak > 0
+                                ? `Sent. Bus may have left view (${nav.streak}/${BEARING_CONFIRM_FRAMES}).`
+                                : "Sent to the board."}
+                  </p>
+                </div>
+              </div>
+
+              <dl className="mt-4 grid grid-cols-2 gap-3">
+                <Diag
+                  label="Bus in view"
+                  value={nav.observed === null ? "no" : `yes · ${nav.observed}`}
+                />
+                <Diag
+                  label="Box centre"
+                  value={nav.centroid === null ? "–" : nav.centroid.toFixed(2)}
+                />
+                {/* Shown so the widened AHEAD band reads as a deliberate
+                    difference. The detector splits on hard thirds, so it will
+                    say "left" for a centroid at 0.32 where this page says
+                    AHEAD — that divergence is the design, not a fault. */}
+                <Diag label="Detector says" value={nav.detector || "–"} />
+                <Diag
+                  label="Last sent"
+                  value={
+                    lastNav === null
+                      ? "nothing yet"
+                      : `${lastNav.pattern}${lastNav.ok ? "" : " · failed"}`
+                  }
+                  alert={lastNav !== null && !lastNav.ok}
+                />
+              </dl>
+            </section>
 
             <section className="rounded-lg border border-border bg-card p-4 text-card-foreground">
               <h2 className="mb-3 text-sm font-medium">In view</h2>
@@ -599,189 +962,6 @@ export default function CapturePage() {
               )}
             </section>
 
-            {/* The manual control is ALWAYS visible and is the primary control,
-                not a fallback. A perfectly periodic camera pan near 0.8 Hz folds
-                through the one-sided magnitude to 1.6 Hz — squarely inside the
-                gait band — so no cadence classifier can separate it from
-                walking. Every sensor failure mode degrades to exactly these two
-                buttons. [15 §finding 4] */}
-            <section className="rounded-lg border border-border bg-card p-4 text-card-foreground">
-              <div className="flex items-baseline justify-between gap-3">
-                <h2 className="text-sm font-medium">Activity</h2>
-                <span className="font-mono text-xs tabular-nums text-muted-foreground">
-                  {mode === "auto" ? "sensor" : mode === "manual" ? "manual" : "off"}
-                  {lastWrite ? ` · seq ${lastWrite.activitySeq}` : ""}
-                </span>
-              </div>
-
-              {/* Bench readout. Two rows deliberately: what the SENSOR thinks,
-                  and what the RELAY actually holds. They diverge whenever the
-                  manual override is in play or a POST failed, and collapsing
-                  them into one number would hide exactly the case you are
-                  checking for. */}
-              <div className="mt-3 grid grid-cols-2 gap-2">
-                <div className="rounded-md border border-border p-3">
-                  <div className="text-xs text-muted-foreground">Sensor sees</div>
-                  <div
-                    className={`font-mono text-xl font-medium tabular-nums ${
-                      motionPermission !== "granted" || diag.degraded
-                        ? "text-muted-foreground"
-                        : diag.activity === "MOVING"
-                          ? "text-emerald-600 dark:text-emerald-400"
-                          : ""
-                    }`}
-                  >
-                    {motionPermission !== "granted"
-                      ? "—"
-                      : diag.activity === "MOVING"
-                        ? "WALKING"
-                        : "STILL"}
-                  </div>
-                  <div className="mt-0.5 font-mono text-xs tabular-nums text-muted-foreground">
-                    {cadenceSpm === null ? "no cadence" : `${cadenceSpm.toFixed(0)} spm`}
-                    {` · ${diag.peaks.length} peak${diag.peaks.length === 1 ? "" : "s"}`}
-                  </div>
-                </div>
-                <div className="rounded-md border border-border p-3">
-                  <div className="text-xs text-muted-foreground">Relay holds</div>
-                  <div className="font-mono text-xl font-medium tabular-nums">{activity}</div>
-                  <div className="mt-0.5 font-mono text-xs tabular-nums text-muted-foreground">
-                    {lastWrite ? `seq ${lastWrite.activitySeq}` : "never written"}
-                    {mode === "manual" ? " · manual" : mode === "auto" ? " · sensor" : ""}
-                  </div>
-                </div>
-              </div>
-
-              <div className="mt-3 flex flex-wrap items-center gap-2">
-                <Button
-                  size="sm"
-                  variant={activity === "STILL" ? "default" : "outline"}
-                  onClick={() => setManual("STILL")}
-                >
-                  Still
-                </Button>
-                <Button
-                  size="sm"
-                  variant={activity === "MOVING" ? "default" : "outline"}
-                  onClick={() => setManual("MOVING")}
-                >
-                  Moving
-                </Button>
-                {motionPermission === "granted" && mode === "manual" && (
-                  <Button size="sm" variant="outline" onClick={resumeSensor}>
-                    Resume sensor
-                  </Button>
-                )}
-              </div>
-
-              {/* Diagnostics — issue #5 requires permission state, sensor
-                  availability, derived activity and last transition time. The
-                  measured rate is the one that matters most: browsers have been
-                  reported dropping to 1 Hz, which kills peak detection silently
-                  and freezes the state at whatever it last held. [10 §4] */}
-              <dl className="mt-3 grid grid-cols-2 gap-3 sm:grid-cols-3">
-                <Diag label="Permission" value={motionPermission ?? "not asked"} />
-                <Diag
-                  label="Sensor"
-                  value={
-                    motionPermission !== "granted"
-                      ? "unavailable"
-                      : diag.sensorUnavailable
-                        ? "null samples"
-                        : diag.usingGravityFallback
-                          ? "gravity fallback"
-                          : "ok"
-                  }
-                />
-                <Diag
-                  label="Rate"
-                  value={diag.rateHz === null ? "–" : `${diag.rateHz.toFixed(0)} Hz`}
-                  alert={diag.degraded}
-                />
-                <Diag label="Peaks / window" value={String(diag.peaks.length)} />
-                <Diag
-                  label="Last change"
-                  value={
-                    lastTransitionAt === null || nowMs === null
-                      ? "–"
-                      : `${(Math.max(0, nowMs - lastTransitionAt) / 1000).toFixed(0)}s ago`
-                  }
-                />
-                {/* Rotation is shown because it is the classic false positive:
-                    a big spin reads as violent motion but is NOT walking, and
-                    the classifier deliberately ignores it. Seeing this spike
-                    while "Sensor sees" stays STILL is the gyro-spike rule
-                    working, not a bug. Issue #5: "Do not equate a single gyro
-                    spike with MOVING." */}
-                <Diag label="Rotation" value={`${diag.rotationMagnitude.toFixed(0)}°/s`} />
-              </dl>
-
-              {/* Proof the request actually left the phone. Without this, a dead
-                  relay and a classifier that never fires look identical from the
-                  outside — both are simply "nothing happening". */}
-              <div className="mt-4">
-                <div className="flex items-baseline justify-between gap-3">
-                  <h3 className="text-xs font-medium text-muted-foreground">
-                    POST /api/activity
-                  </h3>
-                  <span className="font-mono text-xs tabular-nums text-muted-foreground">
-                    {/* Total is derived from the newest id, not read off the
-                        ref: ids are monotonic from 0, and reading a ref during
-                        render is both lint-rejected and genuinely unreliable —
-                        it would not re-render when the count changed. */}
-                    {postLog.length === 0 ? "no requests yet" : `${postLog[0].id + 1} sent`}
-                  </span>
-                </div>
-                {postLog.length === 0 ? (
-                  <p className="mt-2 text-xs text-muted-foreground">
-                    Nothing sent yet. Press Still or Moving, or start the camera to
-                    begin the 30s heartbeat.
-                  </p>
-                ) : (
-                  <ul className="mt-2 space-y-1">
-                    {postLog.map((r) => (
-                      <li
-                        key={r.id}
-                        className="flex items-center justify-between gap-2 font-mono text-xs tabular-nums"
-                      >
-                        <span className="text-muted-foreground">
-                          {new Date(r.t).toLocaleTimeString()}
-                        </span>
-                        <span className="flex-1 truncate">
-                          {r.activity}
-                          <span className="text-muted-foreground"> · {r.reason}</span>
-                        </span>
-                        <span className={r.status === 200 ? "" : "text-destructive"}>
-                          {r.status === "ERR" ? "failed" : r.status}
-                          {r.seq === null ? "" : ` · seq ${r.seq}`}
-                        </span>
-                        <span className="text-muted-foreground">{r.ms}ms</span>
-                      </li>
-                    ))}
-                  </ul>
-                )}
-              </div>
-
-              {diag.degraded && motionPermission === "granted" && (
-                <p className="mt-3 text-sm text-muted-foreground">
-                  The motion sensor is delivering below 10 Hz. Use the manual control — a state
-                  derived from this data is not trustworthy.
-                </p>
-              )}
-              {motionPermission !== null && motionPermission !== "granted" && (
-                <p className="mt-3 text-sm text-muted-foreground">
-                  Motion permission is {motionPermission}. Use the manual control. iOS removed the
-                  Settings toggle in iOS 13 — the only grant path is this page&apos;s prompt, over
-                  HTTPS.
-                </p>
-              )}
-              {relayError && (
-                <p className="mt-3 rounded-md border border-destructive/40 bg-destructive/10 p-3 text-sm text-destructive">
-                  {relayError}
-                </p>
-              )}
-            </section>
-
             <section className="rounded-lg border border-border bg-card p-4 text-card-foreground">
               <div className="flex items-baseline justify-between gap-3">
                 <h2 className="text-sm font-medium">Bus</h2>
@@ -803,13 +983,142 @@ export default function CapturePage() {
                 </p>
               )}
             </section>
-
-            {error && (
-              <p className="rounded-md border border-destructive/40 bg-destructive/10 p-3 text-sm text-destructive">
-                {error}
-              </p>
-            )}
           </>
+        )}
+
+        {/* 3. BENCH DIAGNOSTICS. Last, because they are for the bench and not
+            for the demo. Nothing here has been removed — it has been moved
+            below the two things the page is actually for. */}
+        <section className="rounded-lg border border-border bg-card p-4 text-card-foreground">
+          <h2 className="text-sm font-medium">Bench diagnostics</h2>
+
+          {/* Two rows deliberately: what the SENSOR thinks, and what the RELAY
+              actually holds. They diverge whenever the manual override is in
+              play or a POST failed, and collapsing them into one number would
+              hide exactly the case you are checking for. */}
+          <div className="mt-3 grid grid-cols-2 gap-2">
+            <div className="rounded-md border border-border p-3">
+              <div className="text-xs text-muted-foreground">Sensor sees</div>
+              <div
+                className={`font-mono text-xl font-medium tabular-nums ${
+                  motionPermission !== "granted" || diag.degraded
+                    ? "text-muted-foreground"
+                    : diag.activity === "MOVING"
+                      ? "text-emerald-600 dark:text-emerald-400"
+                      : ""
+                }`}
+              >
+                {motionPermission !== "granted"
+                  ? "—"
+                  : diag.activity === "MOVING"
+                    ? "WALKING"
+                    : "STILL"}
+              </div>
+              <div className="mt-0.5 font-mono text-xs tabular-nums text-muted-foreground">
+                {cadenceSpm === null ? "no cadence" : `${cadenceSpm.toFixed(0)} spm`}
+                {` · ${diag.peaks.length} peak${diag.peaks.length === 1 ? "" : "s"}`}
+              </div>
+            </div>
+            <div className="rounded-md border border-border p-3">
+              <div className="text-xs text-muted-foreground">Relay holds</div>
+              <div className="font-mono text-xl font-medium tabular-nums">{activity}</div>
+              <div className="mt-0.5 font-mono text-xs tabular-nums text-muted-foreground">
+                {lastWrite ? `seq ${lastWrite.activitySeq}` : "never written"}
+                {mode === "manual" ? " · manual" : mode === "auto" ? " · sensor" : ""}
+              </div>
+            </div>
+          </div>
+
+          {/* Issue #5 requires permission state, sensor availability, derived
+              activity and last transition time. The measured rate is the one
+              that matters most: browsers have been reported dropping to 1 Hz,
+              which kills peak detection silently and freezes the state at
+              whatever it last held. [10 §4] */}
+          <dl className="mt-3 grid grid-cols-2 gap-3 sm:grid-cols-3">
+            <Diag label="Permission" value={motionPermission ?? "not asked"} />
+            <Diag
+              label="Sensor"
+              value={
+                motionPermission !== "granted"
+                  ? "unavailable"
+                  : diag.sensorUnavailable
+                    ? "null samples"
+                    : diag.usingGravityFallback
+                      ? "gravity fallback"
+                      : "ok"
+              }
+            />
+            <Diag
+              label="Rate"
+              value={diag.rateHz === null ? "–" : `${diag.rateHz.toFixed(0)} Hz`}
+              alert={diag.degraded}
+            />
+            <Diag label="Peaks / window" value={String(diag.peaks.length)} />
+            <Diag
+              label="Last change"
+              value={
+                lastTransitionAt === null || nowMs === null
+                  ? "–"
+                  : `${(Math.max(0, nowMs - lastTransitionAt) / 1000).toFixed(0)}s ago`
+              }
+            />
+            {/* Rotation is shown because it is the classic false positive: a big
+                spin reads as violent motion but is NOT walking, and the
+                classifier deliberately ignores it. Seeing this spike while
+                "Sensor sees" stays STILL is the gyro-spike rule working, not a
+                bug. Issue #5: "Do not equate a single gyro spike with MOVING." */}
+            <Diag label="Rotation" value={`${diag.rotationMagnitude.toFixed(0)}°/s`} />
+          </dl>
+
+          {/* Proof the request actually left the phone. Without this, a dead
+              relay and a classifier that never fires look identical from the
+              outside — both are simply "nothing happening". */}
+          <div className="mt-4">
+            <div className="flex items-baseline justify-between gap-3">
+              <h3 className="text-xs font-medium text-muted-foreground">POST /api/activity</h3>
+              <span className="font-mono text-xs tabular-nums text-muted-foreground">
+                {/* Total is derived from the newest id, not read off the ref:
+                    ids are monotonic from 0, and reading a ref during render is
+                    both lint-rejected and genuinely unreliable — it would not
+                    re-render when the count changed. */}
+                {postLog.length === 0 ? "no requests yet" : `${postLog[0].id + 1} sent`}
+              </span>
+            </div>
+            {postLog.length === 0 ? (
+              <p className="mt-2 text-xs text-muted-foreground">
+                Nothing sent yet. Start motion detection, or use the override, to begin the 30s
+                heartbeat.
+              </p>
+            ) : (
+              <ul className="mt-2 space-y-1">
+                {postLog.map((r) => (
+                  <li
+                    key={r.id}
+                    className="flex items-center justify-between gap-2 font-mono text-xs tabular-nums"
+                  >
+                    <span className="text-muted-foreground">
+                      {new Date(r.t).toLocaleTimeString()}
+                    </span>
+                    <span className="flex-1 truncate">
+                      {r.activity}
+                      <span className="text-muted-foreground"> · {r.reason}</span>
+                    </span>
+                    <span className={r.status === 200 ? "" : "text-destructive"}>
+                      {r.status === "ERR" ? "failed" : r.status}
+                      {r.seq === null ? "" : ` · seq ${r.seq}`}
+                    </span>
+                    <span className="text-muted-foreground">{r.ms}ms</span>
+                  </li>
+                ))}
+              </ul>
+            )}
+          </div>
+        </section>
+
+        {error && (
+          <p className="rounded-md border border-destructive/40 bg-destructive/10 p-3 text-sm text-destructive">
+            {error}
+          </p>
         )}
       </div>
     </main>

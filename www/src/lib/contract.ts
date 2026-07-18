@@ -3,7 +3,7 @@
 //
 // See plan/2026-07-18-bus-stop-situational-awareness.md → "Data Contracts".
 
-/** Every haptic pattern the device knows (P0–P10). */
+/** Every haptic pattern the device knows (P0–P13). */
 export type PatternId =
   | "NONE" // no active command
   | "READY" // P0  boot complete
@@ -16,10 +16,42 @@ export type PatternId =
   | "WAIT" // P7  request in flight
   | "UNKNOWN" // P8  could not read / low confidence
   | "ACK" // P9  button feedback                     (device-local; never sent)
-  | "ERROR"; // P10 degraded
+  | "ERROR" // P10 degraded
+  // P11–P13 exist in firmware/braille_wearable/src/patterns.h as step tables and
+  // are the board's `playing` telemetry values while a nav pattern runs.
+  | "LEFT" // P11 bear left    — P1 only, 2350 Hz ·  800 ms
+  | "RIGHT" // P12 bear right   — P3 only, 3050 Hz ·  800 ms
+  | "AHEAD"; // P13 keep going   — both channels    · 1000 ms
 
-/** Cloud-originated commands only. The five local patterns never cross the wire. */
-export type CloudPattern = "NONE" | "BUS" | "NUMBER" | "WAIT" | "UNKNOWN" | "ERROR";
+/**
+ * Cloud-originated commands only. The five local patterns never cross the wire.
+ *
+ * DANGER, SIREN, ATTENTION, PROXIMITY and ACK stay device-local: they are the
+ * safety and feedback paths and must work with the Wi-Fi down.
+ *
+ * LEFT / RIGHT / AHEAD are the navigation half, carried on the SAME
+ * `/api/event` → Redis → `/api/pull` path as the bus-information half. There is
+ * no second channel and no second sequence counter — one `seq` orders every
+ * cloud pattern, so a nav command and a bus command can never be delivered out
+ * of order relative to each other.
+ *
+ * FIRMWARE COUPLING — the wire spellings are EXACT and case-sensitive.
+ * `parseCloudCommand()` in relay_pure.h does `strcmp` against a fixed list and
+ * maps everything else to `CloudCommand::INVALID`, which `consumeRelayCommand()`
+ * turns into `RelayDisposition::REJECT` BEFORE `acceptsRelayCommand()` is
+ * consulted. A board whose `parseCloudCommand()` does not know these three
+ * strings drops them on the floor no matter what its activity gate says.
+ */
+export type CloudPattern =
+  | "NONE"
+  | "BUS"
+  | "NUMBER"
+  | "WAIT"
+  | "UNKNOWN"
+  | "ERROR"
+  | "LEFT"
+  | "RIGHT"
+  | "AHEAD";
 
 export type Conf = "high" | "low" | "";
 
@@ -27,6 +59,17 @@ export type Conf = "high" | "low" | "";
 export const ROUTE_MAX_DIGITS = 3;
 /** Quinary encoding covers digits only. A route with a letter is rejected server-side. */
 export const ROUTE_RE = /^[0-9]{1,3}$/;
+/**
+ * The accept-list `/api/event` validates against.
+ *
+ * This array and the `CloudPattern` union are two lists that must stay
+ * identical. The `readonly CloudPattern[]` annotation pins one direction — no
+ * entry here can be outside the union. The other direction (every union member
+ * appears here) is pinned by `contract.test.ts`, which builds a
+ * `satisfies Record<CloudPattern, …>` table and asserts `isCloudPattern` accepts
+ * every key. Drift the other way is the quiet failure: a pattern legal to
+ * TypeScript that `/api/event` answers with 400 "unknown pattern".
+ */
 export const CLOUD_PATTERNS: readonly CloudPattern[] = [
   "NONE",
   "BUS",
@@ -34,8 +77,20 @@ export const CLOUD_PATTERNS: readonly CloudPattern[] = [
   "WAIT",
   "UNKNOWN",
   "ERROR",
+  "LEFT",
+  "RIGHT",
+  "AHEAD",
 ] as const;
 
+/**
+ * Unchanged by the navigation work, deliberately.
+ *
+ * The runtime half is a membership test over `CLOUD_PATTERNS`, so it widened the
+ * moment the three nav values were appended above; the type half is a
+ * hand-written predicate over `CloudPattern`, so it widened with the union. No
+ * edit here — and none wanted. An `isNavPattern`-style special case would be a
+ * second gate to keep in sync with the board's.
+ */
 export function isCloudPattern(v: unknown): v is CloudPattern {
   return typeof v === "string" && (CLOUD_PATTERNS as readonly string[]).includes(v);
 }
@@ -294,7 +349,50 @@ export function detectorToEvent(m: ModalResponse): EventRequest {
   return none;
 }
 
-/** Two commands are "the same event" when every device-visible field matches. */
+/**
+ * Map a detected target's frame bearing to the nav command for the board.
+ *
+ * Pure and total. `Bearing` is a closed three-value union, so the `AHEAD`
+ * fallback is unreachable through the type system — it exists because the
+ * bearing originates at Modal and crosses HTTP, where the union is only a
+ * promise. `coerce.ts:asBearing()` already resolves an unrecognised bearing to
+ * `"center"`; this resolves it to `AHEAD` for the same reason and in the same
+ * direction. An unreadable bearing must degrade to "keep going", never to a
+ * confident turn instruction — a spurious LEFT sends a blind user toward the
+ * kerb, while a spurious AHEAD is what they were already doing.
+ *
+ * This does NOT decide *whether* to send a nav command. It only names the one to
+ * send. Whether the user is in the navigation phase at all is `UserActivity`,
+ * which travels on its own independently versioned channel, and the final say
+ * belongs to `acceptsRelayCommand()` on the board. The relay never gates a
+ * pattern on activity server-side: two gates that can disagree are worse than
+ * one, and the board is the half that still works with the Wi-Fi down.
+ */
+export function bearingToPattern(b: Bearing): Extract<CloudPattern, "LEFT" | "RIGHT" | "AHEAD"> {
+  if (b === "left") return "LEFT";
+  if (b === "right") return "RIGHT";
+  return "AHEAD";
+}
+
+/**
+ * Two commands are "the same event" when every device-visible field matches.
+ *
+ * This is the edge-trigger, and for navigation it is load-bearing rather than an
+ * optimisation. LEFT and RIGHT are 800 ms step tables and AHEAD is 1000 ms
+ * (`patterns.h`), against a ~500 ms capture tick. A caller that re-POSTs an
+ * unchanged bearing bumps `seq`, the board restarts the table from step 0, and
+ * neither pattern ever reaches its second pulse — LEFT and RIGHT collapse into
+ * one indistinguishable continuous buzz, permanently, for as long as the bearing
+ * holds. Which is precisely the case where the signal matters most.
+ *
+ * So `LEFT → LEFT` must compare equal and `LEFT → RIGHT` must not. It does both
+ * with no nav-specific branch, because `pattern` is one of the four fields
+ * compared. The obligation this places on the caller is the other three:
+ * `route`, `conf` and `arrivalId` have to be STABLE across ticks that carry the
+ * same bearing. Deriving `arrivalId` from a frame counter or a timestamp would
+ * make every tick a new event and reintroduce the truncation this prevents —
+ * `contract.test.ts` pins that case.
+ */
 export function sameEvent(a: EventRequest, b: EventRequest): boolean {
   return (
     a.pattern === b.pattern &&

@@ -12,6 +12,14 @@
 //   independently through POST /api/activity and `activitySeq`; it is not carried
 //   on /api/event, and an activity heartbeat must never re-fire a pattern.
 //
+// The navigation sections (`isCloudPattern`, `bearingToPattern`, and
+// `sameEvent > navigation patterns`) were added when LEFT/RIGHT/AHEAD joined the
+// wire. Their load-bearing row is "posts once per bearing change across a run of
+// capture ticks": nav patterns are 800–1000 ms step tables read at a ~500 ms
+// capture tick, so an edge-trigger that stops edge-triggering does not merely
+// spam the board — it truncates every nav pattern at ~500 ms, permanently, and
+// LEFT and RIGHT stop being distinguishable from each other.
+//
 // Nothing here touches Redis. `redis.ts` builds `Redis.fromEnv()` at module
 // scope, so an uncredentialed import burns ~4.3 s of retry backoff per command
 // and a credentialed one mutates the demo state the ESP32 is polling. The wire
@@ -20,11 +28,16 @@ import { describe, expect, it } from "vitest";
 
 import {
   ACTIVITY_SEQ_MAX,
+  CLOUD_PATTERNS,
+  bearingToPattern,
   detectorToEvent,
+  isCloudPattern,
   isUserActivity,
   normActivity,
   normActivitySeq,
   sameEvent,
+  type Bearing,
+  type CloudPattern,
   type EventRequest,
   type ModalReading,
   type ModalResponse,
@@ -127,6 +140,81 @@ const EVENT: EventRequest = {
 
 /** The five fields of `EventRequest`, sorted. Activity is not among them. */
 const EVENT_KEYS = ["arrivalId", "conf", "dest", "pattern", "route"];
+
+// --- navigation fixtures ----------------------------------------------------
+
+/**
+ * A compile-time census of `CloudPattern`.
+ *
+ * `satisfies Record<CloudPattern, true>` fails in BOTH directions on an object
+ * literal: a missing key is a missing `Record` property, an extra key is an
+ * excess property. So this table cannot drift from the union. The runtime
+ * assertions below then pin `CLOUD_PATTERNS` to this table, and the
+ * `readonly CloudPattern[]` annotation on `CLOUD_PATTERNS` pins the last edge.
+ * Together they make the union and the `/api/event` accept-list one list rather
+ * than two that merely look alike — the drift being guarded against is a pattern
+ * TypeScript calls legal that the route answers with 400 "unknown pattern".
+ */
+const EVERY_CLOUD_PATTERN = {
+  NONE: true,
+  BUS: true,
+  NUMBER: true,
+  WAIT: true,
+  UNKNOWN: true,
+  ERROR: true,
+  LEFT: true,
+  RIGHT: true,
+  AHEAD: true,
+} satisfies Record<CloudPattern, true>;
+
+const ALL_CLOUD_PATTERNS = Object.keys(EVERY_CLOUD_PATTERN) as CloudPattern[];
+
+/** The whole of `bearingToPattern`, as data. */
+const NAV_CASES: { bearing: Bearing; pattern: CloudPattern }[] = [
+  { bearing: "left", pattern: "LEFT" },
+  { bearing: "center", pattern: "AHEAD" },
+  { bearing: "right", pattern: "RIGHT" },
+];
+
+/**
+ * A nav command shaped the way the capture page builds one: a pattern and the
+ * latched arrival id, no route and no confidence. `arrivalId` rides along on
+ * purpose — it is the field that can silently break the edge-trigger.
+ */
+const NAV: EventRequest = { pattern: "LEFT", route: "", dest: "", conf: "", arrivalId: 7 };
+
+/**
+ * Near-misses the board would reject, so the relay has to reject them too.
+ *
+ * `parseCloudCommand()` is a `strcmp` chain; anything not spelled exactly is
+ * `CloudCommand::INVALID`. "STILL" and "MOVING" are in here because the activity
+ * vocabulary travels the same wire on an adjacent channel, and a pattern field
+ * carrying an activity value must fail loudly at the relay rather than reaching
+ * a board that will quietly drop it.
+ */
+const NOT_A_PATTERN: unknown[] = [
+  "left",
+  "Left",
+  "LEFT ",
+  " LEFT",
+  "right",
+  "ahead",
+  "Ahead",
+  "CENTER",
+  "CENTRE",
+  "STRAIGHT",
+  "FORWARD",
+  "STILL",
+  "MOVING",
+  "",
+  null,
+  undefined,
+  0,
+  9,
+  ["LEFT"],
+  { pattern: "LEFT" },
+  true,
+];
 
 // --- 1, 2: isUserActivity ---------------------------------------------------
 
@@ -256,6 +344,95 @@ describe("normActivitySeq", () => {
   });
 });
 
+// --- isCloudPattern: the /api/event accept gate ------------------------------
+
+describe("isCloudPattern", () => {
+  it.each(ALL_CLOUD_PATTERNS)("accepts %s", (p) => {
+    expect(isCloudPattern(p)).toBe(true);
+  });
+
+  // The three that navigation added. Called out separately from the sweep above
+  // so a regression names the feature it broke instead of just a count.
+  it.each(["LEFT", "RIGHT", "AHEAD"] as const)("accepts the nav pattern %s", (p) => {
+    expect(isCloudPattern(p)).toBe(true);
+  });
+
+  it.each(NOT_A_PATTERN)("rejects %o", (v) => {
+    expect(isCloudPattern(v)).toBe(false);
+  });
+
+  // The half `readonly CloudPattern[]` cannot check. If someone widens the union
+  // and forgets the array, `/api/event` starts answering 400 "unknown pattern"
+  // for a value the compiler is perfectly happy with — the phone logs a failed
+  // POST, the board never hears the command, and nothing else complains.
+  it("lists every CloudPattern in CLOUD_PATTERNS", () => {
+    const missing = ALL_CLOUD_PATTERNS.filter((p) => !CLOUD_PATTERNS.includes(p));
+
+    expect(missing).toEqual([]);
+  });
+
+  // And the reverse, so a stale entry cannot outlive its removal from the union.
+  it("lists nothing in CLOUD_PATTERNS that is not a CloudPattern", () => {
+    const extra = CLOUD_PATTERNS.filter((p) => !ALL_CLOUD_PATTERNS.includes(p));
+
+    expect(extra).toEqual([]);
+    expect(CLOUD_PATTERNS).toHaveLength(ALL_CLOUD_PATTERNS.length);
+  });
+});
+
+// --- bearingToPattern: frame bearing → nav command ---------------------------
+
+describe("bearingToPattern", () => {
+  it.each(NAV_CASES)("maps $bearing to $pattern", ({ bearing, pattern }) => {
+    expect(bearingToPattern(bearing)).toBe(pattern);
+  });
+
+  // "center" is AHEAD, not NONE. A bus dead ahead is still a thing to walk
+  // toward, and silence at that moment reads as "no bus" to the user.
+  it("maps center to AHEAD rather than to silence", () => {
+    expect(bearingToPattern("center")).toBe("AHEAD");
+  });
+
+  // Total against the type, and total against the wire. The bearing originates
+  // at Modal and crosses HTTP, where `Bearing` is a promise rather than a
+  // guarantee, so the fallback has to exist and has to be the safe one: an
+  // unreadable bearing degrades to "keep going", never to a confident turn. A
+  // spurious LEFT sends a blind user toward the kerb.
+  it.each([
+    { label: "an unknown bearing string", value: "diagonal" },
+    { label: "the empty string coerce.ts emits for no target", value: "" },
+    { label: "null", value: null },
+    { label: "undefined", value: undefined },
+    { label: "an uppercase bearing", value: "LEFT" },
+    { label: "a number", value: 0 },
+  ])("degrades $label to AHEAD", ({ value }) => {
+    expect(bearingToPattern(value as Bearing)).toBe("AHEAD");
+  });
+
+  // The join that matters: whatever this produces, /api/event must accept it.
+  // Without this the translator and the gate are two independent widenings and
+  // nothing proves they landed on the same three strings.
+  it.each(NAV_CASES)("produces a pattern /api/event accepts for $bearing", ({ bearing }) => {
+    expect(isCloudPattern(bearingToPattern(bearing))).toBe(true);
+  });
+
+  it("is pure — same bearing, same answer, no state between calls", () => {
+    const first = NAV_CASES.map((c) => bearingToPattern(c.bearing));
+    const second = NAV_CASES.map((c) => bearingToPattern(c.bearing));
+
+    expect(first).toEqual(second);
+  });
+
+  it("never returns a bus-information pattern", () => {
+    const nav = ["LEFT", "RIGHT", "AHEAD"];
+    const leaked = NAV_CASES.map((c) => bearingToPattern(c.bearing)).filter(
+      (p) => !nav.includes(p),
+    );
+
+    expect(leaked).toEqual([]);
+  });
+});
+
 // --- 13: sameEvent, and the guard that activity stayed off the command path --
 
 describe("sameEvent", () => {
@@ -299,6 +476,98 @@ describe("sameEvent", () => {
     const moving = { ...EVENT, activity: "MOVING" } as unknown as EventRequest;
 
     expect(sameEvent(still, moving)).toBe(true);
+  });
+
+  // --- navigation -----------------------------------------------------------
+  //
+  // For bus information the edge-trigger is hygiene: a re-fired NUMBER is
+  // annoying. For navigation it is correctness. LEFT and RIGHT are 800 ms step
+  // tables and AHEAD is 1000 ms (firmware/braille_wearable/src/patterns.h),
+  // against a ~500 ms capture tick. Re-post an unchanged bearing and `seq`
+  // bumps, the board restarts the table at step 0, and no nav pattern ever
+  // reaches its second pulse: LEFT and RIGHT both collapse to one continuous
+  // buzz on one channel and stop being distinguishable — permanently, for as
+  // long as the bearing holds, which is exactly when the user needs them.
+  describe("navigation patterns", () => {
+    // THE case. A held bearing must compare equal so the capture page stays
+    // silent and the running pattern is allowed to finish.
+    it("is true for a repeated identical nav command, so a held bearing never re-posts", () => {
+      expect(sameEvent(NAV, { ...NAV })).toBe(true);
+    });
+
+    // …and a changed bearing must not, or the user is steered by a stale
+    // command. Every ordered pair, not just LEFT → RIGHT.
+    it.each(
+      (["LEFT", "RIGHT", "AHEAD"] as const).flatMap((from) =>
+        (["LEFT", "RIGHT", "AHEAD"] as const)
+          .filter((to) => to !== from)
+          .map((to) => ({ from, to })),
+      ),
+    )("is false for $from → $to, so the change posts", ({ from, to }) => {
+      expect(sameEvent({ ...NAV, pattern: from }, { ...NAV, pattern: to })).toBe(false);
+    });
+
+    // The two halves of the vocabulary share one `seq`, so crossing between them
+    // has to register as a change like any other.
+    it.each(["NONE", "BUS", "NUMBER", "WAIT", "UNKNOWN", "ERROR"] as const)(
+      "is false for LEFT → %s",
+      (other) => {
+        expect(sameEvent(NAV, { ...NAV, pattern: other })).toBe(false);
+      },
+    );
+
+    it("ignores dest on a nav command too", () => {
+      expect(sameEvent(NAV, { ...NAV, dest: "Clapham Common" })).toBe(true);
+    });
+
+    // The hazard this suite exists to pin. `sameEvent` compares arrivalId, which
+    // is right for bus information — a new arrival is a new event. But it means
+    // a caller that derives arrivalId from a frame counter, a tick index or
+    // `Date.now()` makes EVERY tick a new event under a held bearing, and
+    // reintroduces the truncation the edge-trigger prevents. The contract is not
+    // "call sameEvent"; it is "call sameEvent AND hold route/conf/arrivalId
+    // steady while the bearing is steady".
+    it("treats a moving arrivalId under a held bearing as a new event", () => {
+      expect(sameEvent({ ...NAV, arrivalId: 41 }, { ...NAV, arrivalId: 42 })).toBe(false);
+    });
+
+    it.each([
+      { label: "route", other: { ...NAV, route: "88" } },
+      { label: "conf", other: { ...NAV, conf: "high" } as EventRequest },
+    ])("treats a moving $label under a held bearing as a new event", ({ other }) => {
+      expect(sameEvent(NAV, other)).toBe(false);
+    });
+
+    // The whole loop Track B writes, run end to end: seven capture ticks, the
+    // bearing changing twice, three POSTs. If this ever reports seven the demo
+    // is a continuous buzz.
+    it("posts once per bearing change across a run of capture ticks", () => {
+      const ticks: Bearing[] = ["left", "left", "left", "left", "right", "right", "left"];
+      const posted: CloudPattern[] = [];
+      let last: EventRequest | null = null;
+
+      for (const bearing of ticks) {
+        const next: EventRequest = {
+          pattern: bearingToPattern(bearing),
+          route: "",
+          dest: "",
+          conf: "",
+          arrivalId: NAV.arrivalId,
+        };
+        if (last === null || !sameEvent(last, next)) {
+          posted.push(next.pattern);
+          last = next;
+        }
+      }
+
+      expect(posted).toEqual(["LEFT", "RIGHT", "LEFT"]);
+    });
+
+    // A nav command is an EventRequest and nothing more — no bearing field, no
+    // activity field. Activity stays on its own independently versioned channel.
+    it("carries exactly the five EventRequest fields", () => {
+      expect(Object.keys(NAV).sort()).toEqual(EVENT_KEYS);
+    });
   });
 });
 

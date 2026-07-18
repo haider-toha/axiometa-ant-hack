@@ -141,7 +141,7 @@ its conclusions are now wrong. **Audit 14 wins every one of them.**
 | Add `activity?: UserActivity` to `EventRequest` | "Activity must not ride the command writer"; heartbeat "must not increment command `seq`" (his `AGENTS.md`) | **No change to `EventRequest` or `/api/event`** |
 | `normActivity` defaults to `STILL` | `effectiveActivity()` falls back to `MOVING`; `acceptsRelayCommand(UNKNOWN, BUS)` is `false` | **Default `MOVING`** |
 | `sameEvent` gains an `activity` comparison | Activity is off `EventRequest` entirely | **`sameEvent` unchanged** |
-| Add `LEFT`/`RIGHT`/`AHEAD` to `PatternId` + `CloudPattern` | "Directionality is cut"; `parseCloudCommand("LEFT") == INVALID`, asserted by his test | **Do not add them** |
+| Add `LEFT`/`RIGHT`/`AHEAD` to `PatternId` + `CloudPattern` | "Directionality is cut"; `parseCloudCommand("LEFT") == INVALID`, asserted by his test | ~~**Do not add them**~~ **SUPERSEDED 2026-07-19 — they ARE added.** See [19] and [20]. The cut conflated ToF-derived navigation (still cut) with camera-derived target bearing (restored): `vision/service.py` already returns a per-detection `bearing`, so the camera can answer what a single forward ToF zone cannot. `parseCloudCommand` now maps all three, and `acceptsRelayCommand` takes them only while `MOVING`. `plan/2026-07-18-…:502` corrected to match. |
 | `activity` inserted after `pattern` in the `mget`/JSON | His three docs all show the activity trio **last** | **Append after `ts`** (key order is irrelevant to his key-lookup parser; matching his doc keeps `curl` output diffable) |
 
 One audit-11 call survives and is adopted: **`normActivity` lives in

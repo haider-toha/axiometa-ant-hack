@@ -1,14 +1,21 @@
 import { describe, expect, it } from "vitest";
 
-import type { UserActivity } from "@/lib/contract";
+import type { Bearing, UserActivity } from "@/lib/contract";
 import {
+  AHEAD_BAND,
+  bearingFromBox,
+  BEARING_CONFIRM_FRAMES,
   cadenceGate,
   classify,
+  initialBearingVote,
   initialMotionState,
   MOTION_TUNABLES,
   readMagnitude,
   step,
+  voteBearing,
+  type BearingVote,
   type MotionActivity,
+  type MotionBearing,
   type MotionSample,
   type MotionState,
 } from "@/lib/motion";
@@ -501,5 +508,171 @@ describe("MotionActivity", () => {
     const fromWire: UserActivity = "MOVING";
     const toMotion: MotionActivity = fromWire;
     expect([toWire, toMotion]).toEqual(["STILL", "MOVING"]);
+  });
+
+  // The same pin for the bearing pair. `bearingToPattern` in contract.ts takes a
+  // `Bearing`; this page hands it a `MotionBearing`, so the two must stay
+  // interchangeable or the nav path stops compiling for a reason that has
+  // nothing to do with either module's logic.
+  it("stays mutually assignable with the wire contract's Bearing", () => {
+    const fromMotion: MotionBearing = "left";
+    const toWire: Bearing = fromMotion;
+    const fromWire: Bearing = "right";
+    const toMotion: MotionBearing = fromWire;
+    expect([toWire, toMotion]).toEqual(["left", "right"]);
+  });
+});
+
+// --- target bearing ---------------------------------------------------------
+
+/** A normalised box whose horizontal centroid is `cx`. */
+const boxAt = (cx: number, w = 0.1) => [cx - w / 2, 0.2, cx + w / 2, 0.8];
+
+/** Repeat one observation `n` times. */
+const rep = (n: number, v: MotionBearing | null) => Array.from({ length: n }, () => v);
+
+/** Fold a sequence of observations, returning the emitted bearing after each. */
+function emitted(
+  observations: readonly (MotionBearing | null)[],
+  confirm = BEARING_CONFIRM_FRAMES,
+): (MotionBearing | null)[] {
+  let v: BearingVote = initialBearingVote();
+  return observations.map((o) => {
+    v = voteBearing(v, o, confirm);
+    return v.emitted;
+  });
+}
+
+/**
+ * How many times the emitted bearing changed — i.e. how many POSTs the page
+ * would have issued. This is the number that matters: every change restarts the
+ * board's 800 ms nav pattern, so an over-eager rule is not a cosmetic problem.
+ */
+function navPosts(observations: readonly (MotionBearing | null)[], confirm?: number): number {
+  let prev: MotionBearing | null = null;
+  let n = 0;
+  for (const e of emitted(observations, confirm)) {
+    if (e !== prev) {
+      n += 1;
+      prev = e;
+    }
+  }
+  return n;
+}
+
+describe("bearingFromBox", () => {
+  it.each([
+    [0.05, "left"],
+    [0.2, "left"],
+    [0.5, "center"],
+    [0.8, "right"],
+    [0.95, "right"],
+  ] as const)("reads a centroid at %s as %s", (cx, expected) => {
+    expect(bearingFromBox(boxAt(cx))).toBe(expected);
+  });
+
+  // The load-bearing difference from the detector. vision/service.py `_bearing`
+  // splits on hard thirds, so it calls 0.32 "left"; for a walking instruction
+  // that is noise, not a turn.
+  it("is wider than the detector's thirds — 0.32 reads AHEAD, not LEFT", () => {
+    expect(bearingFromBox(boxAt(0.32))).toBe("center");
+    expect(bearingFromBox(boxAt(0.68))).toBe("center");
+  });
+
+  // Derived from the constant rather than hard-coded, so retuning AHEAD_BAND
+  // moves the assertion with it instead of silently invalidating it.
+  it("puts its boundaries exactly where AHEAD_BAND says", () => {
+    const lo = 0.5 - AHEAD_BAND / 2;
+    const hi = 0.5 + AHEAD_BAND / 2;
+    expect(bearingFromBox(boxAt(lo - 1e-6))).toBe("left");
+    expect(bearingFromBox(boxAt(lo + 1e-6))).toBe("center");
+    expect(bearingFromBox(boxAt(hi - 1e-6))).toBe("center");
+    expect(bearingFromBox(boxAt(hi + 1e-6))).toBe("right");
+  });
+
+  // A fabricated direction is worse than none: null flows into voteBearing as
+  // "no target" and holds the last confirmed value rather than inventing a turn.
+  it.each([
+    ["missing", undefined],
+    ["null", null],
+    ["empty", [] as number[]],
+    ["three-element", [0.1, 0.2, 0.3]],
+    ["NaN", [NaN, 0, 0.5, 1]],
+    ["Infinity", [0, 0, Infinity, 1]],
+  ])("returns null for a %s box", (_label, box) => {
+    expect(bearingFromBox(box)).toBeNull();
+  });
+});
+
+describe("voteBearing", () => {
+  it("needs three consecutive frames to acquire a target", () => {
+    expect(emitted(rep(4, "left"))).toEqual([null, null, "left", "left"]);
+  });
+
+  it("needs three consecutive frames to change an established bearing", () => {
+    const seen = emitted([...rep(3, "left"), ...rep(3, "right")]);
+    expect(seen).toEqual([null, null, "left", "left", "left", "right"]);
+  });
+
+  it("needs three consecutive frames to drop a target", () => {
+    const seen = emitted([...rep(3, "left"), ...rep(3, null)]);
+    expect(seen).toEqual([null, null, "left", "left", "left", null]);
+  });
+
+  // THE case this rule exists for. The detector thresholds on hard thirds, so a
+  // centroid sitting on a boundary alternates. A majority-of-3 vote over
+  // left,center,left,center… yields left,center,left,center… — the same flap at
+  // the same rate. Consecutive agreement never reaches three, so nothing is
+  // emitted at all, which is the right answer for a target genuinely on the line.
+  it("emits nothing across 60 frames of boundary flapping", () => {
+    const flap = Array.from({ length: 60 }, (_, i) =>
+      i % 2 === 0 ? "left" : ("center" as MotionBearing),
+    );
+    expect(navPosts(flap)).toBe(0);
+    expect(emitted(flap).every((e) => e === null)).toBe(true);
+  });
+
+  it("holds an established bearing through 60 frames of boundary flapping", () => {
+    const flap = Array.from({ length: 60 }, (_, i) =>
+      i % 2 === 0 ? "left" : ("center" as MotionBearing),
+    );
+    const seen = emitted([...rep(3, "left"), ...flap]);
+    // One POST for the acquisition, none thereafter.
+    expect(navPosts([...rep(3, "left"), ...flap])).toBe(1);
+    expect(seen.slice(3).every((e) => e === "left")).toBe(true);
+  });
+
+  // At 2 Hz a one-frame miss that cleared the command would re-send it 500 ms
+  // later, restarting the board's 800 ms pattern every time.
+  it.each([1, 2])("absorbs %i dropped detection frames without a POST", (dropped) => {
+    const seq = [...rep(3, "left"), ...rep(dropped, null), ...rep(3, "left")];
+    expect(navPosts(seq)).toBe(1);
+    expect(emitted(seq).slice(3).every((e) => e === "left")).toBe(true);
+  });
+
+  it("resets the streak on a single disagreeing frame", () => {
+    const seq: (MotionBearing | null)[] = ["right", "right", "left", "right", "right"];
+    expect(emitted(seq).every((e) => e === null)).toBe(true);
+  });
+
+  it("is total and does not mutate its input state", () => {
+    const before: BearingVote = { emitted: "left", candidate: "right", streak: 2 };
+    const snapshot = JSON.stringify(before);
+    voteBearing(before, "center");
+    expect(JSON.stringify(before)).toBe(snapshot);
+  });
+
+  it("is pure — the same fold twice gives the same result", () => {
+    const seq: (MotionBearing | null)[] = ["left", null, "left", "left", "center", "left"];
+    expect(emitted(seq)).toEqual(emitted(seq));
+  });
+
+  it("honours a caller-supplied confirmFrames", () => {
+    expect(emitted(rep(2, "right"), 1)).toEqual(["right", "right"]);
+    expect(emitted(rep(4, "right"), 4)).toEqual([null, null, null, "right"]);
+  });
+
+  it("starts from a defined zero", () => {
+    expect(initialBearingVote()).toEqual({ emitted: null, candidate: null, streak: 0 });
   });
 });

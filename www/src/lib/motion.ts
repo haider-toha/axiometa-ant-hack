@@ -1,9 +1,13 @@
-// Pure STILL/MOVING step-cadence classifier for the phone's DeviceMotion stream.
+// The capture page's pure logic: the two folds it needs to turn noisy per-frame
+// signals into decisions the device can be told about.
 //
-// Deliberately free of `window`, timers, fetch and React: the classifier is a
-// fold, `step(state, sample) -> state`, so every threshold below is testable
-// from an array of synthetic samples with no fake timers and no DOM. The browser
-// plumbing that feeds it lives in src/app/capture/page.tsx. The single impure
+//   1. STILL/MOVING, from the phone's DeviceMotion stream — `step`.
+//   2. LEFT/AHEAD/RIGHT, from the detector's target box — `voteBearing`.
+//
+// Deliberately free of `window`, timers, fetch and React: both are folds of the
+// shape `f(state, sample) -> state`, so every threshold below is testable from
+// an array of synthetic samples with no fake timers and no DOM. The browser
+// plumbing that feeds them lives in src/app/capture/page.tsx. The single impure
 // function — requestMotionPermission — is fenced at the bottom of the file and
 // only touches DeviceMotionEvent inside its own body, so importing this module
 // under Node or jsdom does nothing.
@@ -413,6 +417,127 @@ export function classify(
   tun: MotionTunables = MOTION_TUNABLES,
 ): MotionState {
   return samples.reduce<MotionState>((s, sample) => step(s, sample, tun), initialMotionState());
+}
+
+// --- target bearing: the capture page's second pure fold --------------------
+//
+// Which way to walk to reach the bus. It shares this module with the cadence
+// classifier because it is the same KIND of thing — a pure, total fold over a
+// noisy per-frame signal — and keeping both here means every debounce rule on
+// this page is unit-testable without rendering a component or faking a camera.
+//
+// It is deliberately NOT in contract.ts: that file is the wire format shared
+// with the firmware, and this is a local smoothing policy the board never sees.
+
+/**
+ * Structurally identical to `Bearing` in ./contract, for exactly the reason
+ * `MotionActivity` is: nothing in this module may depend on the wire contract.
+ * motion.test.ts pins the mutual assignability so the pair cannot drift.
+ */
+export type MotionBearing = "left" | "center" | "right";
+
+/**
+ * Fraction of the frame width that reads as "center" — i.e. AHEAD.
+ *
+ * The detector's own `bearing` splits the frame into hard THIRDS with no
+ * deadband (vision/service.py `_bearing`: cx < W/3 → left, cx < 2W/3 → center,
+ * else right). That is a reasonable way to log which side a hazard was on, but
+ * it is the wrong shape for telling a walking user which way to turn:
+ *
+ *   1. it commits to LEFT for a centroid at 0.32 — and for a bus that fills a
+ *      third of the frame, that is not a turn instruction, it is noise; and
+ *   2. under ambiguity the useful answer is "keep going", not a turn. AHEAD is
+ *      the cheap mistake here; a wrong LEFT walks someone off a kerb.
+ *
+ * 0.44 answers AHEAD for anything whose centroid is inside the middle 44 % of
+ * the frame (0.28..0.72) and reserves LEFT/RIGHT for a target genuinely off to
+ * one side. ASSUMED, not measured — no bench walk has tuned this number.
+ *
+ * Widening the band does NOT on its own stop the emitted bearing flapping: a
+ * hard threshold at any position still flaps when the centroid hovers on it.
+ * That is what `voteBearing` below is for. The two rules do different jobs —
+ * this one picks the right answer, that one stops it changing its mind.
+ */
+export const AHEAD_BAND = 0.44;
+
+/**
+ * Bearing of a normalised [x1, y1, x2, y2] box, from its horizontal centroid.
+ *
+ * `null` for a malformed or non-finite box rather than a guessed direction: a
+ * fabricated LEFT is worse than no instruction, and `voteBearing` treats null
+ * as "no target" and holds the last confirmed value.
+ */
+export function bearingFromBox(box: readonly number[] | null | undefined): MotionBearing | null {
+  if (!box || box.length !== 4) return null;
+  const [x1, , x2] = box;
+  if (!Number.isFinite(x1) || !Number.isFinite(x2)) return null;
+  const cx = (x1 + x2) / 2;
+  const half = AHEAD_BAND / 2;
+  if (cx < 0.5 - half) return "left";
+  if (cx > 0.5 + half) return "right";
+  return "center";
+}
+
+/**
+ * `emitted` is the confirmed bearing the device is being told about; `null`
+ * means no target. `candidate`/`streak` are the evidence accumulating for a
+ * change — when `streak` is 0 there is no pending change and `candidate` is
+ * meaningless.
+ */
+export interface BearingVote {
+  emitted: MotionBearing | null;
+  candidate: MotionBearing | null;
+  streak: number;
+}
+
+/**
+ * Consecutive agreeing frames required before the emitted bearing changes.
+ *
+ * Three frames is ~1.5 s at the page's 2 Hz capture rate. Counted in FRAMES and
+ * not milliseconds on purpose: the unit of evidence here is a detection, and a
+ * detector running slow gives fewer, not worse, opinions. The consequence is
+ * that a stalled detector stretches the confirmation window in wall-clock time
+ * — recorded as a residual risk in audit 21 rather than papered over.
+ */
+export const BEARING_CONFIRM_FRAMES = 3;
+
+export function initialBearingVote(): BearingVote {
+  return { emitted: null, candidate: null, streak: 0 };
+}
+
+/**
+ * Fold one frame's observed bearing into the confirmed one.
+ *
+ * The rule is one sentence: **any change to the emitted bearing — including
+ * acquiring a target and losing one — needs `confirmFrames` consecutive frames
+ * agreeing on the new value.** A single disagreeing frame resets the count.
+ *
+ * A majority vote was the obvious alternative and is not enough. The detector
+ * thresholds on hard thirds, so a box centroid hovering on a boundary produces
+ * left, center, left, center…; best-of-3 over that sequence yields left,
+ * center, left, center… — the same flap rate, just delayed. Requiring
+ * CONSECUTIVE agreement never reaches three of anything on that input, so the
+ * emitted bearing simply holds, which is the correct answer for a target that
+ * genuinely is on the line.
+ *
+ * The same rule absorbs a dropped detection: at 2 Hz a one-frame miss would
+ * otherwise clear the command and re-send it 500 ms later, restarting the
+ * board's 800 ms nav pattern every time and truncating it permanently.
+ */
+export function voteBearing(
+  state: BearingVote,
+  observed: MotionBearing | null,
+  confirmFrames: number = BEARING_CONFIRM_FRAMES,
+): BearingVote {
+  // Agrees with what we are already emitting: cancel any pending change.
+  if (observed === state.emitted) {
+    return state.streak === 0 ? state : { emitted: state.emitted, candidate: null, streak: 0 };
+  }
+  // `state.streak > 0` disambiguates "candidate is null because nothing is
+  // pending" from "the pending candidate IS null, i.e. the target is gone".
+  const streak = observed === state.candidate && state.streak > 0 ? state.streak + 1 : 1;
+  if (streak >= confirmFrames) return { emitted: observed, candidate: null, streak: 0 };
+  return { emitted: state.emitted, candidate: observed, streak };
 }
 
 // --- impure boundary: the only DOM-touching function in this module ---------

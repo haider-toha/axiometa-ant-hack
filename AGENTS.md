@@ -20,7 +20,7 @@ Build the bus-stop situational-awareness prototype:
 - Two AX22-0018 passive buzzers on the P1/P3 diagonal, driven as low-frequency haptic/tone outputs.
 - PDM microphone on I2S0 for local siren detection.
 - VL53L0CX ToF for local proximity reflex.
-- Phone browser camera capture through the Next.js app.
+- Phone browser camera capture through the Next.js app (`www/`).
 - Modal YOLO/Claude endpoint for bus arrival and route reading.
 - Vercel + Upstash relay for outbound-only ESP32 polling.
 
@@ -31,6 +31,10 @@ The latest plan revision restored an explicit first-hour experiment: test whethe
 - spatial left/right from physical separation: not supported;
 - experimental left/right from frequency contrast: in scope until the wear test says otherwise.
 
+## Web App
+
+The active web app is `www/` — a Next.js 16 app scaffolded with George's `design-studio` taste system (Tailwind v4 + shadcn on Base UI). **George owns the web app.** All new frontend, the phone camera-capture page, API routes, and the device relay are built here going forward. The legacy `app/` (below) is not the target.
+
 ## Legacy Traps
 
 The old speech-to-braille idea is closed. Do not build from it.
@@ -38,7 +42,7 @@ The old speech-to-braille idea is closed. Do not build from it.
 - `plan/archive/` is provenance only.
 - `audit/speech-to-braille-wearable/` is a closed historical record.
 - `firmware/braille_wearable/` keeps its directory name only to avoid PlatformIO churn; the braille, LCD, and encoder code inside is legacy unless the current plan explicitly says to reuse a part.
-- `app/` currently contains a mostly legacy speech/braille Next.js app. Reuse the relay idioms named in the plan, but do not extend the speech, STT, TTS, reply suggestion, braille, LCD, or encoder flows.
+- `app/` is the stale legacy speech/braille Next.js app — do not use, edit, or reference it, and do not build new web work there. It informed the relay idioms named in the plan, but new web work lives in `www/`.
 - `cad/braille_wearable_exocage.py` is not the chosen design. Leave it alone unless the plan changes.
 
 Do not claim "opposite sides of the wrist" or spatial left/right localization. The two buzzers are 33.941 mm apart; any left/right attempt is via frequency contrast and must be described as experimental until wear-tested. Prioritize the buzzer viability and L/R discrimination wear test early, because it decides whether the haptic navigation scope survives.
@@ -50,24 +54,24 @@ Do not claim "opposite sides of the wrist" or spatial left/right localization. T
 - Preserve outbound-only ESP32 networking. The board polls Vercel; it does not accept inbound connections.
 - Keep local safety paths local: ToF and siren alerts must not depend on Wi-Fi.
 - Use Anthropic structured outputs for Modal Claude calls: `output_config.format` plus `json_schema`.
-- Before editing Next.js code, read the relevant local docs under `app/node_modules/next/dist/docs/`; this repo uses Next.js 16.
+- Before editing Next.js code, read the relevant local docs under `www/node_modules/next/dist/docs/`; this repo uses Next.js 16.
 - Do not rely on `parts/` absence as inventory evidence. It mirrors the vendor catalogue, not the bench.
 
 ## Verification
 
 Run the checks that match the files changed.
 
-App:
+Web app (`www/`, the active app):
 
 ```bash
-cd app
-npm ci
-npm test
-npm run lint
-npm run build
+cd www
+pnpm install
+pnpm exec tsc --noEmit
+pnpm run lint
+pnpm run build
 ```
 
-`npm run build` can print Upstash missing-env warnings in a local shell without `UPSTASH_REDIS_REST_URL` and `UPSTASH_REDIS_REST_TOKEN`; the build still has to finish successfully. Runtime relay smoke requires those env vars.
+`pnpm run build` can print Upstash missing-env warnings in a local shell without `UPSTASH_REDIS_REST_URL` and `UPSTASH_REDIS_REST_TOKEN`; the build still has to finish successfully. Runtime relay smoke requires those env vars. Never commit `www/.env.local` — only the empty `www/.env.example` template is tracked.
 
 Firmware:
 

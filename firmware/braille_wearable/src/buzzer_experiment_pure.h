@@ -29,8 +29,8 @@ struct BuzzerPattern {
     uint8_t stepCount;
 };
 
-inline constexpr uint16_t AUDIO_PROXY_LEFT_HZ = 700;
-inline constexpr uint16_t AUDIO_PROXY_RIGHT_HZ = 1400;
+inline constexpr uint16_t AUDIO_PROXY_LEFT_HZ = 2350;
+inline constexpr uint16_t AUDIO_PROXY_RIGHT_HZ = 3050;
 
 inline constexpr BuzzerStep NAV_LEFT_STEPS[] = {
     {AUDIO_PROXY_LEFT_HZ, 0, 200}, {0, 0, 200},

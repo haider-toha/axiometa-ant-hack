@@ -13,8 +13,9 @@ static uint32_t totalDuration(const BuzzerPattern& pattern) {
 }
 
 void test_audio_proxy_assigns_one_distinct_frequency_to_each_buzzer(void) {
-    TEST_ASSERT_EQUAL_UINT16(700, AUDIO_PROXY_LEFT_HZ);
-    TEST_ASSERT_EQUAL_UINT16(1400, AUDIO_PROXY_RIGHT_HZ);
+    TEST_ASSERT_EQUAL_UINT16(2350, AUDIO_PROXY_LEFT_HZ);
+    TEST_ASSERT_EQUAL_UINT16(3050, AUDIO_PROXY_RIGHT_HZ);
+    TEST_ASSERT_EQUAL_UINT16(700, AUDIO_PROXY_RIGHT_HZ - AUDIO_PROXY_LEFT_HZ);
 }
 
 void test_buzzer_and_led_button_ports_match_the_verified_schematics(void) {

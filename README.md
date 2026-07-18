@@ -68,9 +68,9 @@ extension kit**, so component placement is fixed by the board.
 
 | Port | Module | Notes |
 |---|---|---|
-| P1 | AX22-0018 passive buzzer A | Signal on **IO1 → GPIO3**; 700 Hz LEFT audio proxy |
+| P1 | AX22-0018 passive buzzer A | Signal on **IO1 → GPIO3**; 2350 Hz LEFT audio proxy |
 | P2 | VL53L0CX ToF distance sensor | I²C, shared bus |
-| P3 | AX22-0018 passive buzzer B | Signal on **IO1 → GPIO16**; 1400 Hz RIGHT audio proxy |
+| P3 | AX22-0018 passive buzzer B | Signal on **IO1 → GPIO16**; 3050 Hz RIGHT audio proxy |
 | P4 | PDM microphone (AX22-0044) | Must bind to **I2S0** — the PDM-to-PCM converter exists on I2S0 only |
 
 The first hardware experiment is complete: the buzzers were audible but produced virtually no tactile movement. They are rejected as haptic actuators. The demo retains them only to simulate two future vibration channels through distinct audible frequencies; see `audit/bus-stop-situational-awareness/05-buzzer-bench-test.md`.

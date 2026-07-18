@@ -41,7 +41,7 @@ The LED also turns off automatically when a check or 12-trial session finishes. 
 
 ## Interpretation Boundary
 
-P1 / LEFT always uses 700 Hz. P3 / RIGHT always uses 1400 Hz. Simultaneous patterns play both proxy tones; alternating patterns alternate them.
+P1 / LEFT always uses 2350 Hz. P3 / RIGHT always uses 3050 Hz. The exact 700 Hz separation is preserved while both tones sit closer to the MLT-8530's 2.7 kHz resonance. Simultaneous patterns play both proxy tones; alternating patterns alternate them.
 
 These mappings simulate the two channels that future ERM or LRA vibration motors would provide. Hearing or scoring these patterns does not show that real motors will be felt, spatially localized, or distinguishable. That requires retuning and testing with actual vibration hardware and representative users.
 
@@ -49,7 +49,7 @@ These mappings simulate the two channels that future ERM or LRA vibration motors
 
 ### 1. Audio Channel Check
 
-Press the P2 button to arm, then enter `v`. The firmware plays P1 / LEFT at 700 Hz and then P3 / RIGHT at 1400 Hz. This confirms audible output and channel routing only.
+Press the P2 button to arm, then enter `v`. The firmware plays P1 / LEFT at 2350 Hz and then P3 / RIGHT at 3050 Hz. This confirms audible output and channel routing only.
 
 ### 2. Navigation Simulation
 
@@ -59,7 +59,7 @@ Press the P2 button to arm, then enter `n` for 12 balanced, shuffled audio trial
 - Perceived RIGHT: operator enters `r`.
 - Replay without revealing the answer: `p`.
 
-LEFT is P1 at 700 Hz. RIGHT is P3 at 1400 Hz. The score checks whether the audio labels and software path are clear; it is not a tactile navigation result.
+LEFT is P1 at 2350 Hz. RIGHT is P3 at 3050 Hz. The score checks whether the audio labels and software path are clear; it is not a tactile navigation result.
 
 ### 3. Situational Simulation
 
@@ -69,14 +69,14 @@ Press the P2 button to arm, then enter `s` for 12 balanced, shuffled audio trial
 - Perceived WAIT: operator enters `w`.
 - Replay without revealing the answer: `p`.
 
-EVENT is three simultaneous two-tone pulses. WAIT alternates the 700 Hz and 1400 Hz channels twice. The score checks semantic and timing clarity only.
+EVENT is three simultaneous two-tone pulses. WAIT alternates the 2350 Hz and 3050 Hz channels twice. The score checks semantic and timing clarity only.
 
 ## Record The Result
 
 ```text
 Date / operator:
-LEFT 700 Hz audible and routed correctly:
-RIGHT 1400 Hz audible and routed correctly:
+LEFT 2350 Hz audible and routed correctly:
+RIGHT 3050 Hz audible and routed correctly:
 Navigation simulation score:  /12
 Situational simulation score: /12
 Replays used:

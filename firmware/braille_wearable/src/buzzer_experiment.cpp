@@ -130,7 +130,9 @@ void printHelp() {
     Serial.println();
     Serial.println(F("=== AX22-0018 audio proxy for future vibration motors ==="));
     Serial.println(F("P2 LED button: press to arm; press again to stop immediately"));
-    Serial.println(F("v  audible proxy check: LEFT 700 Hz, then RIGHT 1400 Hz"));
+    Serial.printf("v  audible proxy check: LEFT %u Hz, then RIGHT %u Hz\n",
+                  AUDIO_PROXY_LEFT_HZ,
+                  AUDIO_PROXY_RIGHT_HZ);
     Serial.println(F("n  start 12 blind navigation trials (guess with l or r)"));
     Serial.println(F("s  start 12 blind situational trials (guess with e or w)"));
     Serial.println(F("p  replay the current blind trial without revealing it"));

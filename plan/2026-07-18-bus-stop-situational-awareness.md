@@ -4,7 +4,7 @@
 
 **Goal:** Build the sensing, classification, navigation, relay, and output-pattern prototype for a wrist-worn DeafBlind navigation and situational-awareness product. The intended product uses purpose-built vibration motors; the hack hardware uses two passive buzzers only as audible proxies for those future vibration channels.
 
-**Architecture:** Three sensor inputs and two simulated output channels. A PDM microphone feeds an on-device FFT that fires a coarse local alert in ~79 ms and a confirmed-siren classification in 1–2 s. A VL53L0CX ToF gives a purely local proximity reflex with no network in the path. A phone browser POSTs frames at 2 Hz to a Modal endpoint that runs YOLO26n, holds two seconds of detection history, latches exactly one `BUS_ARRIVED` event, crops the destination blind and asks Claude to read it under a strict JSON schema. The phone owns the `STILL`/`MOVING` interaction state and translates camera results into bus-information or LEFT/RIGHT/AHEAD navigation commands. Those commands reach the board through the existing Vercel + Upstash polling relay. P1 at 700 Hz and P3 at 1400 Hz audibly simulate two future vibration channels. See the latest Revision note below.
+**Architecture:** Three sensor inputs and two simulated output channels. A PDM microphone feeds an on-device FFT that fires a coarse local alert in ~79 ms and a confirmed-siren classification in 1–2 s. A VL53L0CX ToF gives a purely local proximity reflex with no network in the path. A phone browser POSTs frames at 2 Hz to a Modal endpoint that runs YOLO26n, holds two seconds of detection history, latches exactly one `BUS_ARRIVED` event, crops the destination blind and asks Claude to read it under a strict JSON schema. The phone owns the `STILL`/`MOVING` interaction state and translates camera results into bus-information or LEFT/RIGHT/AHEAD navigation commands. Those commands reach the board through the existing Vercel + Upstash polling relay. P1 at 2350 Hz and P3 at 3050 Hz audibly simulate two future vibration channels. See the latest Revision note below.
 
 **Tech Stack:** ESP32-S3-MINI-1 (Arduino-ESP32 3.x / ESP-IDF v5.x, FreeRTOS, LEDC in **tone** mode, I2S0 PDM→PCM, `arduinoFFT<float>`, `Adafruit_VL53L0X`, `ArduinoJson` v7) · 2× AX22-0018 passive buzzer (MLT-8530) as audio proxies, not haptic actuators · Modal 1.5.2 + Ultralytics YOLO26n on T4 · `anthropic` 0.117.0 with `output_config.format` structured outputs · Next.js 16.2.10 on Vercel + Upstash Redis · in-browser `getUserMedia` capture on the phone (Python/OpenCV survives only inside Modal, not on a laptop) · build123d via `cad/tests/fake_adsk` for CAD.
 
@@ -42,7 +42,7 @@ This revision supersedes every downstream statement that describes the AX22-0018
 
 **1. The tactile viability test failed.** The labelled 70/100/150/220 Hz sweep was audible but produced virtually no tactile movement [T5]. The AX22-0018 modules are rejected as haptic actuators for this prototype. Do not continue the blind tactile-discrimination test and do not describe the current output as haptic feedback.
 
-**2. The hack demo now uses an explicit audio simulation.** P1 / LEFT plays 700 Hz and P3 / RIGHT plays 1400 Hz. Patterns designated BOTH play both channel frequencies; patterns designated A or B remain on their assigned channel; alternating patterns alternate them. This preserves output routing, count, rhythm, duration, and semantic integration for demonstration, but proves nothing about tactile perception or spatial localization.
+**2. The hack demo now uses an explicit audio simulation.** P1 / LEFT plays 2350 Hz and P3 / RIGHT plays 3050 Hz. This preserves the original 700 Hz separation while moving both tones close to the MLT-8530's 2.7 kHz resonance for better audibility in a noisy room. Patterns designated BOTH play both channel frequencies; patterns designated A or B remain on their assigned channel; alternating patterns alternate them. This preserves output routing, count, rhythm, duration, and semantic integration for demonstration, but proves nothing about tactile perception or spatial localization.
 
 **3. Product direction still assumes real vibration hardware.** A future build would replace both buzzers with purpose-built ERM or LRA actuators and adapt the vocabulary to their actual amplitude and waveform controls. That is a documented product assumption, not a current result. It remains unvalidated until tested on real actuators with representative users.
 
@@ -60,7 +60,7 @@ This revision overrides earlier rulings where they conflict. Three changes, all 
 
 **2. Camera capture moves from the laptop Python client to the mobile-ready `www/` app.** [T4 §Decision 1] locked `cv2.VideoCapture(0)` on the laptop and explicitly rejected a browser app; that ruling is **reversed by request.** George owns the Next.js app in `www/`; its capture page uses `getUserMedia({ video })` + a `<canvas>` grab at 2 Hz and is served over HTTPS on the Vercel deployment. `vision/bus_client.py` is **cut**; `vision/bus_vision.py` (Modal) and `vision/read_blind.py` remain. The trade [T4 §Decision 1] warned of — iOS Safari permission UX, a possible reload-and-re-grant on stage — is now **accepted, not avoided**; rehearse the grant flow before the demo.
 
-**3. Left/right navigation is back in scope as software and audio simulation.** [T3 D14/D20] cut LEFT/RIGHT/AHEAD and retired all spatial coding because the two ports are a fixed 33.941 mm apart — below the ~70 mm forearm two-point threshold. **That geometry is unchanged by the swap** and spatial localization stays unavailable. The current demo carries LEFT/RIGHT through a per-channel audio contrast: 700 Hz on P1 and 1400 Hz on P3. P11–P13 validate navigation command routing only. Future motors require a new tactile vocabulary and wear test; no current result predicts their discriminability.
+**3. Left/right navigation is back in scope as software and audio simulation.** [T3 D14/D20] cut LEFT/RIGHT/AHEAD and retired all spatial coding because the two ports are a fixed 33.941 mm apart — below the ~70 mm forearm two-point threshold. **That geometry is unchanged by the swap** and spatial localization stays unavailable. The current demo carries LEFT/RIGHT through a per-channel audio contrast: 2350 Hz on P1 and 3050 Hz on P3. P11–P13 validate navigation command routing only. Future motors require a new tactile vocabulary and wear test; no current result predicts their discriminability.
 
 ---
 
@@ -71,7 +71,7 @@ Every task's requirements implicitly include this section.
 1. **Today is 2026-07-18. The hack ends 2026-07-19. Roughly 1.5 days remain.** Sequencing beats completeness. The Cut List near the end is binding when the clock runs out.
 2. **Hardcoding is sanctioned.** Route **88**, destination **Clapham Common**. No configuration knobs, no generality, no "make this pluggable".
 3. **No soldering. All modules are AX22 snap-in. No extension kit, no ribbon leads, no purchased extras.** All four ports are occupied and every part is in hand.
-4. **The two buzzers are audio proxies, not tactile actuators** [T5]. P1 / LEFT uses 700 Hz and P3 / RIGHT uses 1400 Hz to make the conceptual channels audible. Their 33.941 mm physical separation carries no validated meaning in the current demo. Do not claim spatial or tactile left/right discrimination.
+4. **The two buzzers are audio proxies, not tactile actuators** [T5]. P1 / LEFT uses 2350 Hz and P3 / RIGHT uses 3050 Hz to make the conceptual channels audible. Their 33.941 mm physical separation carries no validated meaning in the current demo. Do not claim spatial or tactile left/right discrimination.
 5. **Buzzer Signal pins drive from Port 1 and Port 3.** The AX22-0018 header is `G / Vin / S` — a single Signal line per buzzer plus power and ground; there is no second drive channel. Working assumption: Signal → **GPIO3 (Port 1)** and **GPIO16 (Port 3)**, reusing the ERM diagonal. **Confirm the Signal-pin-to-IO mapping against `parts/Axiometa Genesis Mini - Starter Kit/passive-buzzer/files/SCH_AX22-0018.pdf` and the module silk before first drive** — it was derived for the ERM (AX22-0013), not this part. The committed `firmware/braille_wearable/src/pins.h:9-10` says GPIO4/GPIO9 and is **wrong** for either part; with those pins nothing sounds and it looks like dead hardware.
 6. **The microphone binds to `I2S_NUM_0`. Never `I2S_NUM_1`, never `I2S_NUM_AUTO`.** The PDM-to-PCM converter exists on I2S0 only, and binding I2S1 fails silently by yielding a raw bitstream [T3 §PDM capture, T4 §TRAP 1].
 7. **The ToF → output reflex and siren → output reflex are fully local.** No network in either path. In the hack demo the output is an audible proxy; the product intent is local vibration output.
@@ -147,7 +147,7 @@ Earlier drafts assumed a missing microphone. That assumption was wrong, and its 
 | Axiometa Genesis Mini (ESP32-S3-MINI-1-N4R2) | **REUSE / IN-HAND** | 55.000 × 55.000 mm PCB, MEASURED-FROM-STEP [T1] |
 | VL53L0CX ToF, AX22-0015 | **REUSE / IN-HAND** | `parts/distance-sensor-vl53l0cx/files/AX22-0015.step` |
 | ~~ERM vibration motor ×2, AX22-0013~~ | **CUT — could not source in time** | Superseded by the buzzer below (Revision §1) |
-| **Passive buzzer ×2, AX22-0018 (MLT-8530)** | **REUSE / IN-HAND** | `parts/Axiometa Genesis Mini - Starter Kit/passive-buzzer/`. 22×22 mm module, single Signal-pin PWM. Bench-rejected as tactile actuators; retained as 700/1400 Hz audio proxies [T5] |
+| **Passive buzzer ×2, AX22-0018 (MLT-8530)** | **REUSE / IN-HAND** | `parts/Axiometa Genesis Mini - Starter Kit/passive-buzzer/`. 22×22 mm module, single Signal-pin PWM. Bench-rejected as tactile actuators; retained as 2350/3050 Hz audio proxies [T5] |
 | **PDM microphone, AX22-0044, marking T3902** | **REUSE / IN-HAND** | **No `parts/` folder, no STEP, no public product page — new uncatalogued hardware.** Footprint is `ASSUMED-AX22-STANDARD`; Z height and port face need calipers (Do This First §3) |
 | USB-C source, ≥1 A | **REUSE / IN-HAND** | Constraint 8 |
 | 20 mm strap + Ø2.5 pins | **REUSE / IN-HAND** | Drives `LUG_GAP = 20.0`, not 22.0 |
@@ -437,9 +437,9 @@ static const size_t PULL_BODY_MAX = 512;   // reject anything larger BEFORE pars
 
 ## The Haptic Vocabulary — 11 patterns, all time-coded
 
-Two AX22-0018 passive buzzers now render the vocabulary as an **audible simulation** [T5]. P1 uses 700 Hz and P3 uses 1400 Hz so the two conceptual future vibration channels remain explicit. Pattern semantics still use channel, simultaneity, count, rhythm, and duration, but no result from this hardware validates tactile perception.
+Two AX22-0018 passive buzzers now render the vocabulary as an **audible simulation** [T5]. P1 uses 2350 Hz and P3 uses 3050 Hz so the two conceptual future vibration channels remain explicit. Pattern semantics still use channel, simultaneity, count, rhythm, and duration, but no result from this hardware validates tactile perception.
 
-> **Post-bench-test interpretation.** These patterns were authored for future vibration motors. On the hack hardware, ignore duty/intensity and render channel A as 700 Hz and channel B as 1400 Hz. Count, rhythm, duration, and channel routing remain demonstrable. Felt intensity, tactile pitch, and body localization do not.
+> **Post-bench-test interpretation.** These patterns were authored for future vibration motors. On the hack hardware, ignore duty/intensity and render channel A as 2350 Hz and channel B as 3050 Hz. Count, rhythm, duration, and channel routing remain demonstrable. Felt intensity, tactile pitch, and body localization do not.
 
 ### Design rules
 
@@ -453,7 +453,7 @@ Two AX22-0018 passive buzzers now render the vocabulary as an **audible simulati
 
 ### Driving the passive buzzers as explicit audio proxies
 
-The AX22-0018 is built for audible output — MLT-8530, 2.7 kHz resonant, 80 dB [`passive-buzzer/CONTENT.md`]. The bench test confirmed that it could be heard but not practically felt [T5]. The demo therefore drives P1 at 700 Hz and P3 at 1400 Hz. These tones make channel selection obvious without pretending to reproduce the physics of ERM/LRA vibration.
+The AX22-0018 is built for audible output — MLT-8530, 2.7 kHz resonant, 80 dB [`passive-buzzer/CONTENT.md`]. The bench test confirmed that it could be heard but not practically felt [T5]. The demo therefore drives P1 at 2350 Hz and P3 at 3050 Hz. These tones preserve the original 700 Hz separation while sitting close to resonance, making channel selection more audible without pretending to reproduce the physics of ERM/LRA vibration.
 
 There is no buzzer datasheet risk of the ERM kind — the MLT-8530 part is named on the product page and the LCSC datasheet (C94599) is the real PDF, not an HTML scrape. The uncertainty here is **perceptual**, and only a wrist can resolve it.
 
@@ -467,7 +467,7 @@ Notation: `A` = Port 1 buzzer, `B` = Port 3 buzzer, `BOTH` = both (optional 30 m
 | **P1** | **DANGER** | BOTH | 100 % | `(200 on / 150 off) ×5`, then `500` sustained tail | ×4, gap **750** | **2250/cycle · 11 250 total** | **SAFETY** | no | Tier-2b confirmed siren **AND** amplitude trend rising |
 | **P2** | **SIREN WARNING** | BOTH | 65 % | `(400 on / 300 off) ×2` | ×1 | **1400** | ALERT | no | Tier-2b confirmed siren, flat or falling trend. Rate-limited 1 per 10 s |
 | **P3** | **ATTENTION** | BOTH | 100 % | single `250` pulse | ×1 | **250** | **SAFETY** | no | Tier-2a: band energy exceeds the adaptive floor by +12 dB on 2 consecutive FFT frames (~79 ms) |
-| **P4** | **PROXIMITY** | **A only** | 700 Hz audio proxy | `120 on / gap`, `gap = map(mm, 300→1200, 120→900)` — closer = faster | state refreshed on every valid range sample | continuous | HAZARD | no | ToF < 1200 mm on 3 consecutive samples (~150 ms in the isolated runner) |
+| **P4** | **PROXIMITY** | **A only** | 2350 Hz audio proxy | `120 on / gap`, `gap = map(mm, 300→1200, 120→900)` — closer = faster | state refreshed on every valid range sample | continuous | HAZARD | no | ToF < 1200 mm on 3 consecutive samples (~150 ms in the isolated runner) |
 | **P5** | **BUS ARRIVING** | BOTH | 65 → 82 → 100 % | `(250 on / 250 off) ×3`, ascending | ×1 | **1500** | INFORMATION | no | `BUS_ARRIVED` edge from the relay |
 | **P6** | **ROUTE NUMBER** | BOTH | digits **buzz band ~100 Hz**, brackets **alert band ~200 Hz** | preamble `500 @ ~200 Hz` + `600` silence · digits: `LONG=500`, `SHORT=150`, intra-gap `250`, inter-digit gap **800** · terminator `600` silence + `500 @ ~200 Hz` | ×1 | **6400 for "88"** | INFORMATION | **yes** | Claude returned `confidence == "high"` and the 3-vote gate reached consensus |
 | **P7** | **WAIT** | A, B alternating | 100 % | `A 300 on / 200 off / B 300 on / 200 off` ×2 | ×4, gap **500** | **2000/cycle · 9500 total** | FEEDBACK | no | Vision request in flight, no result yet |
@@ -481,12 +481,12 @@ Notation: `A` = Port 1 buzzer, `B` = Port 3 buzzer, `BOTH` = both (optional 30 m
 
 ### Navigation block — AUDIO SIMULATION (P11–P13)
 
-These three demonstrate the software path for "steer toward the bus door." LEFT is the 700 Hz P1 proxy, RIGHT is the 1400 Hz P3 proxy, and AHEAD is both. They do not establish that a wearer can localize or distinguish future vibration motors.
+These three demonstrate the software path for "steer toward the bus door." LEFT is the 2350 Hz P1 proxy, RIGHT is the 3050 Hz P3 proxy, and AHEAD is both. They do not establish that a wearer can localize or distinguish future vibration motors.
 
 | # | Pattern | Buzzer | Drive | Timing spec | Repeats | Class | Trigger |
 |---|---|---|---|---|---|---|---|
-| **P11** | **LEFT** | A only | **700 Hz audio proxy** | `(200 on / 200 off) ×2` | ×1, re-postable | INFORMATION | Detector says the bus door / target is to the user's left |
-| **P12** | **RIGHT** | B only | **1400 Hz audio proxy** | `(200 on / 200 off) ×2` | ×1, re-postable | INFORMATION | Target is to the user's right |
+| **P11** | **LEFT** | A only | **2350 Hz audio proxy** | `(200 on / 200 off) ×2` | ×1, re-postable | INFORMATION | Detector says the bus door / target is to the user's left |
+| **P12** | **RIGHT** | B only | **3050 Hz audio proxy** | `(200 on / 200 off) ×2` | ×1, re-postable | INFORMATION | Target is to the user's right |
 | **P13** | **AHEAD** | BOTH | both proxy tones together | `400 on / 200 off / 400 on` | ×1 | INFORMATION | Target is roughly centred — proceed forward |
 
 **Design honesty for P11–P13:**

@@ -354,7 +354,7 @@ are `CARRIED-OVER-UNVERIFIED` from `plan/2026-07-17-…md:34` and `audit/…/20-
 | Port | Centre (measured) | Module | Part | IO0 | IO1 | IO2 | Signals used |
 |---|---|---|---|---|---|---|---|
 | **P1** | (−12.000, −12.000) | **ERM A** | AX22-0013 | GPIO4 | GPIO3 | GPIO2 | Data = **GPIO4** (IO0) |
-| **P2** | (+12.000, −12.000) | **VL53L0CX ToF** | AX22-0015 | GPIO7 | GPIO6 | GPIO5 | SDA=**GPIO10**, SCL=**GPIO11** (shared) · XSHUT = **GPIO7** (IO0) |
+| **P2** | (+12.000, −12.000) | **VL53L0CX ToF** | AX22-0015 | GPIO7 | GPIO6 | GPIO5 | SDA=**GPIO10**, SCL=**GPIO11** (shared) · XSHUT = **GPIO6** (IO1) |
 | **P3** | (+12.000, +12.000) | **ERM B** | AX22-0013 | GPIO9 | GPIO16 | GPIO15 | Data = **GPIO9** (IO0) |
 | **P4** | (−12.000, +12.000) | **PDM microphone** | **AX22-0044** (marking **T3902**) | GPIO1 | GPIO17 | GPIO18 | PDM CLK + DATA on 2 of the 3 IO pins — **confirm against the module silk at bring-up** |
 
@@ -363,10 +363,9 @@ are `CARRIED-OVER-UNVERIFIED` from `plan/2026-07-17-…md:34` and `audit/…/20-
 - **Zero LCD assignments. Zero encoder assignments.**
 - Shared buses on every port: MOSI **GPIO12** / MISO **GPIO13** / SCK **GPIO14** / SDA **GPIO10** /
   SCL **GPIO11**. I²C was unused in the old build, so the ToF has a clean bus.
-- **XSHUT pin derivation (new).** Comparing the two pinout images: the ERM's right header is
-  `G · Vin · N.C · **D**(ata) · N.C` and the ToF's is `G · Vin · N.C · **Xs** · N.C` — Xs occupies
-  **the same physical pin position** as the ERM's Data pin, which the locked map places on **IO0**.
-  Therefore **ToF XSHUT = IO0 = GPIO7 on P2**. Corroboration: the ToF's *left* header is
+- **XSHUT correction (2026-07-18).** The circuit schematic `SCH_AX22-0015.pdf` directly labels the
+  XSHUT net `IO1D`. Therefore **ToF XSHUT = IO1 = GPIO6 on P2**. This supersedes the earlier
+  pinout-image inference. The ToF's *left* header remains
   `N.C · N.C · N.C · SDA · SCL` (positions 4, 5), matching the shared-bus order
   `MOSI12 · MISO13 · SCK14 · SDA10 · SCL11` exactly. **The left header is the shared bus; the right
   header is power + IO.** Sources: `parts/distance-sensor-vl53l0cx/images/pinout/Pins-0015.png`,

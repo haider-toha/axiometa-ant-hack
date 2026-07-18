@@ -24,7 +24,7 @@ Related docs: [`MODAL-FOR-WWW.md`](MODAL-FOR-WWW.md) (the Modal contract) · [`p
 3. **Tests (vitest, per george-stack)** — not written. Highest ROI: `detectorToEvent()` (BUS→WAIT→NUMBER→UNKNOWN mapping + route regex) and the relay `mset`-before-`incr seq` ordering.
 4. **End-to-end smoke** — once env + deploy land: `curl` a locked-demo `/api/event` payload, confirm `/api/pull` returns the incremented command, then drive the capture page against a real Modal URL.
 5. **Real-phone rehearsal** — iOS Safari camera permission grant on the actual demo device (the plan flags this as the thing that still bites on stage).
-6. **L/R navigation (conditional)** — if the buzzer wear test keeps it: `CloudPattern` needs `LEFT`/`RIGHT`/`AHEAD`, `detectorToEvent()` must handle a detector-supplied left/centre/right, and the detector must emit bus-box horizontal position. Currently **not** wired — deliberately, pending the test.
+6. **L/R navigation (in scope)** — the tactile buzzer test failed, but the approved demo path keeps navigation as a frequency-coded audio simulation. `CloudPattern` needs `LEFT`/`RIGHT`/`AHEAD`, the contract needs `STILL`/`MOVING`, `detectorToEvent()` must handle a detector-supplied left/centre/right while moving, and the detector must emit bus-box horizontal position. Currently **not** wired.
 
 ---
 
@@ -36,7 +36,7 @@ Related docs: [`MODAL-FOR-WWW.md`](MODAL-FOR-WWW.md) (the Modal contract) · [`p
 | **Firmware polling host** | We block firmware | Board should poll `bus-stop-awareness.vercel.app/api/pull` — set `VERCEL_HOST` in `secrets.h`. The legacy speech app at `app-eight-lyart-98.vercel.app` is retired. |
 | **`DeviceCommand` struct mirrors `contract.ts`** | We block firmware | Firmware `net.h` must match our `CloudPattern` strings, `route` (`char[8]`), and `conf` values (`"high"`/`"low"`/`""` → `CONF_*`). Keep the two in lockstep. |
 | **Upstash Redis instance** | We depend on it | Plan says `UPSTASH_*` already provisioned at Production scope (old `app`). Confirm `www` uses the same instance; our key schema is new, so no collision. |
-| **Buzzer discrimination wear test** (merged PR #4) | Gates item A6 | Its result decides whether L/R nav survives, or whether the device falls to the audio-proxy fallback. |
+| **Buzzer discrimination wear test** (merged PR #4) | Resolved for item A6 | Tactile output failed. L/R navigation remains in scope as an explicit 2350/3050 Hz audio simulation; it does not validate tactile or spatial discrimination. |
 | **Anthropic structured outputs** | Not our dependency | Claude runs inside Modal, server-side. `www` never calls it — no key needed in the app. |
 
 ---
@@ -45,7 +45,7 @@ Related docs: [`MODAL-FOR-WWW.md`](MODAL-FOR-WWW.md) (the Modal contract) · [`p
 
 1. **Vercel target for `www`** — **locked:** `bus-stop-awareness.vercel.app` (`haider-projects/bus-stop-awareness`). Firmware `VERCEL_HOST` must match.
 2. **Same Upstash instance as old `app/`?** — if yes, confirm old speech-era keys won't confuse the debug screen (our reads default cleanly, so low risk).
-3. **Is L/R nav in scope for the web app?** — driven by the wear-test outcome.
+3. **L/R navigation is in scope for the web app.** The remaining decision is the detector-to-command threshold for left/centre/right; the plan proposes horizontal frame thirds.
 
 ---
 

@@ -40,6 +40,7 @@ pnpm-debug.log*
 *.bin
 *.hex
 *.map
+/a.out
 
 # Local CAD / temp artifacts
 *.stl.tmp

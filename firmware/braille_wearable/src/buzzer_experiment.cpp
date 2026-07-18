@@ -19,7 +19,7 @@ enum class SessionMode : uint8_t {
 
 struct TrialSession {
     SessionMode mode = SessionMode::NONE;
-    BuzzerPatternId schedule[TRIAL_COUNT] = {};
+    PatternId schedule[TRIAL_COUNT] = {};
     uint8_t trialIndex = 0;
     uint8_t score = 0;
     bool awaitingGuess = false;
@@ -40,8 +40,8 @@ void allOff() {
 }
 
 void setControlLed(bool on) {
-    digitalWrite(CONTROL_LED_PIN,
-                 on ? CONTROL_LED_ACTIVE_LEVEL : !CONTROL_LED_ACTIVE_LEVEL);
+    digitalWrite(EXPERIMENT_LED_PIN,
+                 on ? EXPERIMENT_LED_ACTIVE_LEVEL : !EXPERIMENT_LED_ACTIVE_LEVEL);
 }
 
 void disarmOutput(const char* message) {
@@ -62,7 +62,7 @@ void armOutput() {
 }
 
 bool consumeButtonPress() {
-    const bool buttonDown = digitalRead(CONTROL_BUTTON_PIN) == CONTROL_BUTTON_ACTIVE_LEVEL;
+    const bool buttonDown = digitalRead(EXPERIMENT_BUTTON_PIN) == EXPERIMENT_BUTTON_ACTIVE_LEVEL;
     const uint32_t now = millis();
     const bool pressed = buttonDown && !previousButtonDown &&
                          now - lastButtonPressMs >= BUTTON_DEBOUNCE_MS;
@@ -105,18 +105,18 @@ bool requireArmed() {
     return false;
 }
 
-bool playPattern(BuzzerPatternId id) {
+bool playPattern(PatternId id) {
     if (!outputArmed) {
         return false;
     }
-    const BuzzerPattern& pattern = patternFor(id);
+    const OutputPattern& pattern = outputPatternFor(id);
     allOff();
     if (!waitInterruptibly(100)) {
         return false;
     }
     for (uint8_t i = 0; i < pattern.stepCount; ++i) {
-        setTone(BUZZER_LEFT_PIN, pattern.steps[i].leftHz);
-        setTone(BUZZER_RIGHT_PIN, pattern.steps[i].rightHz);
+        setTone(BUZZER_LEFT_PIN, pattern.steps[i].p1Hz);
+        setTone(BUZZER_RIGHT_PIN, pattern.steps[i].p3Hz);
         if (!waitInterruptibly(pattern.steps[i].durationMs)) {
             allOff();
             return false;
@@ -130,7 +130,9 @@ void printHelp() {
     Serial.println();
     Serial.println(F("=== AX22-0018 audio proxy for future vibration motors ==="));
     Serial.println(F("P2 LED button: press to arm; press again to stop immediately"));
-    Serial.println(F("v  audible proxy check: LEFT 700 Hz, then RIGHT 1400 Hz"));
+    Serial.printf("v  audible proxy check: LEFT %u Hz, then RIGHT %u Hz\n",
+                  AUDIO_PROXY_LEFT_HZ,
+                  AUDIO_PROXY_RIGHT_HZ);
     Serial.println(F("n  start 12 blind navigation trials (guess with l or r)"));
     Serial.println(F("s  start 12 blind situational trials (guess with e or w)"));
     Serial.println(F("p  replay the current blind trial without revealing it"));
@@ -167,7 +169,7 @@ void playAudioProxyCheck() {
 void shuffleSchedule() {
     for (int i = TRIAL_COUNT - 1; i > 0; --i) {
         const uint32_t j = esp_random() % static_cast<uint32_t>(i + 1);
-        const BuzzerPatternId tmp = session.schedule[i];
+        const PatternId tmp = session.schedule[i];
         session.schedule[i] = session.schedule[j];
         session.schedule[j] = tmp;
     }
@@ -197,12 +199,12 @@ void startSession(SessionMode mode) {
     session = TrialSession{};
     session.mode = mode;
 
-    const BuzzerPatternId first = mode == SessionMode::NAVIGATION
-                                      ? BuzzerPatternId::NAV_LEFT
-                                      : BuzzerPatternId::EVENT;
-    const BuzzerPatternId second = mode == SessionMode::NAVIGATION
-                                       ? BuzzerPatternId::NAV_RIGHT
-                                       : BuzzerPatternId::WAIT;
+    const PatternId first = mode == SessionMode::NAVIGATION
+                                ? PatternId::LEFT
+                                : PatternId::BUS;
+    const PatternId second = mode == SessionMode::NAVIGATION
+                                 ? PatternId::RIGHT
+                                 : PatternId::WAIT;
     for (uint8_t i = 0; i < TRIAL_COUNT / 2; ++i) {
         session.schedule[i] = first;
         session.schedule[i + TRIAL_COUNT / 2] = second;
@@ -214,12 +216,13 @@ void startSession(SessionMode mode) {
     playCurrentTrial();
 }
 
-char expectedGuess(BuzzerPatternId id) {
+char expectedGuess(PatternId id) {
     switch (id) {
-        case BuzzerPatternId::NAV_LEFT:  return 'l';
-        case BuzzerPatternId::NAV_RIGHT: return 'r';
-        case BuzzerPatternId::EVENT:     return 'e';
-        case BuzzerPatternId::WAIT:      return 'w';
+        case PatternId::LEFT:  return 'l';
+        case PatternId::RIGHT: return 'r';
+        case PatternId::BUS:   return 'e';
+        case PatternId::WAIT:  return 'w';
+        case PatternId::AHEAD: return '?';
     }
     return '?';
 }
@@ -240,14 +243,14 @@ void submitGuess(char guess) {
         return;
     }
 
-    const BuzzerPatternId actual = session.schedule[session.trialIndex];
+    const PatternId actual = session.schedule[session.trialIndex];
     const bool correct = guess == expectedGuess(actual);
     if (correct) {
         ++session.score;
     }
     Serial.printf("%s. Actual: %s. Score: %u/%u.\n",
                   correct ? "CORRECT" : "INCORRECT",
-                  patternFor(actual).name,
+                  outputPatternFor(actual).name,
                   session.score,
                   session.trialIndex + 1);
 
@@ -311,10 +314,10 @@ void setup() {
     Serial.begin(115200);
     delay(800);
 
-    pinMode(CONTROL_BUTTON_PIN, INPUT);
-    pinMode(CONTROL_LED_PIN, OUTPUT);
+    pinMode(EXPERIMENT_BUTTON_PIN, INPUT);
+    pinMode(EXPERIMENT_LED_PIN, OUTPUT);
     setControlLed(false);
-    previousButtonDown = digitalRead(CONTROL_BUTTON_PIN) == CONTROL_BUTTON_ACTIVE_LEVEL;
+    previousButtonDown = digitalRead(EXPERIMENT_BUTTON_PIN) == EXPERIMENT_BUTTON_ACTIVE_LEVEL;
 
     const bool leftAttached = ledcAttach(BUZZER_LEFT_PIN, 100, LEDC_RESOLUTION_BITS);
     const bool rightAttached = ledcAttach(BUZZER_RIGHT_PIN, 100, LEDC_RESOLUTION_BITS);

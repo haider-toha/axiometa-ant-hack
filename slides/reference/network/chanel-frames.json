@@ -1,0 +1,59 @@
+{
+  "source": "https://www.chanel.com/us/watches/the-j12-watch/",
+  "scrapedAt": "2026-07-18T21:38:00Z",
+  "viewport": { "w": 625, "h": 1266, "dpr": 1 },
+  "technique": "canvas-2d-image-sequence",
+  "note": "Primary image-sequence reference. Real numbered frames drawn via CanvasRenderingContext2D.drawImage.",
+  "canvas": [
+    { "css": "625×813", "buffer": "973×1266", "dpr": 1, "ctx": "2d" },
+    { "css": "610×363", "buffer": "2278×1266", "dpr": 1, "ctx": "2d" },
+    { "css": "625×1266", "buffer": "690×1266", "dpr": 1, "ctx": "2d" }
+  ],
+  "sequences": {
+    "seq1": {
+      "role": "video cover / hybrid",
+      "uniqueFrames": 0,
+      "note": "Backed by mp4 (~7.44 MB) rather than discrete frames",
+      "videoMB": 7.44
+    },
+    "seq2": {
+      "uniqueFrames": 80,
+      "frameMin": 2,
+      "frameMax": 81,
+      "avgKB": 42.7,
+      "totalMB": 3.34,
+      "naming": "sequence-02-mobile-1200-#####_1560x1200.png (served as AVIF via CDN)",
+      "nativeRes": "1560×1200"
+    },
+    "seq3": {
+      "uniqueFrames": 100,
+      "frameMin": 1,
+      "frameMax": 100,
+      "avgKB": 20.5,
+      "totalMB": 2.02,
+      "naming": "sequence-03-desktop-2880-#####_1600x2880.png",
+      "nativeRes": "1600×2880"
+    },
+    "seq4": {
+      "uniqueFrames": 100,
+      "frameMin": 1,
+      "frameMax": 100,
+      "avgKB": 26.6,
+      "totalMB": 2.62,
+      "naming": "sequence-04-mobile-1200-#####_2200x1200.png",
+      "nativeRes": "2200×1200"
+    }
+  },
+  "aggregate": {
+    "sequenceNetworkHits": 283,
+    "avgKB": 28.9,
+    "totalSequenceMB": 7.98,
+    "scrollViewports": 16.15
+  },
+  "specTakeaway": {
+    "framesPerBeat": "80–100",
+    "perFrameKB": "20–43 (AVIF/mobile CDN)",
+    "totalPayloadPerBeatMB": "2.0–3.3",
+    "bufferStrategy": "CSS size ≈ viewport; buffer often 1×–1.5× CSS width at dpr 1 in this scrape"
+  }
+}

@@ -1,6 +1,24 @@
 {
   "version": 1,
   "skills": {
+    "3d-spatial": {
+      "source": "dylantarre/animation-principles",
+      "sourceType": "github",
+      "skillPath": "skills/01-by-domain/3d-spatial/SKILL.md",
+      "computedHash": "20687f3db9e35853fc03444255c70771138c682ad83ad8213fa616011e6f39a1"
+    },
+    "3d-web-experience": {
+      "source": "sickn33/antigravity-awesome-skills",
+      "sourceType": "github",
+      "skillPath": "skills/3d-web-experience/SKILL.md",
+      "computedHash": "abf349a30764951de0ff17fe6e4b0d3a5332d3682b3b97109d7a23f813406d1a"
+    },
+    "Blender": {
+      "source": "sfkislev/flue",
+      "sourceType": "github",
+      "skillPath": "skills/blender/SKILL.md",
+      "computedHash": "ad8c24c7c69274b4f3dff649f5f74e01aec4c59bace0fa68d8a1a6c6fbd0288d"
+    },
     "cad": {
       "source": "earthtojake/text-to-cad",
       "sourceType": "github",
@@ -13,11 +31,23 @@
       "skillPath": "skills/cad-viewer/SKILL.md",
       "computedHash": "a7e9c02d2bfa838c20f6926c8b6d3983163fae5d756c6a6b277139f638223283"
     },
+    "canvas-design": {
+      "source": "anthropics/skills",
+      "sourceType": "github",
+      "skillPath": "skills/canvas-design/SKILL.md",
+      "computedHash": "3fa7ea60170023ad8268bf9fd734ea75dd404279a2ef8ddf5abaa1102ad8e5f4"
+    },
     "deploy-to-vercel": {
       "source": "vercel-labs/agent-skills",
       "sourceType": "github",
       "skillPath": "skills/deploy-to-vercel/SKILL.md",
       "computedHash": "03e0eaaa9bf13ba1e7ffa387f5893de6f324c0868c627001f179395a8feaa7c9"
+    },
+    "design-critique": {
+      "source": "anthropics/knowledge-work-plugins",
+      "sourceType": "github",
+      "skillPath": "design/skills/design-critique/SKILL.md",
+      "computedHash": "55100e100ac2789175128df2899e8ace3c8732300cd2719df26c57b13e391ff8"
     },
     "dxf": {
       "source": "earthtojake/text-to-cad",
@@ -42,6 +72,30 @@
       "sourceType": "github",
       "skillPath": "skills/productivity/grill-me/SKILL.md",
       "computedHash": "f361db4e15e6bfd562a9282b1dccda513910a50061f9e838ce017be9c69dde3f"
+    },
+    "gsap-awwwards-website": {
+      "source": "eng0ai/eng0-template-skills",
+      "sourceType": "github",
+      "skillPath": "gsap-awwwards-website/SKILL.md",
+      "computedHash": "31885704a171d33427eef4d7245a4c4591c35b628f332f68cd9517bc33deb5ad"
+    },
+    "r3f-best-practices": {
+      "source": "emalorenzo/three-agent-skills",
+      "sourceType": "github",
+      "skillPath": "skills/r3f-best-practices/SKILL.md",
+      "computedHash": "d15cf5c47c35125afb4bfb079c3da515a34152f9839985065270a85e6bf36fb5"
+    },
+    "scroll-animations": {
+      "source": "dylantarre/animation-principles",
+      "sourceType": "github",
+      "skillPath": "skills/05-by-animation-type/scroll-animations/SKILL.md",
+      "computedHash": "1dd984a631d29f3ede3cbe3302e8998560e5426761a5f57ed7bb4e74cb8ad2a3"
+    },
+    "scrollytelling": {
+      "source": "doodledood/claude-code-plugins",
+      "sourceType": "github",
+      "skillPath": "claude-plugins/frontend-design/skills/scrollytelling/SKILL.md",
+      "computedHash": "e01bbc844aff7bd581e0f99e2413369521bc4784d358ffc69ecd5408eee4ef11"
     },
     "speech-to-text": {
       "source": "elevenlabs/skills",
@@ -72,6 +126,12 @@
       "sourceType": "github",
       "skillPath": "text-to-speech/SKILL.md",
       "computedHash": "ce96454df84df2c8196ce7a650ac178185f3a62b32c2f1fd6250f05ec4982ff0"
+    },
+    "three-best-practices": {
+      "source": "emalorenzo/three-agent-skills",
+      "sourceType": "github",
+      "skillPath": "skills/three-best-practices/SKILL.md",
+      "computedHash": "d135429cf44ae2fe06e6403b0fb417eaeb8c328641308b1b615e85a130c73794"
     },
     "upstash": {
       "source": "upstash/skills",
@@ -120,6 +180,12 @@
       "sourceType": "github",
       "skillPath": "skills/web-design-guidelines/SKILL.md",
       "computedHash": "f3bc47f890f42a44db1007ab390709ec368e4b8c089baee6b0007182236ac474"
+    },
+    "web-motion-design": {
+      "source": "dylantarre/animation-principles",
+      "sourceType": "github",
+      "skillPath": "skills/01-by-domain/web-motion-design/SKILL.md",
+      "computedHash": "ec2e6a89573cb273bf12667ccbc2bde8cfd500271a1e7d888b05aba0ae7cc159"
     },
     "writing-guidelines": {
       "source": "vercel-labs/agent-skills",

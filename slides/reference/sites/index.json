@@ -1,0 +1,70 @@
+{
+  "updatedAt": "2026-07-18T21:50:00Z",
+  "counts": {
+    "tier1Measured": 5,
+    "newScrapes": 5,
+    "catalogEntriesApprox": 55,
+    "openDemos": 10,
+    "agentsUsed": 4
+  },
+  "lanes": {
+    "aerospaceCad": [
+      "https://www.portalsystems.space/",
+      "https://www.icomat.co.uk/",
+      "https://endurosat.com/",
+      "https://www.jobyaviation.com/experience",
+      "https://www.jobyaviation.com/technology",
+      "https://www.thinkom.com/special-mission",
+      "https://lgmaviation.com/",
+      "https://www.hanwhaaerospace.com/eng/showroom.do",
+      "https://explodeview.com/",
+      "https://discoverengines.rolls-royce.com/",
+      "https://vision.avatr.com/",
+      "https://milremrobotics.com/themis-family/",
+      "https://www.skydio.com/x10",
+      "https://www.archer.com/aircraft",
+      "https://boomsupersonic.com/symphony",
+      "https://www.rideradian.com/exr",
+      "https://www.digantara.co.in/mission",
+      "https://www.virgingalactic.com/experience",
+      "https://www.chanel.com/us/watches/j12-savoir-faire/",
+      "https://www.omegawatches.com/clearspace"
+    ],
+    "electronicsModules": [
+      "https://teenage.engineering/products/po",
+      "https://crazygl.com/hero/product-exploded-view",
+      "https://crazygl.com/hero/scroll-assemble-product",
+      "https://frame.work/laptop13",
+      "https://www.apple.com/apple-vision-pro/",
+      "https://nothing.tech/products/phone-3"
+    ],
+    "imageSequenceCanon": [
+      "https://www.chanel.com/us/watches/the-j12-watch/",
+      "https://css-tricks.com/lets-make-one-of-those-fancy-scrolling-animations-used-on-apple-product-pages/",
+      "https://gsap.com/docs/v3/HelperFunctions/helpers/imageSequenceScrub"
+    ],
+    "darkIndustrialType": [
+      "https://www.icomat.co.uk/",
+      "https://www.figure.ai/",
+      "https://lightmatter.co/",
+      "https://ayarlabs.com/"
+    ]
+  },
+  "scrapesOnDisk": [
+    "sites/scrapes/portal-space.json",
+    "sites/scrapes/endurosat.json",
+    "sites/scrapes/crazygl-explode.json",
+    "sites/scrapes/teenage-engineering-po.json",
+    "sites/scrapes/figure-ai.json",
+    "network/airpods-frames.json",
+    "network/chanel-frames.json",
+    "timing/scroll-frame-map.json",
+    "timing/pin-ratios.json",
+    "design/type-scale.json"
+  ],
+  "claudeEntryPoints": [
+    "catalog.md",
+    "spec.md",
+    "harness/canvas-sequence.js"
+  ]
+}

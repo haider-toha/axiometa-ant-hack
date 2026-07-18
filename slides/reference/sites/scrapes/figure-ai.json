@@ -1,0 +1,17 @@
+{
+  "site": "https://www.figure.ai/",
+  "scrapedAt": "2026-07-18T21:46:00Z",
+  "lane": "robotics-industrial-type",
+  "relevance": "medium",
+  "why": "Humanoid robotics brand with disciplined dark type system — useful for display/body pairing, not for image-sequence technique.",
+  "technique": "video-led / sticky-dom",
+  "scrollViewports": 4.85,
+  "canvases": [],
+  "type": [
+    { "family": "pp-neue-machina-plain", "sizePx": 20, "weight": "400", "letterSpacing": "normal", "color": "rgb(255,255,255)" },
+    { "family": "neue-haas-grot-text", "sizePx": 14, "weight": "400", "letterSpacing": "-0.14px", "color": "rgb(255,255,255)" },
+    { "family": "neue-haas-grot-text", "sizePx": 18, "weight": "400", "letterSpacing": "-0.18px" },
+    { "family": "neue-haas-grot-text", "sizePx": 24, "weight": "400", "letterSpacing": "-0.24px" }
+  ],
+  "steal": ["Machina-like display + Grot-like body", "Tracking tightens slightly as size grows", "Short page — don’t over-scroll robotics marketing"]
+}

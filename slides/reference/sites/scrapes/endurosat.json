@@ -1,0 +1,48 @@
+{
+  "site": "https://www.endurosat.com/",
+  "scrapedAt": "2026-07-18T21:55:00Z",
+  "lane": "aerospace-cad-modules",
+  "relevance": "very-high",
+  "why": "Satellite manufacturer with modular avionics catalog (OBC, EPS, antennas, solar, structures) + full-viewport WebGL — closest commercial analog to selling a kit of CAD modules.",
+  "technique": "webgl",
+  "scrollViewports": 30.99,
+  "canvases": [
+    { "css": "625x1266", "buffer": "625x1266", "ctx": "webgl", "pos": "fixed", "note": "Full-viewport WebGL layer; parent runway ~20.5× height" }
+  ],
+  "moduleCatalog": {
+    "buses": [
+      "https://www.endurosat.com/products/frame-max-satellite/",
+      "https://www.endurosat.com/products/16u-platform/",
+      "https://www.endurosat.com/products/8u-platform/",
+      "https://www.endurosat.com/products/desksat/"
+    ],
+    "avionics": [
+      "https://www.endurosat.com/products/onboard-computer/",
+      "https://www.endurosat.com/products/cubesat-eps/",
+      "https://www.endurosat.com/products/s-band-transceiver/",
+      "https://www.endurosat.com/products/uhf-transceiver-ii/"
+    ],
+    "rf": [
+      "https://www.endurosat.com/products/x-band-patch-antenna/",
+      "https://www.endurosat.com/products/gnss-patch-antenna-l1-l2/"
+    ],
+    "structuresLab": [
+      "https://www.endurosat.com/products/16u-cubesat-structure/",
+      "https://www.endurosat.com/products/assembly-jig/",
+      "https://www.endurosat.com/products/rotary-jig/"
+    ]
+  },
+  "steal": [
+    "Organize Genesis Mini deck like EnduroSat nav: Structures / Power / Sensing / UI / Actuation",
+    "DeskSat = tabletop demo framing for hackathon kit",
+    "Flight-heritage badge language → 'hackathon-proven' / 'field module' badges (tastefully)",
+    "One WebGL/canvas plane fixed while content scrolls ~20–30 vh (long-form mission narrative)"
+  ],
+  "axiometaMapping": {
+    "Onboard Computer": "rotary-encoder + IPS as 'UI/compute periphery'",
+    "Transceiver": "ir-transceiver",
+    "Sensors": "dht11, light-dependent-resistor",
+    "Actuators": "passive-buzzer, vibration-motor-erm, neopixel-matrix",
+    "DeskSat": "Genesis Mini assembled on bench"
+  }
+}

@@ -64,6 +64,7 @@ export async function openOutputSerialSession(
   const decoder = new TextDecoder();
   let closing = false;
   let disconnected = false;
+  let failureMessage: string | null = null;
 
   const reportDisconnect = () => {
     if (disconnected) return;
@@ -89,11 +90,20 @@ export async function openOutputSerialSession(
       const trailing = decoder.decode();
       if (trailing) handlers.onText(trailing);
     } catch (error) {
-      if (!closing) handlers.onError(serialErrorMessage(error));
+      if (!closing) {
+        failureMessage = serialErrorMessage(error);
+      }
     } finally {
       reader.releaseLock();
       port.removeEventListener("disconnect", handlePhysicalDisconnect);
-      reportDisconnect();
+      if (failureMessage) {
+        if (port.readable || port.writable) {
+          await port.close().catch(() => undefined);
+        }
+        handlers.onError(failureMessage);
+      } else {
+        reportDisconnect();
+      }
     }
   })();
 

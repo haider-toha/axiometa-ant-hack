@@ -373,8 +373,9 @@ void serviceRelay(uint32_t nowMs) {
     RelayUpdate update{};
     while (relayPollUpdate(update)) {
         if (update.resetCommandBaseline) {
-            resetRelaySequence(relaySequence);
-            Serial.println(F("RELAY command=baseline_reset reason=long_outage"));
+            resetRelayControlAfterOutage(relaySequence, activityControl);
+            refreshEffectiveActivity(nowMs, "long_outage");
+            Serial.println(F("RELAY command=baseline_reset activity=invalidated reason=long_outage"));
         }
         if (update.hasActivity) {
             if (update.activity == UserActivity::UNKNOWN) {

@@ -254,6 +254,12 @@ inline void invalidateCloudActivity(ActivityControlState& state) {
     state.cloudUpdatedMs = 0;
 }
 
+inline void resetRelayControlAfterOutage(RelaySequenceState& sequence,
+                                         ActivityControlState& activity) {
+    resetRelaySequence(sequence);
+    invalidateCloudActivity(activity);
+}
+
 inline void setServiceActivity(ActivityControlState& state,
                                UserActivity activity) {
     if (activity == UserActivity::UNKNOWN) return;

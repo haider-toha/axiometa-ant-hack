@@ -278,6 +278,22 @@ void test_baseline_heartbeat_does_not_open_still_gate(void) {
             wire, true, UserActivity::STILL, 4, 2000).disposition));
 }
 
+void test_long_outage_reset_revokes_authorized_still(void) {
+    RelaySequenceState sequence{};
+    ActivityControlState control{};
+    consumeRelayCommand(sequence, command(20, CloudCommand::NONE),
+                        UserActivity::MOVING);
+    applyCloudActivity(control, UserActivity::STILL, 100);
+    TEST_ASSERT_EQUAL_UINT8(static_cast<uint8_t>(UserActivity::STILL),
+                            static_cast<uint8_t>(effectiveActivity(control, 101)));
+
+    resetRelayControlAfterOutage(sequence, control);
+
+    TEST_ASSERT_FALSE(sequence.initialized);
+    TEST_ASSERT_EQUAL_UINT8(static_cast<uint8_t>(UserActivity::MOVING),
+                            static_cast<uint8_t>(effectiveActivity(control, 102)));
+}
+
 void test_activity_lease_and_tof_policy_are_millis_wrap_safe(void) {
     ActivityControlState state{};
     applyCloudActivity(state, UserActivity::STILL, UINT32_MAX - 10);
@@ -319,6 +335,7 @@ int main(int, char**) {
     RUN_TEST(test_missing_activity_snapshot_revokes_still_before_next_command);
     RUN_TEST(test_activity_heartbeat_refreshes_lease_without_changing_sequence);
     RUN_TEST(test_baseline_heartbeat_does_not_open_still_gate);
+    RUN_TEST(test_long_outage_reset_revokes_authorized_still);
     RUN_TEST(test_activity_lease_and_tof_policy_are_millis_wrap_safe);
     RUN_TEST(test_entering_still_clears_rendered_proximity_but_moving_does_not);
     return UNITY_END();

@@ -2,11 +2,11 @@
 
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
-**Goal:** Build a wrist-worn ESP32-S3 device that tells a DeafBlind user, entirely through two passive buzzers driven as haptic actuators, that a siren is approaching, that something is close in front of them, and **which bus just pulled in**.
+**Goal:** Build the sensing, classification, relay, and output-pattern prototype for a wrist-worn DeafBlind situational-awareness product. The intended product uses purpose-built vibration motors; the hack hardware uses two passive buzzers only as audible proxies for those future vibration channels.
 
-**Architecture:** Three inputs, one output. A PDM microphone feeds an on-device FFT that fires a coarse haptic alert in ~79 ms and a confirmed-siren classification in 1–2 s. A VL53L0CX ToF gives a purely local proximity reflex with no network in the path. A phone browser POSTs frames at 2 Hz to a Modal endpoint that runs YOLO26n, holds two seconds of detection history, latches exactly one `BUS_ARRIVED` event, crops the destination blind and asks Claude to read it under a strict JSON schema; the answer travels to the board through the existing Vercel + Upstash polling relay. The two AX22-0018 buzzers are 33.941 mm apart, so pure spatial left/right is unavailable — the default vocabulary stays time-coded, and left/right navigation is *attempted* through a per-side frequency contrast (felt pitch, not felt position). See the Revision note below.
+**Architecture:** Three inputs, one simulated output. A PDM microphone feeds an on-device FFT that fires a coarse local alert in ~79 ms and a confirmed-siren classification in 1–2 s. A VL53L0CX ToF gives a purely local proximity reflex with no network in the path. A phone browser POSTs frames at 2 Hz to a Modal endpoint that runs YOLO26n, holds two seconds of detection history, latches exactly one `BUS_ARRIVED` event, crops the destination blind and asks Claude to read it under a strict JSON schema; the answer travels to the board through the existing Vercel + Upstash polling relay. P1 at 700 Hz and P3 at 1400 Hz audibly simulate two future vibration channels. See the latest Revision note below.
 
-**Tech Stack:** ESP32-S3-MINI-1 (Arduino-ESP32 3.x / ESP-IDF v5.x, FreeRTOS, LEDC in **tone** mode, I2S0 PDM→PCM, `arduinoFFT<float>`, `Adafruit_VL53L0X`, `ArduinoJson` v7) · 2× AX22-0018 passive buzzer (MLT-8530) · Modal 1.5.2 + Ultralytics YOLO26n on T4 · `anthropic` 0.117.0 with `output_config.format` structured outputs · Next.js 16.2.10 on Vercel + Upstash Redis · in-browser `getUserMedia` capture on the phone (Python/OpenCV survives only inside Modal, not on a laptop) · build123d via `cad/tests/fake_adsk` for CAD.
+**Tech Stack:** ESP32-S3-MINI-1 (Arduino-ESP32 3.x / ESP-IDF v5.x, FreeRTOS, LEDC in **tone** mode, I2S0 PDM→PCM, `arduinoFFT<float>`, `Adafruit_VL53L0X`, `ArduinoJson` v7) · 2× AX22-0018 passive buzzer (MLT-8530) as audio proxies, not haptic actuators · Modal 1.5.2 + Ultralytics YOLO26n on T4 · `anthropic` 0.117.0 with `output_config.format` structured outputs · Next.js 16.2.10 on Vercel + Upstash Redis · in-browser `getUserMedia` capture on the phone (Python/OpenCV survives only inside Modal, not on a laptop) · build123d via `cad/tests/fake_adsk` for CAD.
 
 **Evidence legend.** Every measured claim below traces to one of four audit files. They are authoritative over anything else in the repository.
 
@@ -16,14 +16,31 @@
 | **T2** | `audit/bus-stop-situational-awareness/02-track-2-modal-claude-grounding-and-hardcoded-spec.md` |
 | **T3** | `audit/bus-stop-situational-awareness/03-track-3-transcript-and-gesture-vocabulary.md` |
 | **T4** | `audit/bus-stop-situational-awareness/04-track-4-system-firmware-architecture.md` |
+| **T5** | `audit/bus-stop-situational-awareness/05-buzzer-bench-test.md` |
 
 `plan/archive/` holds three superseded plans. **Do not build from them.** Their headers list claims that these four tracks disproved.
 
 ---
 
+## Revision 2026-07-18c — Buzzer tactile failure and audio-proxy demo
+
+This revision supersedes every downstream statement that describes the AX22-0018 modules as felt, tactile, haptic, or accessibility-validating output.
+
+**1. The tactile viability test failed.** The labelled 70/100/150/220 Hz sweep was audible but produced virtually no tactile movement [T5]. The AX22-0018 modules are rejected as haptic actuators for this prototype. Do not continue the blind tactile-discrimination test and do not describe the current output as haptic feedback.
+
+**2. The hack demo now uses an explicit audio simulation.** P1 / LEFT plays 700 Hz and P3 / RIGHT plays 1400 Hz. BOTH patterns play both channel frequencies; alternating patterns alternate them. This preserves output routing, count, rhythm, duration, and semantic integration for demonstration, but proves nothing about tactile perception or spatial localization.
+
+**3. Product direction still assumes real vibration hardware.** A future build would replace both buzzers with purpose-built ERM or LRA actuators and adapt the vocabulary to their actual amplitude and waveform controls. That is a documented product assumption, not a current result. It remains unvalidated until tested on real actuators with representative users.
+
+**Stage line:** *"These two tones simulate the two vibration channels the product would use. The supplied buzzers could be heard but not felt, so this prototype demonstrates sensing and pattern routing rather than tactile efficacy."*
+
+---
+
 ## Revision 2026-07-18b — Actuator swap, mobile capture, L/R navigation attempt
 
-This revision overrides earlier rulings where they conflict. Three changes, all landing after the four audit tracks were written; where a track finding is contradicted, **this section wins and states the reason.** Downstream mentions of "motor", "ERM", "duty %", and "laptop webcam" elsewhere in this document should be read through this revision.
+> **Historical revision. Revision 2026-07-18c supersedes its tactile and wear-test proposals after the bench result.** Its camera decision and electrical facts remain current.
+
+This revision overrides earlier rulings where they conflict. Three changes, all landing after the first four audit tracks were written. Downstream mentions must now also be read through Revision 2026-07-18c and T5.
 
 **1. The two ERM motors are replaced by two AX22-0018 passive buzzers.** The ERMs could not be sourced in time; the buzzer ships in the Genesis Mini Starter Kit and is in hand. It is an **MLT-8530 electromagnetic** (magnetic, not piezo) transducer on a 22×22 mm module — 2.7 kHz resonant, 80 dB — driven by a **single Signal-pin PWM** (header `G / Vin / S`); there is no second drive channel and no amplitude-by-duty knob the way an ERM has [`parts/Axiometa Genesis Mini - Starter Kit/passive-buzzer/CONTENT.md`]. This flips the drive model from *duty-cycle amplitude* to *frequency (tone)* and flips the output physics from inertial vibration to acoustic diaphragm motion. **We drive the buzzer at a low frequency to elicit a felt buzz rather than an audible tone.** This is an experiment: a sealed magnetic buzzer is not a tactile actuator, so the felt output may be weak. A first-hour wear test (Task 13-adjacent) decides whether the tactile path is viable or whether the device falls back to audible-tone signalling for a hearing companion. The overdrive-kick / start-voltage analysis written for the ERM is **moot** — buzzers have no stiction and no inrush.
 
@@ -40,10 +57,10 @@ Every task's requirements implicitly include this section.
 1. **Today is 2026-07-18. The hack ends 2026-07-19. Roughly 1.5 days remain.** Sequencing beats completeness. The Cut List near the end is binding when the clock runs out.
 2. **Hardcoding is sanctioned.** Route **88**, destination **Clapham Common**. No configuration knobs, no generality, no "make this pluggable".
 3. **No soldering. All modules are AX22 snap-in. No extension kit, no ribbon leads, no purchased extras.** All four ports are occupied and every part is in hand.
-4. **The two buzzers are 33.941 mm apart on the {1,3} diagonal** — the maximum the board allows, and 48 % of the ~70 mm forearm two-point-discrimination threshold [T1 §Motor Separation Finding]. **Pure spatial left/right localization is unachievable; the default vocabulary stays time-coded.** The buzzer swap adds one lever the ERMs lacked — a **per-side frequency contrast** — so L/R is *attempted* via felt pitch, not felt position (see the Navigation block, P11–P13). The phrase "opposite sides of the wrist" still describes a physically impossible *spatial* arrangement and must not be used to claim spatial localization; any L/R claim rests on frequency discrimination and the wear test, not geometry.
+4. **The two buzzers are audio proxies, not tactile actuators** [T5]. P1 / LEFT uses 700 Hz and P3 / RIGHT uses 1400 Hz to make the conceptual channels audible. Their 33.941 mm physical separation carries no validated meaning in the current demo. Do not claim spatial or tactile left/right discrimination.
 5. **Buzzer Signal pins drive from Port 1 and Port 3.** The AX22-0018 header is `G / Vin / S` — a single Signal line per buzzer plus power and ground; there is no second drive channel. Working assumption: Signal → **GPIO3 (Port 1)** and **GPIO16 (Port 3)**, reusing the ERM diagonal. **Confirm the Signal-pin-to-IO mapping against `parts/Axiometa Genesis Mini - Starter Kit/passive-buzzer/files/SCH_AX22-0018.pdf` and the module silk before first drive** — it was derived for the ERM (AX22-0013), not this part. The committed `firmware/braille_wearable/src/pins.h:9-10` says GPIO4/GPIO9 and is **wrong** for either part; with those pins nothing sounds and it looks like dead hardware.
 6. **The microphone binds to `I2S_NUM_0`. Never `I2S_NUM_1`, never `I2S_NUM_AUTO`.** The PDM-to-PCM converter exists on I2S0 only, and binding I2S1 fails silently by yielding a raw bitstream [T3 §PDM capture, T4 §TRAP 1].
-7. **The ToF → haptic reflex and the siren → haptic reflex are fully local.** No network in either path. The device must work with Wi-Fi unplugged for both safety tiers.
+7. **The ToF → output reflex and siren → output reflex are fully local.** No network in either path. In the hack demo the output is an audible proxy; the product intent is local vibration output.
 8. **Power: a ≥1 A (≥5 W) USB-C source — kept for margin, but its old binding reason is gone.** That constraint was 2 × ERM inrush [T1 §Old Global Constraints row 3]. Two MLT-8530 buzzers draw on the order of ~30 mA each with no inertial inrush, so the rail is comfortable now; ESP32-S3 + Wi-Fi transients dominate. Keep ≥1 A anyway — headroom is free.
 9. **The ESP32 is outbound-only.** It polls `https://app-eight-lyart-98.vercel.app/api/pull` every 300 ms and never accepts an inbound connection.
 10. **Serverless is stateless; all shared state lives in Upstash Redis.** The one exception is the Modal container's own arrival state machine, which is safe only because `max_containers=1` pins it to a single process.
@@ -51,7 +68,7 @@ Every task's requirements implicitly include this section.
 12. **Use Anthropic's first-class structured outputs** (`output_config.format` + `json_schema`). Prompt-only JSON is the weakest available mechanism and **assistant prefill now returns 400** on Opus 4.8 [T2 §Claude Vision 3].
 13. **"We have not validated with DeafBlind users."** That sentence survives into every artefact, unchanged. The community norm is "nothing about us without us". The transcript's *"we've talked to them"* is genuinely ambiguous [T3 D15] and **no claim may be built on it**.
 14. **`parts/` is a catalogue mirror, not an inventory.** Absence of a folder is evidence about Axiometa's product listing and says nothing about what is on the bench [T1 §Inference trap].
-15. **No component in this build has a display or a control knob.** The wrist is the only output channel. There is no on-device ground truth, which is why the acceptance test in Task 17 exists.
+15. **The current buzzer output is audible demo feedback, not a DeafBlind-accessible output channel.** A companion/debug screen provides ground truth. Product accessibility depends on replacing the buzzers with validated vibration hardware.
 
 ---
 
@@ -115,7 +132,7 @@ Earlier drafts assumed a missing microphone. That assumption was wrong, and its 
 | Axiometa Genesis Mini (ESP32-S3-MINI-1-N4R2) | **REUSE / IN-HAND** | 55.000 × 55.000 mm PCB, MEASURED-FROM-STEP [T1] |
 | VL53L0CX ToF, AX22-0015 | **REUSE / IN-HAND** | `parts/distance-sensor-vl53l0cx/files/AX22-0015.step` |
 | ~~ERM vibration motor ×2, AX22-0013~~ | **CUT — could not source in time** | Superseded by the buzzer below (Revision §1) |
-| **Passive buzzer ×2, AX22-0018 (MLT-8530)** | **REUSE / IN-HAND** | `parts/Axiometa Genesis Mini - Starter Kit/passive-buzzer/`. 22×22 mm module, single Signal-pin PWM, STEP present so Z is CAD-derivable. Driven low-freq for felt buzz — tactile viability is a wear-test question |
+| **Passive buzzer ×2, AX22-0018 (MLT-8530)** | **REUSE / IN-HAND** | `parts/Axiometa Genesis Mini - Starter Kit/passive-buzzer/`. 22×22 mm module, single Signal-pin PWM. Bench-rejected as tactile actuators; retained as 700/1400 Hz audio proxies [T5] |
 | **PDM microphone, AX22-0044, marking T3902** | **REUSE / IN-HAND** | **No `parts/` folder, no STEP, no public product page — new uncatalogued hardware.** Footprint is `ASSUMED-AX22-STANDARD`; Z height and port face need calipers (Do This First §3) |
 | USB-C source, ≥1 A | **REUSE / IN-HAND** | Constraint 8 |
 | 20 mm strap + Ø2.5 pins | **REUSE / IN-HAND** | Drives `LUG_GAP = 20.0`, not 22.0 |
@@ -393,27 +410,23 @@ static const size_t PULL_BODY_MAX = 512;   // reject anything larger BEFORE pars
 
 ## The Haptic Vocabulary — 11 patterns, all time-coded
 
-Two AX22-0018 passive buzzers, 33.941 mm apart. The **default** vocabulary (P0–P10) depends on *which side fires only via the both-vs-one presence rule*, never on spatial localization. The **navigation** block (P11–P13, experimental) deliberately does encode side — via a per-side frequency contrast, not position. [T3 §Locked Gesture Vocabulary, amended by Revision §1/§3]
+Two AX22-0018 passive buzzers now render the vocabulary as an **audible simulation** [T5]. P1 uses 700 Hz and P3 uses 1400 Hz so the two conceptual future vibration channels remain explicit. Pattern semantics still use channel, simultaneity, count, rhythm, and duration, but no result from this hardware validates tactile perception.
 
-> **Buzzer caveat carried into every rule below.** These patterns were authored for ERMs, whose control channel is *amplitude* (duty). A passive magnetic buzzer's control channel is *frequency* (tone), and its felt output is diaphragm motion, not inertial vibration. Where a rule below says "duty %", read it as "map to a drive **frequency/tone**": the buzzer is driven at a **low fundamental (~60–200 Hz square wave, ~50 % duty)** to trade its 2.7 kHz acoustic job for a felt buzz. Loudness/intensity is *not* a clean channel on this part, so patterns that leaned on MED-vs-FULL amplitude now lean harder on **count, rhythm and duration**. A first-hour wear test confirms any of this is felt at all.
+> **Post-bench-test interpretation.** These patterns were authored for future vibration motors. On the hack hardware, ignore duty/intensity and render channel A as 700 Hz and channel B as 1400 Hz. Count, rhythm, duration, and channel routing remain demonstrable. Felt intensity, tactile pitch, and body localization do not.
 
 ### Design rules
 
-1. **Default patterns are L/R-agnostic; the navigation block is the one exception.** For P0–P10, 33.941 mm against a ~70 mm two-point threshold still means no side-localization claim. **The navigation block (P11–P13) is a deliberate, bounded L/R attempt** and it — and only it — requires a blindfold wear test to decide whether the per-side frequency contrast is discriminable. If that test fails, P11–P13 are cut and the rest of the build is unaffected [T3 D20, amended].
-2. **BOTH buzzers = the world. ONE buzzer = the device.** External events (danger, sirens, buses, numbers) fire both; internal state (proximity, acknowledgement, waiting, errors) fires one. On ERMs this was an amplitude ("strong vs weak") distinction; on buzzers it is a **two-source-vs-one-source presence** distinction — coarser and itself a wear-test item, but it still halves the recognition space before any counting. If both-vs-one proves unreliable, fall back to distinguishing these classes by rhythm alone.
+1. **Default patterns are L/R-agnostic; navigation uses conceptual channels.** P11–P13 may remain in the demo to show LEFT/RIGHT/AHEAD routing, but they are audio labels, not evidence that future body-worn actuators will be spatially distinguishable.
+2. **BOTH channels = the world. ONE channel = the device.** External events fire both proxy tones; internal state fires one. This demonstrates software routing only. The future motor implementation must validate whether simultaneity or amplitude provides a usable tactile distinction.
 3. **Frequency is the primary channel; loudness is not.** Usable design: a **buzz band ≈ 60–120 Hz** and an **alert band ≈ 180–250 Hz**, both felt as coarse "low" vs "high" texture, plus plain on/off gating. Do not design meaning onto fine amplitude steps — the buzzer cannot deliver them.
 4. **Proven timing primitives reused, not reinvented** (`firmware/braille_wearable/src/braille.cpp:12-16`): buzz 400 ms · beat gap 300 ms · letter gap 800 ms (reused as the inter-digit gap). The both-fire stagger is retained at 30 ms only for onset legibility, not electrical reasons (see rule 5).
-5. **No electrical stagger is needed.** The ERM rule staggered onsets to halve 2×90 mA inrush on a shared rail; buzzers have **no inrush**, so that reason is void. Keep a 30 ms both-fire stagger *only if* the wear test shows it improves onset legibility — otherwise fire both simultaneously.
+5. **No electrical stagger is needed for the audio proxy.** The buzzers have no ERM inrush, so both tones may start simultaneously. Future vibration hardware must make its own onset and power decision.
 6. **Every pattern is a step table** driven by a 10 ms tick. Arbitration is a pointer store; all timing stays off the main loop. Each step now carries a **(freq, on/off)** pair instead of a duty %.
 7. **No overdrive kick.** It existed to break ERM stiction on unknown start voltage — a problem buzzers do not have. Onsets are clean; drive straight to the target frequency.
 
-### Driving a passive buzzer for touch, not sound
+### Driving the passive buzzers as explicit audio proxies
 
-The AX22-0018 is built for **audible** output — MLT-8530, 2.7 kHz resonant, 80 dB [`passive-buzzer/CONTENT.md`]. We are using it off-label: driven near resonance it is a loud tone (useless to a DeafBlind user and antisocial in a demo room); driven at a **low fundamental it becomes a coarse tactile buzz**, at the cost of most of its output. The open question the wear test answers first:
-
-- **Is a ~60–200 Hz drive felt through the strap and sleeve at all?** A sealed magnetic buzzer moves a small diaphragm, not an eccentric mass, so the felt energy is far lower than an ERM's. If nothing is felt, the tactile concept fails and the device becomes an **audible** signaller for a hearing companion — a documented, honest fallback, not a silent one.
-- **Which two low bands read as distinct "low" vs "high" texture?** Vibrotactile pitch is coarse; pick the two most-separated bands that are both felt (start ~60–100 Hz and ~180–250 Hz) and lock them.
-- **Does two-buzzers-vs-one register as "stronger/wider"?** This is the BOTH-vs-ONE rule's new physical basis and it is weaker than the ERM amplitude cue. Verify or fall back to rhythm-only class coding.
+The AX22-0018 is built for audible output — MLT-8530, 2.7 kHz resonant, 80 dB [`passive-buzzer/CONTENT.md`]. The bench test confirmed that it could be heard but not practically felt [T5]. The demo therefore drives P1 at 700 Hz and P3 at 1400 Hz. These tones make channel selection obvious without pretending to reproduce the physics of ERM/LRA vibration.
 
 There is no buzzer datasheet risk of the ERM kind — the MLT-8530 part is named on the product page and the LCSC datasheet (C94599) is the real PDF, not an HTML scrape. The uncertainty here is **perceptual**, and only a wrist can resolve it.
 
@@ -439,21 +452,21 @@ Notation: `A` = Port 1 buzzer, `B` = Port 3 buzzer, `BOTH` = both (optional 30 m
 
 **Partially uncut:** LEFT, RIGHT and AHEAD return as the experimental Navigation block below (Revision §3). **Still cut:** STOP and MOVE OVER — no trigger produces them in this build. **Still deliberately not added:** any TURN pattern. A rotation instruction the user cannot verify they executed correctly is worse than no instruction — it produces a user who has turned an unknown amount in an unknown direction and now believes the device has seen something. On insufficient information the device fires **P8 UNKNOWN** [T3 D2].
 
-### Navigation block — EXPERIMENTAL (P11–P13), gated on the wear test
+### Navigation block — AUDIO SIMULATION (P11–P13)
 
-**These three exist only if the wear test proves the per-side frequency contrast is discriminable.** They are the buildable form of "steer toward the bus door" — attempted, not promised. The mechanism is **frequency-coded laterality**: left and right are carried by felt *pitch*, and the responsible buzzer is *also* the one physically on that side, so spatial and frequency cues reinforce rather than compete. If the test fails, delete all three; nothing else depends on them.
+These three demonstrate the software path for "steer toward the bus door." LEFT is the 700 Hz P1 proxy, RIGHT is the 1400 Hz P3 proxy, and AHEAD is both. They do not establish that a wearer can localize or distinguish future vibration motors.
 
 | # | Pattern | Buzzer | Drive | Timing spec | Repeats | Class | Trigger |
 |---|---|---|---|---|---|---|---|
-| **P11** | **LEFT** | A only | **low band ~70 Hz** | `(200 on / 200 off) ×2` | ×1, re-postable | INFORMATION | Detector says the bus door / target is to the user's left |
-| **P12** | **RIGHT** | B only | **high band ~220 Hz** | `(200 on / 200 off) ×2` | ×1, re-postable | INFORMATION | Target is to the user's right |
-| **P13** | **AHEAD** | BOTH | both bands together | `400 on / 200 off / 400 on` | ×1 | INFORMATION | Target is roughly centred — proceed forward |
+| **P11** | **LEFT** | A only | **700 Hz audio proxy** | `(200 on / 200 off) ×2` | ×1, re-postable | INFORMATION | Detector says the bus door / target is to the user's left |
+| **P12** | **RIGHT** | B only | **1400 Hz audio proxy** | `(200 on / 200 off) ×2` | ×1, re-postable | INFORMATION | Target is to the user's right |
+| **P13** | **AHEAD** | BOTH | both proxy tones together | `400 on / 200 off / 400 on` | ×1 | INFORMATION | Target is roughly centred — proceed forward |
 
 **Design honesty for P11–P13:**
 - **Redundant coding is the whole point.** Side is signalled *three* ways at once — which buzzer fires (spatial, weak at 33.9 mm), the pitch band (frequency, the load-bearing cue), and, if kept, a habitual mental "low = left / high = right" mapping the user is taught. Any one working is enough.
 - **This is not verified navigation.** As with the cut TURN pattern, the device cannot confirm the user moved correctly. P11–P13 are advisory nudges toward a *dwelling* bus (15–30 s), not turn-by-turn guidance. On low detector confidence, fire **P8 UNKNOWN**, never a guessed direction.
 - **"We have not validated this with DeafBlind users"** applies with double force here — frequency-coded laterality on a repurposed buzzer is the least-grounded idea in the build. It ships flagged as an experiment, or not at all.
-- **Triggering** needs the detector to emit a coarse left/centre/right for the bus box (its horizontal centroid vs frame thirds). That is a few lines in `bus_vision.py`; the relay carries it as a new `CloudPattern` value only if the block survives the wear test.
+- **Triggering** needs the detector to emit a coarse left/centre/right for the bus box (its horizontal centroid vs frame thirds). The relay may carry it as a `CloudPattern` for the audio simulation; future haptic use remains conditional on motor validation.
 
 ### Discriminability analysis
 
@@ -462,10 +475,10 @@ Assessed as felt through a sleeve on the volar wrist, where amplitude is attenua
 | Pair | Risk | Separation | Verdict |
 |---|---|---|---|
 | **P3 ATTENTION vs P9 ACK** | **Highest** — both single short hits | Amplitude (2 motors vs 1, ~2× energy) and duration (250 vs 150 ms, ~1.7×, near the duration JND). **Waveform separation alone is marginal** | **Accepted — resolved by causation, not waveform.** P9 fires only within 20 ms of the user pressing the button. P3 arrives unbidden. Self-disambiguating in every real case |
-| **P2 SIREN vs P5 BUS ARRIVING** | **High** — both a few medium pulses from both motors | Pulse count 2 vs 3; beat 400 vs 250 ms; envelope flat vs ascending | **Test this pair first in the wear test.** If confused: extend P5 to 4 pulses, or prepend a 700 ms sustained head. Both are one-line step-table changes |
+| **P2 SIREN vs P5 BUS ARRIVING** | **High** — both a few pulses on both channels | Pulse count 2 vs 3; beat 400 vs 250 ms; envelope flat vs ascending | Check semantic clarity in the audio demo; repeat the test from scratch on future vibration hardware |
 | **P1 DANGER vs P4 PROXIMITY at close range** | **High in principle** — as an object nears, P4 becomes a fast insistent buzz | Amplitude (both @100 % vs one @100 %); P1 has a 500 ms sustained tail and repeats, P4 never does | **Safe by arbitration, not by waveform.** P1 preempts P4 (SAFETY > HAZARD), so they never overlap, and the mandatory 150 ms clearing gap marks the transition |
 | **P1 DANGER vs P10 ERROR** | Medium | Motors (2 vs 1), intensity (100 vs 65 %), rhythm (fast even ×5 vs asymmetric long-short-long), persistence (every 3 s vs every 60 s) | **Safe — four independent margins.** An earlier fast-triplet ERROR was too close to DANGER and was replaced with the asymmetric figure |
-| **P6 preamble (500 @ alert band) vs P6 LONG (500 @ buzz band)** | Medium — identical duration | **Pitch band** (alert ~200 Hz vs buzz ~100 Hz — a coarse but felt texture difference) and following gap (600 vs 250 ms, 2.4×). Relies on the buzz-vs-alert band contrast being felt — a wear-test item | **Safe if the two bands are discriminable; else lengthen the preamble gap** |
+| **P6 preamble vs P6 LONG** | Medium — identical duration | Following gap and sequence context; do not infer a tactile pitch distinction from the audio proxy | Retune and re-test on future vibration hardware |
 | **P6 LONG (500) vs P6 SHORT (150)** | Low | 3.3× duration ratio, far above the ~20–25 % duration JND. Identical intensity and motor set, so duration is the only varying dimension | **Safe. The cleanest contrast in the vocabulary** — correctly so, because it carries the payload |
 | **P7 WAIT vs P4 PROXIMITY** | Low | Both single-motor and repeating, but P4's gap **changes as the user moves their arm** and P7's never does; P7 has 500 ms silent windows, P4 is continuous | **Safe — and the discriminator is embodied.** The user's own motion disambiguates within one arm movement |
 | **P8 UNKNOWN vs P0 READY** | Low | Opposite envelopes (900 ms fade-out vs 400 ms ramp-up), 2.25× duration, and P0 fires only at boot | **Safe** |

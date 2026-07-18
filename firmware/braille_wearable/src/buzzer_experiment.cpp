@@ -128,9 +128,9 @@ bool playPattern(BuzzerPatternId id) {
 
 void printHelp() {
     Serial.println();
-    Serial.println(F("=== AX22-0018 buzzer discrimination experiment ==="));
+    Serial.println(F("=== AX22-0018 audio proxy for future vibration motors ==="));
     Serial.println(F("P2 LED button: press to arm; press again to stop immediately"));
-    Serial.println(F("v  labelled viability sweep: 70/100/150/220 Hz per side"));
+    Serial.println(F("v  audible proxy check: LEFT 700 Hz, then RIGHT 1400 Hz"));
     Serial.println(F("n  start 12 blind navigation trials (guess with l or r)"));
     Serial.println(F("s  start 12 blind situational trials (guess with e or w)"));
     Serial.println(F("p  replay the current blind trial without revealing it"));
@@ -140,29 +140,27 @@ void printHelp() {
     Serial.println();
 }
 
-void playViabilitySweep() {
+void playAudioProxyCheck() {
     if (!requireArmed()) {
         return;
     }
     session = TrialSession{};
-    Serial.println(F("\nVIABILITY SWEEP: keep the modules on the wrist, never near an ear."));
+    Serial.println(F("\nAUDIO PROXY CHECK: this does not test tactile output."));
     for (uint8_t side = 0; side < 2; ++side) {
         const char* sideName = side == 0 ? "LEFT / Port 1" : "RIGHT / Port 3";
         const uint8_t pin = side == 0 ? BUZZER_LEFT_PIN : BUZZER_RIGHT_PIN;
-        for (uint8_t i = 0; i < VIABILITY_FREQUENCY_COUNT; ++i) {
-            const uint16_t hz = VIABILITY_FREQUENCIES_HZ[i];
-            Serial.printf("%s: %u Hz\n", sideName, hz);
-            setTone(pin, hz);
-            if (!waitInterruptibly(800)) {
-                return;
-            }
-            allOff();
-            if (!waitInterruptibly(500)) {
-                return;
-            }
+        const uint16_t hz = side == 0 ? AUDIO_PROXY_LEFT_HZ : AUDIO_PROXY_RIGHT_HZ;
+        Serial.printf("%s audio proxy: %u Hz\n", sideName, hz);
+        setTone(pin, hz);
+        if (!waitInterruptibly(800)) {
+            return;
+        }
+        allOff();
+        if (!waitInterruptibly(500)) {
+            return;
         }
     }
-    Serial.println(F("Sweep complete. Record which frequencies were clearly felt on each side."));
+    Serial.println(F("Proxy check complete. This confirms routing and sound only."));
     disarmOutput("OUTPUT DISARMED: LED off.");
 }
 
@@ -285,7 +283,7 @@ void handleCommand(char command) {
         command = static_cast<char>(command - 'A' + 'a');
     }
     switch (command) {
-        case 'v': playViabilitySweep(); break;
+        case 'v': playAudioProxyCheck(); break;
         case 'n': startSession(SessionMode::NAVIGATION); break;
         case 's': startSession(SessionMode::SITUATIONAL); break;
         case 'l':

@@ -29,30 +29,30 @@ struct BuzzerPattern {
     uint8_t stepCount;
 };
 
-inline constexpr uint16_t VIABILITY_FREQUENCIES_HZ[] = {70, 100, 150, 220};
-inline constexpr uint8_t VIABILITY_FREQUENCY_COUNT = 4;
+inline constexpr uint16_t AUDIO_PROXY_LEFT_HZ = 700;
+inline constexpr uint16_t AUDIO_PROXY_RIGHT_HZ = 1400;
 
 inline constexpr BuzzerStep NAV_LEFT_STEPS[] = {
-    {70, 0, 200}, {0, 0, 200},
-    {70, 0, 200}, {0, 0, 200},
+    {AUDIO_PROXY_LEFT_HZ, 0, 200}, {0, 0, 200},
+    {AUDIO_PROXY_LEFT_HZ, 0, 200}, {0, 0, 200},
 };
 
 inline constexpr BuzzerStep NAV_RIGHT_STEPS[] = {
-    {0, 220, 200}, {0, 0, 200},
-    {0, 220, 200}, {0, 0, 200},
+    {0, AUDIO_PROXY_RIGHT_HZ, 200}, {0, 0, 200},
+    {0, AUDIO_PROXY_RIGHT_HZ, 200}, {0, 0, 200},
 };
 
 inline constexpr BuzzerStep EVENT_STEPS[] = {
-    {100, 100, 250}, {0, 0, 250},
-    {100, 100, 250}, {0, 0, 250},
-    {100, 100, 250}, {0, 0, 250},
+    {AUDIO_PROXY_LEFT_HZ, AUDIO_PROXY_RIGHT_HZ, 250}, {0, 0, 250},
+    {AUDIO_PROXY_LEFT_HZ, AUDIO_PROXY_RIGHT_HZ, 250}, {0, 0, 250},
+    {AUDIO_PROXY_LEFT_HZ, AUDIO_PROXY_RIGHT_HZ, 250}, {0, 0, 250},
 };
 
 inline constexpr BuzzerStep WAIT_STEPS[] = {
-    {100, 0, 300}, {0, 0, 200},
-    {0, 100, 300}, {0, 0, 200},
-    {100, 0, 300}, {0, 0, 200},
-    {0, 100, 300}, {0, 0, 200},
+    {AUDIO_PROXY_LEFT_HZ, 0, 300}, {0, 0, 200},
+    {0, AUDIO_PROXY_RIGHT_HZ, 300}, {0, 0, 200},
+    {AUDIO_PROXY_LEFT_HZ, 0, 300}, {0, 0, 200},
+    {0, AUDIO_PROXY_RIGHT_HZ, 300}, {0, 0, 200},
 };
 
 inline constexpr BuzzerPattern NAV_LEFT_PATTERN = {

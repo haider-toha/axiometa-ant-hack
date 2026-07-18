@@ -1,8 +1,8 @@
-# Buzzer Discrimination Experiment Implementation Plan
+# Buzzer Audio-Proxy Implementation Plan
 
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
-**Goal:** Add an isolated, uploadable Genesis Mini firmware target for scored navigation and stationary situational buzzer discrimination tests.
+**Goal:** Preserve an isolated, uploadable two-channel audio simulation after the AX22-0018 tactile viability test failed.
 
 **Architecture:** Keep pattern data and verified port mappings in an Arduino-free header so native tests can verify semantics. A dedicated Arduino source owns LEDC tone output, the P2 LED-button arm/stop control, balanced trial shuffling, Serial controls, scoring, and user feedback. A separate PlatformIO environment builds only that source, leaving the legacy application unchanged.
 
@@ -11,7 +11,8 @@
 ## Global Constraints
 
 - Buzzer A is Port 1 IO1 / GPIO3; buzzer B is Port 3 IO1 / GPIO16.
-- Navigation is frequency-coded and experimental; never claim spatial localization.
+- P1 / LEFT is a 700 Hz audio proxy and P3 / RIGHT is a 1400 Hz audio proxy.
+- Never claim tactile efficacy, accessibility validation, or spatial localization from the scored sessions.
 - Do not initialize or depend on Wi-Fi, display, encoder, microphone, ToF, or secrets.
 - The scored tests are balanced 12-trial binary sessions with a pass threshold of 10/12.
 
@@ -25,7 +26,7 @@
 - Modify: `firmware/braille_wearable/platformio.ini`
 
 **Interfaces:**
-- Produces: `BuzzerPatternId`, `BuzzerStep`, `BuzzerPattern`, `patternFor(BuzzerPatternId)`, `VIABILITY_FREQUENCIES_HZ`.
+- Produces: `BuzzerPatternId`, `BuzzerStep`, `BuzzerPattern`, `patternFor(BuzzerPatternId)`, and fixed per-channel audio proxy frequencies.
 
 - [ ] Write Unity tests for LEFT, RIGHT, EVENT, WAIT, and the viability frequencies.
 - [ ] Add a native test environment filter and run it to confirm failure because the contract header is absent.

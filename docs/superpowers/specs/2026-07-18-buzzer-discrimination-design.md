@@ -2,7 +2,7 @@
 
 ## Goal
 
-Determine whether two AX22-0018 passive buzzers can provide usable tactile signals for both experimental left/right navigation and stationary situational-awareness patterns before integrating the rest of the product.
+The original goal was to test tactile viability. That test failed: the buzzers were audible but produced virtually no felt movement. The retained runner now uses them as explicit audio proxies for two future vibration channels and validates only routing, timing, and pattern semantics.
 
 ## Scope
 
@@ -25,16 +25,16 @@ An AX22-0050 tactile LED button temporarily occupies Port 2 for this experiment.
 
 ## Experiment Protocol
 
-### Viability Sweep
+### Audio Proxy Check
 
-Play 70, 100, 150, and 220 Hz on each buzzer with labels visible in Serial. This establishes which frequencies are felt through the intended strap and sleeve. It is calibration, not a scored test.
+Play P1 / LEFT at 700 Hz and P3 / RIGHT at 1400 Hz with labels visible in Serial. This confirms that both proxy channels are audible and correctly routed.
 
 ### Navigation Test
 
 Run 12 randomized, balanced blind trials:
 
-- LEFT: Port 1 at 70 Hz, `200 ms on / 200 ms off` twice.
-- RIGHT: Port 3 at 220 Hz, `200 ms on / 200 ms off` twice.
+- LEFT: Port 1 at 700 Hz, `200 ms on / 200 ms off` twice.
+- RIGHT: Port 3 at 1400 Hz, `200 ms on / 200 ms off` twice.
 
 The operator enters the wearer's guess over Serial. The firmware reveals the answer, tracks the score, and advances. Passing is at least 10 correct out of 12. This threshold has less than a 2% probability of occurring by chance in a balanced binary test.
 
@@ -42,8 +42,8 @@ The operator enters the wearer's guess over Serial. The firmware reveals the ans
 
 Run 12 randomized, balanced blind trials using patterns from the current vocabulary:
 
-- EVENT: both buzzers at 100 Hz, `250 ms on / 250 ms off` three times, representing BUS ARRIVING.
-- WAIT: Port 1 then Port 3 at 100 Hz, `300 ms on / 200 ms off`, repeated twice.
+- EVENT: both proxy tones together, `250 ms on / 250 ms off` three times, representing BUS ARRIVING.
+- WAIT: 700 Hz Port 1 then 1400 Hz Port 3, `300 ms on / 200 ms off`, repeated twice.
 
 The operator enters EVENT or WAIT over Serial. Passing is at least 10 correct out of 12.
 
@@ -51,7 +51,7 @@ The operator enters EVENT or WAIT over Serial. Passing is at least 10 correct ou
 
 - P2 button: press once to arm output; press again to stop and discard the active run.
 - P2 LED: on while output is armed; off while safe/disarmed and after completion.
-- `v`: run the labelled viability sweep.
+- `v`: run the labelled audio proxy check.
 - `n`: start a navigation session.
 - `s`: start a stationary situational session.
 - `l` / `r`: submit a navigation guess.
@@ -65,11 +65,10 @@ The button is serviced during pulse timing so a stop silences both buzzers witho
 
 ## Safety And Interpretation
 
-- Keep the modules on the wrist or bench, never near an ear; they are audible buzzers being used off-label.
-- Start at the low frequencies in this design and do not use the 2.7 kHz resonant frequency for the tactile test.
-- A navigation pass supports a learned frequency-coded distinction, not a claim of spatial localization.
-- If the viability sweep is not felt, stop the scored tests and record tactile output as failed.
-- If navigation fails but situational patterns pass, cut P11-P13 while retaining rhythm-based situational output.
+- Keep the audible modules away from ears.
+- A score supports only the clarity of the audio simulation and software routing.
+- Do not claim tactile output, spatial localization, DeafBlind accessibility, or motor-vocabulary validation from this runner.
+- Future ERM/LRA hardware must be retuned and tested independently with representative users.
 
 ## Verification
 

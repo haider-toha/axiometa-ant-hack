@@ -12,12 +12,9 @@ static uint32_t totalDuration(const BuzzerPattern& pattern) {
     return total;
 }
 
-void test_viability_sweep_uses_four_separated_low_frequencies(void) {
-    TEST_ASSERT_EQUAL_UINT8(4, VIABILITY_FREQUENCY_COUNT);
-    TEST_ASSERT_EQUAL_UINT16(70, VIABILITY_FREQUENCIES_HZ[0]);
-    TEST_ASSERT_EQUAL_UINT16(100, VIABILITY_FREQUENCIES_HZ[1]);
-    TEST_ASSERT_EQUAL_UINT16(150, VIABILITY_FREQUENCIES_HZ[2]);
-    TEST_ASSERT_EQUAL_UINT16(220, VIABILITY_FREQUENCIES_HZ[3]);
+void test_audio_proxy_assigns_one_distinct_frequency_to_each_buzzer(void) {
+    TEST_ASSERT_EQUAL_UINT16(700, AUDIO_PROXY_LEFT_HZ);
+    TEST_ASSERT_EQUAL_UINT16(1400, AUDIO_PROXY_RIGHT_HZ);
 }
 
 void test_buzzer_and_led_button_ports_match_the_verified_schematics(void) {
@@ -34,9 +31,9 @@ void test_navigation_left_is_two_low_pulses_on_port_1_only(void) {
     TEST_ASSERT_EQUAL_STRING("LEFT", pattern.name);
     TEST_ASSERT_EQUAL_UINT8(4, pattern.stepCount);
     TEST_ASSERT_EQUAL_UINT32(800, totalDuration(pattern));
-    TEST_ASSERT_EQUAL_UINT16(70, pattern.steps[0].leftHz);
+    TEST_ASSERT_EQUAL_UINT16(AUDIO_PROXY_LEFT_HZ, pattern.steps[0].leftHz);
     TEST_ASSERT_EQUAL_UINT16(0, pattern.steps[0].rightHz);
-    TEST_ASSERT_EQUAL_UINT16(70, pattern.steps[2].leftHz);
+    TEST_ASSERT_EQUAL_UINT16(AUDIO_PROXY_LEFT_HZ, pattern.steps[2].leftHz);
     TEST_ASSERT_EQUAL_UINT16(0, pattern.steps[2].rightHz);
 }
 
@@ -46,9 +43,9 @@ void test_navigation_right_is_two_high_pulses_on_port_3_only(void) {
     TEST_ASSERT_EQUAL_UINT8(4, pattern.stepCount);
     TEST_ASSERT_EQUAL_UINT32(800, totalDuration(pattern));
     TEST_ASSERT_EQUAL_UINT16(0, pattern.steps[0].leftHz);
-    TEST_ASSERT_EQUAL_UINT16(220, pattern.steps[0].rightHz);
+    TEST_ASSERT_EQUAL_UINT16(AUDIO_PROXY_RIGHT_HZ, pattern.steps[0].rightHz);
     TEST_ASSERT_EQUAL_UINT16(0, pattern.steps[2].leftHz);
-    TEST_ASSERT_EQUAL_UINT16(220, pattern.steps[2].rightHz);
+    TEST_ASSERT_EQUAL_UINT16(AUDIO_PROXY_RIGHT_HZ, pattern.steps[2].rightHz);
 }
 
 void test_stationary_event_is_three_pulses_on_both_buzzers(void) {
@@ -57,8 +54,8 @@ void test_stationary_event_is_three_pulses_on_both_buzzers(void) {
     TEST_ASSERT_EQUAL_UINT8(6, pattern.stepCount);
     TEST_ASSERT_EQUAL_UINT32(1500, totalDuration(pattern));
     for (uint8_t i = 0; i < pattern.stepCount; i += 2) {
-        TEST_ASSERT_EQUAL_UINT16(100, pattern.steps[i].leftHz);
-        TEST_ASSERT_EQUAL_UINT16(100, pattern.steps[i].rightHz);
+        TEST_ASSERT_EQUAL_UINT16(AUDIO_PROXY_LEFT_HZ, pattern.steps[i].leftHz);
+        TEST_ASSERT_EQUAL_UINT16(AUDIO_PROXY_RIGHT_HZ, pattern.steps[i].rightHz);
     }
 }
 
@@ -67,19 +64,19 @@ void test_stationary_wait_alternates_left_then_right_twice(void) {
     TEST_ASSERT_EQUAL_STRING("WAIT", pattern.name);
     TEST_ASSERT_EQUAL_UINT8(8, pattern.stepCount);
     TEST_ASSERT_EQUAL_UINT32(2000, totalDuration(pattern));
-    TEST_ASSERT_EQUAL_UINT16(100, pattern.steps[0].leftHz);
+    TEST_ASSERT_EQUAL_UINT16(AUDIO_PROXY_LEFT_HZ, pattern.steps[0].leftHz);
     TEST_ASSERT_EQUAL_UINT16(0, pattern.steps[0].rightHz);
     TEST_ASSERT_EQUAL_UINT16(0, pattern.steps[2].leftHz);
-    TEST_ASSERT_EQUAL_UINT16(100, pattern.steps[2].rightHz);
-    TEST_ASSERT_EQUAL_UINT16(100, pattern.steps[4].leftHz);
+    TEST_ASSERT_EQUAL_UINT16(AUDIO_PROXY_RIGHT_HZ, pattern.steps[2].rightHz);
+    TEST_ASSERT_EQUAL_UINT16(AUDIO_PROXY_LEFT_HZ, pattern.steps[4].leftHz);
     TEST_ASSERT_EQUAL_UINT16(0, pattern.steps[4].rightHz);
     TEST_ASSERT_EQUAL_UINT16(0, pattern.steps[6].leftHz);
-    TEST_ASSERT_EQUAL_UINT16(100, pattern.steps[6].rightHz);
+    TEST_ASSERT_EQUAL_UINT16(AUDIO_PROXY_RIGHT_HZ, pattern.steps[6].rightHz);
 }
 
 int main(int, char**) {
     UNITY_BEGIN();
-    RUN_TEST(test_viability_sweep_uses_four_separated_low_frequencies);
+    RUN_TEST(test_audio_proxy_assigns_one_distinct_frequency_to_each_buzzer);
     RUN_TEST(test_buzzer_and_led_button_ports_match_the_verified_schematics);
     RUN_TEST(test_navigation_left_is_two_low_pulses_on_port_1_only);
     RUN_TEST(test_navigation_right_is_two_high_pulses_on_port_3_only);

@@ -259,6 +259,28 @@ describe("compareRelayState", () => {
     ).toMatchObject({ kind: "missed" });
   });
 
+  it("treats an unconfirmed first relay command as pending, then missed", () => {
+    const board = initialBoardRelayState();
+    expect(
+      compareRelayState({
+        usbConnected: true,
+        relayOnline: true,
+        relay: relayState({ ts: 9_000 }),
+        board,
+        now: 10_000,
+      }),
+    ).toMatchObject({ kind: "pending" });
+    expect(
+      compareRelayState({
+        usbConnected: true,
+        relayOnline: true,
+        relay: relayState({ ts: 7_000 }),
+        board,
+        now: 10_000,
+      }),
+    ).toMatchObject({ kind: "missed" });
+  });
+
   it("marks an observed sequence gap missed", () => {
     const decoder = new RelaySerialDecoder();
     const board = reduceBoardRelayState(

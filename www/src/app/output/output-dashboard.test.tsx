@@ -6,6 +6,11 @@ import {
   type OutputDashboardProps,
 } from "@/app/output/output-dashboard";
 import type { OutputTransition } from "@/app/output/output-timeline";
+import {
+  RelaySerialDecoder,
+  initialBoardRelayState,
+  reduceBoardRelayState,
+} from "@/app/output/relay-serial";
 
 const IDLE = { v: 1 as const, leftHz: 0, rightHz: 0, upMs: 1000 };
 const CLOCK = 10_000;
@@ -28,6 +33,7 @@ function renderDashboard(overrides: Partial<OutputDashboardProps> = {}) {
     timelineNowUpMs: null,
     traceEndUpMs: null,
     recentPulseEndedAt: { left: null, right: null },
+    boardRelay: initialBoardRelayState(),
     error: null,
     onConnect: vi.fn(),
     onDisconnect: vi.fn(),
@@ -166,5 +172,89 @@ describe("OutputDashboard", () => {
     expect(timeline).toHaveAccessibleDescription(
       "Left: 1 pulse, 120 milliseconds. Right: no pulses.",
     );
+  });
+
+  it("switches between accessible output and relay trace tabs", async () => {
+    vi.stubGlobal(
+      "fetch",
+      vi.fn().mockResolvedValue(
+        new Response(
+          JSON.stringify({
+            seq: 24,
+            device: {
+              pattern: "NUMBER",
+              route: "88",
+              dest: "Clapham Common",
+              conf: "high",
+              arrivalId: 7,
+              ts: 9_000,
+              activity: "STILL",
+              activitySeq: 5,
+              activityTs: 8_500,
+            },
+            detector: {
+              event: "",
+              present: false,
+              confidence: 0,
+              arrivalId: 0,
+              route: "",
+              destination: "",
+              readingConf: "",
+              votes: [],
+              labels: [],
+              hazards: [],
+              targetBearing: "",
+            },
+            telemetry: {
+              bandRms: 0,
+              peakHz: 0,
+              modIdx: 0,
+              trend: "flat",
+              playing: "NONE",
+              tofMm: 0,
+              upMs: 0,
+              rssi: -55,
+            },
+          }),
+          { status: 200 },
+        ),
+      ),
+    );
+    const decoder = new RelaySerialDecoder();
+    const boardRelay = reduceBoardRelayState(
+      initialBoardRelayState(),
+      decoder.push(
+        "RELAY command=accepted pattern=NUMBER seq=24 activity=STILL route=88\n",
+        9_500,
+      ),
+    );
+    renderDashboard({ connection: "connected", boardRelay });
+
+    const channelsTab = screen.getByRole("tab", { name: "Output channels" });
+    const relayTab = screen.getByRole("tab", { name: "Relay trace" });
+    expect(channelsTab).toHaveAttribute("aria-selected", "true");
+
+    fireEvent.click(relayTab);
+    expect(relayTab).toHaveAttribute("aria-selected", "true");
+    expect(await screen.findByRole("heading", { name: "Board received" })).toBeInTheDocument();
+
+    fireEvent.click(channelsTab);
+    expect(screen.getByRole("region", { name: "Five-second output timeline" })).toBeInTheDocument();
+    vi.unstubAllGlobals();
+  });
+
+  it("supports arrow-key navigation between tabs", () => {
+    renderDashboard();
+    const channelsTab = screen.getByRole("tab", { name: "Output channels" });
+    const relayTab = screen.getByRole("tab", { name: "Relay trace" });
+    channelsTab.focus();
+
+    fireEvent.keyDown(channelsTab, { key: "ArrowRight" });
+    expect(relayTab).toHaveFocus();
+    expect(relayTab).toHaveAttribute("aria-selected", "true");
+
+    fireEvent.keyDown(relayTab, { key: "ArrowLeft" });
+    expect(channelsTab).toHaveFocus();
+    expect(channelsTab).toHaveAttribute("aria-selected", "true");
   });
 });

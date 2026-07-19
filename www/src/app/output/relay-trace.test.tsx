@@ -91,7 +91,8 @@ describe("RelayTrace", () => {
     vi.mocked(fetch).mockResolvedValue(response());
     render(<RelayTrace connection="connected" board={boardState()} clock={CLOCK} />);
 
-    expect(await screen.findByRole("status")).toHaveTextContent("ACCEPTED");
+    await screen.findByText("ACCEPTED");
+    expect(screen.getByRole("status")).toHaveTextContent("ACCEPTED");
     expect(screen.getByRole("heading", { name: "Relay outgoing" })).toBeInTheDocument();
     expect(screen.getByRole("heading", { name: "Board received" })).toBeInTheDocument();
     expect(screen.getAllByText("Relay only").length).toBeGreaterThan(0);
@@ -142,7 +143,8 @@ describe("RelayTrace", () => {
     vi.mocked(fetch).mockResolvedValue(new Response("nope", { status: 503 }));
     render(<RelayTrace connection="connected" board={boardState()} clock={CLOCK} />);
 
-    expect(await screen.findByRole("status")).toHaveTextContent("RELAY OFFLINE");
+    await screen.findByText("RELAY OFFLINE");
+    expect(screen.getByRole("status")).toHaveTextContent("RELAY OFFLINE");
     expect(screen.getByText("HTTP 503")).toBeInTheDocument();
   });
 });

@@ -23,6 +23,12 @@ import {
   pruneOutputTransitions,
   type OutputTransition,
 } from "./output-timeline";
+import {
+  RelaySerialDecoder,
+  initialBoardRelayState,
+  reduceBoardRelayState,
+  type BoardRelayState,
+} from "./relay-serial";
 
 const TELEMETRY_STALE_MS = 1_500;
 const subscribeToBrowserCapability = () => () => undefined;
@@ -38,7 +44,11 @@ export function OutputMonitor() {
   }>({ left: null, right: null });
   const [error, setError] = useState<string | null>(null);
   const [clock, setClock] = useState(() => Date.now());
+  const [boardRelay, setBoardRelay] = useState<BoardRelayState>(() =>
+    initialBoardRelayState(),
+  );
   const decoderRef = useRef(new OutputTelemetryDecoder());
+  const relayDecoderRef = useRef(new RelaySerialDecoder());
   const sessionRef = useRef<OutputSerialSession | null>(null);
   const generationRef = useRef(0);
   const connectingGenerationRef = useRef<number | null>(null);
@@ -52,14 +62,20 @@ export function OutputMonitor() {
 
   const resetTrace = useCallback(() => {
     decoderRef.current.reset();
+    relayDecoderRef.current.reset();
     previousRecordRef.current = null;
     setTelemetry(null);
     setLastRecordAt(null);
     setHistory([]);
     setRecentPulseEndedAt({ left: null, right: null });
+    setBoardRelay(initialBoardRelayState());
   }, []);
 
   const consumeText = useCallback((chunk: string) => {
+    const relayEvents = relayDecoderRef.current.push(chunk, Date.now());
+    if (relayEvents.length > 0) {
+      setBoardRelay((current) => reduceBoardRelayState(current, relayEvents));
+    }
     for (const record of decoderRef.current.push(chunk)) {
       const receivedAt = Date.now();
       const previousRecord = previousRecordRef.current;
@@ -236,6 +252,7 @@ export function OutputMonitor() {
       timelineNowUpMs={timelineNowUpMs}
       traceEndUpMs={traceEndUpMs}
       recentPulseEndedAt={recentPulseEndedAt}
+      boardRelay={boardRelay}
       error={error}
       onConnect={() => void connect()}
       onDisconnect={disconnect}

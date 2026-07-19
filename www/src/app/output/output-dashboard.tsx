@@ -1,4 +1,7 @@
+"use client";
+
 import { Cable, Unplug } from "lucide-react";
+import { useState } from "react";
 
 import { Button } from "@/components/ui/button";
 import type { OutputTelemetry } from "@/lib/output-telemetry";
@@ -10,6 +13,8 @@ import {
   type OutputTimelineSegment,
   type OutputTransition,
 } from "./output-timeline";
+import type { BoardRelayState } from "./relay-serial";
+import { RelayTrace } from "./relay-trace";
 
 export const OUTPUT_AFTERGLOW_MS = 750;
 
@@ -30,6 +35,7 @@ export type OutputDashboardProps = {
   timelineNowUpMs: number | null;
   traceEndUpMs: number | null;
   recentPulseEndedAt: { left: number | null; right: number | null };
+  boardRelay: BoardRelayState;
   error: string | null;
   onConnect: () => void;
   onDisconnect: () => void;
@@ -53,12 +59,32 @@ export function OutputDashboard({
   timelineNowUpMs,
   traceEndUpMs,
   recentPulseEndedAt,
+  boardRelay,
   error,
   onConnect,
   onDisconnect,
 }: OutputDashboardProps) {
+  const [view, setView] = useState<"channels" | "relay">("channels");
   const connected = connection === "connected";
   const canDisconnect = connected || connection === "connecting";
+  const moveTabFocus = (next: "channels" | "relay") => {
+    setView(next);
+    document
+      .getElementById(next === "channels" ? "output-channels-tab" : "relay-trace-tab")
+      ?.focus();
+  };
+  const handleTabKey = (event: React.KeyboardEvent<HTMLButtonElement>) => {
+    if (event.key === "ArrowLeft" || event.key === "ArrowRight") {
+      event.preventDefault();
+      moveTabFocus(view === "channels" ? "relay" : "channels");
+    } else if (event.key === "Home") {
+      event.preventDefault();
+      moveTabFocus("channels");
+    } else if (event.key === "End") {
+      event.preventDefault();
+      moveTabFocus("relay");
+    }
+  };
 
   return (
     <main className={styles.dashboard}>
@@ -103,36 +129,81 @@ export function OutputDashboard({
         </p>
       )}
 
-      <section className={styles.channels} aria-label="Physical output channels">
-        <OutputChannel
-          side="left"
-          port="P1"
-          frequency={telemetry?.leftHz ?? null}
-          connected={connected}
-          fresh={fresh}
-          clock={clock}
-          recentPulseEndedAt={recentPulseEndedAt.left}
-        />
-        <OutputChannel
-          side="right"
-          port="P3"
-          frequency={telemetry?.rightHz ?? null}
-          connected={connected}
-          fresh={fresh}
-          clock={clock}
-          recentPulseEndedAt={recentPulseEndedAt.right}
-        />
-      </section>
+      <div className={styles.viewTabs} role="tablist" aria-label="Output monitor views">
+        <button
+          id="output-channels-tab"
+          type="button"
+          role="tab"
+          aria-selected={view === "channels"}
+          aria-controls="output-channels-panel"
+          tabIndex={view === "channels" ? 0 : -1}
+          onClick={() => setView("channels")}
+          onKeyDown={handleTabKey}
+        >
+          Output channels
+        </button>
+        <button
+          id="relay-trace-tab"
+          type="button"
+          role="tab"
+          aria-selected={view === "relay"}
+          aria-controls="relay-trace-panel"
+          tabIndex={view === "relay" ? 0 : -1}
+          onClick={() => setView("relay")}
+          onKeyDown={handleTabKey}
+        >
+          Relay trace
+        </button>
+      </div>
 
-      <p className="sr-only" aria-live="polite">
-        {outputAnnouncement(connection, telemetry, fresh)}
-      </p>
+      {view === "channels" ? (
+        <div
+          className={styles.viewPanel}
+          id="output-channels-panel"
+          role="tabpanel"
+          aria-labelledby="output-channels-tab"
+        >
+          <section className={styles.channels} aria-label="Physical output channels">
+            <OutputChannel
+              side="left"
+              port="P1"
+              frequency={telemetry?.leftHz ?? null}
+              connected={connected}
+              fresh={fresh}
+              clock={clock}
+              recentPulseEndedAt={recentPulseEndedAt.left}
+            />
+            <OutputChannel
+              side="right"
+              port="P3"
+              frequency={telemetry?.rightHz ?? null}
+              connected={connected}
+              fresh={fresh}
+              clock={clock}
+              recentPulseEndedAt={recentPulseEndedAt.right}
+            />
+          </section>
 
-      <PulseTimeline
-        history={history}
-        timelineNowUpMs={timelineNowUpMs}
-        traceEndUpMs={traceEndUpMs}
-      />
+          <p className="sr-only" aria-live="polite">
+            {outputAnnouncement(connection, telemetry, fresh)}
+          </p>
+
+          <PulseTimeline
+            history={history}
+            timelineNowUpMs={timelineNowUpMs}
+            traceEndUpMs={traceEndUpMs}
+          />
+        </div>
+      ) : (
+        <div
+          className={styles.viewPanel}
+          id="relay-trace-panel"
+          role="tabpanel"
+          aria-labelledby="relay-trace-tab"
+        >
+          <RelayTrace connection={connection} board={boardRelay} clock={clock} />
+        </div>
+      )}
     </main>
   );
 }

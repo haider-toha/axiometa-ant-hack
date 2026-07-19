@@ -269,7 +269,13 @@ export function compareRelayState({
   const activity = compareActivity(relay, board);
   if (!usbConnected) return verdict("no_usb", "NO USB", "neutral", "Connect the ESP32 to confirm receipt.", activity);
   if (!relayOnline) return verdict("relay_offline", "RELAY OFFLINE", "destructive", "/api/state is not responding.", activity);
-  if (!relay || !board.command) return verdict("waiting", "WAITING", "neutral", "Waiting for relay intent and a board receipt.", activity);
+  if (!relay) return verdict("waiting", "WAITING", "neutral", "Waiting for relay intent and a board receipt.", activity);
+  if (!board.command) {
+    const age = Math.max(0, now - relay.device.ts);
+    return age <= 2_000
+      ? verdict("pending", "PENDING", "warning", `Relay sequence ${relay.seq} has not reached the board yet.`, activity)
+      : verdict("missed", "MISSED", "destructive", `Relay sequence ${relay.seq} is more than two seconds old.`, activity);
+  }
   if (board.sequenceGap !== null) {
     return verdict("missed", "MISSED", "destructive", `Board reported ${board.sequenceGap} missed sequence${board.sequenceGap === 1 ? "" : "s"}.`, activity);
   }

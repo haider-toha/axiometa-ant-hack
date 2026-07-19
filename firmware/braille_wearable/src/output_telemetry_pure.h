@@ -158,6 +158,15 @@ inline bool sameOutputSnapshot(const OutputSemanticSnapshot& left,
            left.outputMode == right.outputMode;
 }
 
+inline bool sameOutputTelemetry(HapticDrive leftDrive,
+                                const OutputSemanticSnapshot& leftSnapshot,
+                                HapticDrive rightDrive,
+                                const OutputSemanticSnapshot& rightSnapshot) {
+    return leftDrive.p1Hz == rightDrive.p1Hz &&
+           leftDrive.p3Hz == rightDrive.p3Hz &&
+           sameOutputSnapshot(leftSnapshot, rightSnapshot);
+}
+
 inline bool outputTelemetryDue(bool changed, uint32_t nowMs,
                                uint32_t lastTelemetryMs) {
     return changed ||

@@ -7,6 +7,7 @@
 #include "haptic_pure.h"
 #include "navigation_pure.h"
 #include "net.h"
+#include "output_telemetry_pure.h"
 #include "patterns.h"
 #include "siren_runtime_pure.h"
 #include "tof.h"
@@ -20,6 +21,7 @@ ActivityControlState activityControl;
 RelaySequenceState relaySequence;
 UserActivity currentActivity = UserActivity::MOVING;
 PatternPlayer cloudPlayer;
+OutputTelemetrySource cloudPlayerSource = OutputTelemetrySource::NONE;
 PatternPlayer sirenPlayer;
 OutputEnableLatch outputLatch;
 SirenDecision activeSirenOutput = SirenDecision::NONE;
@@ -38,6 +40,18 @@ bool readyPending = true;
 uint32_t readyEligibleAtMs = 0;
 RelayTelemetry relayTelemetry;
 uint32_t lastTelemetryPublishMs = 0;
+bool hasOutputTelemetry = false;
+HapticDrive lastOutputTelemetryDrive{0, 0};
+OutputSemanticSnapshot lastOutputTelemetrySnapshot{
+    OutputTelemetryState::IDLE,
+    OutputTelemetrySource::NONE,
+    "NONE",
+    UserActivity::MOVING,
+    OutputTelemetryReason::NO_OUTPUT,
+    -1,
+    DEFAULT_OUTPUT_MODE,
+};
+uint32_t lastOutputTelemetryMs = 0;
 
 void startSirenOutput(SirenDecision decision, uint32_t nowMs);
 
@@ -111,7 +125,8 @@ void clearServiceActivityMode() {
     Serial.println(F("ACTIVITY service_override=cleared source=relay"));
 }
 
-void submitCloudCommand(CloudCommand command, const char* name) {
+void submitCloudCommand(CloudCommand command, const char* name,
+                        OutputTelemetrySource source) {
     switch (evaluateCommandGate(outputLatch.enabled, currentActivity, command,
                                 proximityCanRender(), sirenOutputActive())) {
         case CommandGate::OUTPUT_STOPPED:
@@ -138,6 +153,7 @@ void submitCloudCommand(CloudCommand command, const char* name) {
         return;
     }
     startPattern(cloudPlayer, *pattern, millis());
+    cloudPlayerSource = source;
     Serial.printf("COMMAND accepted=%s activity=%s\n", name,
                   userActivityName(currentActivity));
 }
@@ -159,6 +175,7 @@ void submitServiceDirection(ServiceDirection direction, const char* name) {
     const OutputPattern* pattern = serviceDirectionPattern(direction);
     if (pattern != nullptr) {
         startPattern(cloudPlayer, *pattern, millis());
+        cloudPlayerSource = OutputTelemetrySource::SERVICE;
         Serial.printf("CHANNEL_SIMULATION accepted=%s claim=concept_only\n", name);
     }
 }
@@ -191,11 +208,26 @@ void handleSerial(char command) {
         case 'l': submitServiceDirection(ServiceDirection::LEFT, "LEFT"); break;
         case 'r': submitServiceDirection(ServiceDirection::RIGHT, "RIGHT"); break;
         case 'a': submitServiceDirection(ServiceDirection::AHEAD, "AHEAD"); break;
-        case 'b': submitCloudCommand(CloudCommand::BUS, "BUS"); break;
-        case 'w': submitCloudCommand(CloudCommand::WAIT, "WAIT"); break;
-        case '8': submitCloudCommand(CloudCommand::NUMBER, "NUMBER_88"); break;
-        case 'u': submitCloudCommand(CloudCommand::UNKNOWN, "UNKNOWN"); break;
-        case 'e': submitCloudCommand(CloudCommand::ERROR, "ERROR"); break;
+        case 'b':
+            submitCloudCommand(CloudCommand::BUS, "BUS",
+                               OutputTelemetrySource::SERVICE);
+            break;
+        case 'w':
+            submitCloudCommand(CloudCommand::WAIT, "WAIT",
+                               OutputTelemetrySource::SERVICE);
+            break;
+        case '8':
+            submitCloudCommand(CloudCommand::NUMBER, "NUMBER_88",
+                               OutputTelemetrySource::SERVICE);
+            break;
+        case 'u':
+            submitCloudCommand(CloudCommand::UNKNOWN, "UNKNOWN",
+                               OutputTelemetrySource::SERVICE);
+            break;
+        case 'e':
+            submitCloudCommand(CloudCommand::ERROR, "ERROR",
+                               OutputTelemetrySource::SERVICE);
+            break;
         case 'x':
             stopPattern(cloudPlayer);
             stopPattern(sirenPlayer);
@@ -313,6 +345,7 @@ void serviceReady(uint32_t nowMs) {
     }
     readyPending = false;
     startPattern(cloudPlayer, READY_PATTERN, nowMs);
+    cloudPlayerSource = OutputTelemetrySource::SYSTEM;
     Serial.printf("READY activity=%s transport=%s tof=local mic=local\n",
                   userActivityName(currentActivity),
                   relayNetworkConfigured() ? "relay" : "offline_service");
@@ -421,7 +454,8 @@ void serviceRelay(uint32_t nowMs) {
 
         if (decision.disposition == RelayDisposition::ACCEPT) {
             submitCloudCommand(update.command.pattern,
-                               cloudCommandName(update.command.pattern));
+                               cloudCommandName(update.command.pattern),
+                               OutputTelemetrySource::RELAY);
         } else if (decision.disposition == RelayDisposition::NO_OUTPUT) {
             stopCloudPattern();
         }
@@ -446,6 +480,68 @@ const char* currentlyPlayingName() {
         return "NUMBER";
     }
     return cloudPlayer.pattern->name;
+}
+
+const char* currentSirenPatternName() {
+    if (!sirenOutputActive()) {
+        return "NONE";
+    }
+    if (activeSirenOutput == SirenDecision::SIREN_WARNING) {
+        return "SIREN";
+    }
+    return sirenDecisionName(activeSirenOutput);
+}
+
+const char* currentCloudPatternName() {
+    if (cloudPlayer.pattern == nullptr || !patternOutput(cloudPlayer).active) {
+        return "NONE";
+    }
+    return cloudPlayer.pattern == &NUMBER_PATTERN ? "NUMBER" :
+                                                    cloudPlayer.pattern->name;
+}
+
+OutputSemanticSnapshot currentOutputSemantics() {
+    const OutputSemanticInputs inputs{
+        outputLatch.enabled,
+        sirenOutputActive(),
+        currentSirenPatternName(),
+        proximityActive,
+        proximityCanRender(),
+        patternOutput(cloudPlayer).active,
+        cloudPlayerSource,
+        currentCloudPatternName(),
+        currentActivity,
+        relayTelemetry.tofMm > 0 ? static_cast<int32_t>(relayTelemetry.tofMm) : -1,
+        hapticOutputMode(),
+    };
+    return selectOutputSemantics(inputs);
+}
+
+void serviceOutputTelemetry(uint32_t nowMs) {
+    const HapticDrive drive = hapticHardwareDrive();
+    const OutputSemanticSnapshot snapshot = currentOutputSemantics();
+    const bool changed = !hasOutputTelemetry ||
+                         !sameOutputTelemetry(
+                             drive, snapshot,
+                             lastOutputTelemetryDrive,
+                             lastOutputTelemetrySnapshot);
+    if (!outputTelemetryDue(changed, nowMs, lastOutputTelemetryMs)) {
+        return;
+    }
+
+    char telemetry[320];
+    const int length = formatOutputTelemetry(
+        telemetry, sizeof(telemetry), drive, nowMs, snapshot);
+    if (length <= 0) {
+        return;
+    }
+    Serial.write(
+        reinterpret_cast<const uint8_t*>(telemetry),
+        static_cast<size_t>(length));
+    hasOutputTelemetry = true;
+    lastOutputTelemetryDrive = drive;
+    lastOutputTelemetrySnapshot = snapshot;
+    lastOutputTelemetryMs = nowMs;
 }
 
 void serviceRelayTelemetry(uint32_t nowMs) {
@@ -553,6 +649,7 @@ void loop() {
     applyTofUpdate(tofService(nowMs), nowMs);
     serviceReady(nowMs);
     serviceOutput(nowMs);
+    serviceOutputTelemetry(nowMs);
     serviceRelayTelemetry(nowMs);
     delay(1);
 }

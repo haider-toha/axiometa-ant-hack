@@ -158,6 +158,15 @@ void test_snapshot_equality_compares_pattern_content(void) {
         selectOutputSemantics(firstInputs), selectOutputSemantics(secondInputs)));
 }
 
+void test_record_change_detection_includes_physical_drive(void) {
+    const OutputSemanticSnapshot snapshot = selectOutputSemantics(idleInputs());
+
+    TEST_ASSERT_TRUE(sameOutputTelemetry(
+        {0, 0}, snapshot, {0, 0}, snapshot));
+    TEST_ASSERT_FALSE(sameOutputTelemetry(
+        {2350, 0}, snapshot, {0, 0}, snapshot));
+}
+
 void test_reports_truncation_for_small_buffer(void) {
     char buffer[8];
     const OutputSemanticSnapshot snapshot = selectOutputSemantics(idleInputs());
@@ -187,6 +196,7 @@ int main(int, char **) {
     RUN_TEST(test_night_mode_mutes_an_active_winner_without_hiding_it);
     RUN_TEST(test_unknown_tof_formats_as_json_null);
     RUN_TEST(test_snapshot_equality_compares_pattern_content);
+    RUN_TEST(test_record_change_detection_includes_physical_drive);
     RUN_TEST(test_reports_truncation_for_small_buffer);
     RUN_TEST(test_heartbeat_is_immediate_on_change_and_due_once_per_second);
     RUN_TEST(test_heartbeat_timing_is_wrap_safe);

@@ -41,14 +41,15 @@ function rest(count: number, hz = 30, t0 = 0): MotionSample[] {
  * Half-wave, not a full sine, and this matters. `readMagnitude` returns
  * sqrt(x²+y²+z²), which is one-sided — a full sine on one axis rectifies through
  * it to DOUBLE the frequency, so a "1.9 Hz" fixture would present as 3.8 Hz,
- * fall outside the 350–850 ms band, and the positive test would fail for a
- * reason that has nothing to do with the classifier. A one-sided burst per step
- * is also closer to a real heel strike.
+ * alias through the cooldown to below stepMinMs, and the positive test would
+ * fail for a reason that has nothing to do with the classifier. A one-sided
+ * burst per step is also closer to a real heel strike.
  *
  * `axis: "z"` puts the gait along gravity, which is the realistic geometry and
  * the only one where the accelerationIncludingGravity fallback sees the full
- * amplitude. Default amp 6 sits clearly above the ~3.35 m/s² effective raw
- * threshold — see audit 17 §"Classifier spec as built" before changing it.
+ * amplitude. Default amp 6 sits far above the ~1.3 m/s² effective raw
+ * threshold of the audit-24 prominence (0.45 × the ~2.9 raw→smoothed factor
+ * measured in audit 17); amp 1.5 is the pinned gentle-walk floor.
  */
 function walk(
   ms: number,
@@ -213,12 +214,13 @@ describe("cadence gate", () => {
   });
 
   // Case 8 — issue #5 wants measured transition times. Asserted as a band so a
-  // bench retune of the thresholds does not break the suite.
-  it("enters MOVING inside the documented 2.0–3.5 s window", () => {
+  // bench retune of the thresholds does not break the suite. Audit 24 dropped
+  // the gate to two peaks + a 500 ms debounce, so entry lands ~1.2–1.8 s.
+  it("enters MOVING inside the documented 1.0–2.0 s window", () => {
     const s = classify(walk(6000));
     expect(s.lastTransitionT).not.toBeNull();
-    expect(s.lastTransitionT).toBeGreaterThanOrEqual(2000);
-    expect(s.lastTransitionT).toBeLessThanOrEqual(3500);
+    expect(s.lastTransitionT).toBeGreaterThanOrEqual(1000);
+    expect(s.lastTransitionT).toBeLessThanOrEqual(2000);
   });
 
   // Case 4 — the debounce is real; two peaks is below minPeaks.
@@ -228,15 +230,15 @@ describe("cadence gate", () => {
     expect(s.peaks.length).toBe(2);
   });
 
-  // Case 11 — a bare peak count would pass this; the interval test is what
-  // rejects it. The 5000 ms window retains the few heavily-smoothed aliased
-  // peaks that scrape past prominence — exactly minPeaks of them — so this is
-  // now a live demonstration of the interval rule doing the rejecting, not the
-  // count.
+  // Case 11 — a bare peak count would pass this instantly (15 peaks!); the
+  // interval rule is what rejects it, and it SURVIVES the audit-24 bias: the
+  // 300 ms cooldown aliases 6 Hz lobes to a uniform 333 ms spacing, which sits
+  // below stepMinMs on the 30 Hz sample grid. The gate is biased, not
+  // amplitude-triggered.
   it("rejects a 6 Hz cadence", () => {
     const s = classify(walk(6000, { stepHz: 6 }));
     expect(s.activity).toBe("STILL");
-    expect(s.peaks.length).toBe(3);
+    expect(s.peaks.length).toBe(15);
   });
 
   // Case 11b — the precise upper edge: 333 ms spacing, below stepMinMs.
@@ -244,24 +246,29 @@ describe("cadence gate", () => {
     expect(classify(walk(8000, { stepHz: 3 })).activity).toBe("STILL");
   });
 
-  // Case 12 — the lower edge. 0.5 Hz peaks are 2000 ms apart: the 5000 ms
-  // window now holds three of them, but the interval sits beyond stepMaxMs, so
-  // the gate still refuses.
-  it("rejects a 0.5 Hz cadence", () => {
+  // Case 12 — the band's lower edge moved again under audit 24: 0.5 Hz peaks
+  // are 2000 ms apart, exactly the new stepMaxMs, so a very slow shuffle is
+  // admitted…
+  it("admits a 0.5 Hz shuffle at the band ceiling", () => {
     const s = classify(walk(9000, { stepHz: 0.5 }));
-    expect(s.activity).toBe("STILL");
+    expect(s.activity).toBe("MOVING");
     expect(s.peaks.length).toBe(3);
   });
 
-  // Case 12b — 72 steps/min, the old documented design floor. Under the
-  // audit-22 band its ~833 ms intervals (quantised up to 866 ms at 30 Hz) sit
-  // comfortably in-band instead of straddling the old 850 ms edge, so entry is
-  // now prompt rather than delayed by boundary jitter.
+  // …and this is what still rejects: 0.4 Hz peaks are 2500 ms apart, beyond
+  // even the widened band, so the interval rule refuses however many peaks
+  // accumulate. The cadence gate is biased, not abolished.
+  it("rejects a 0.4 Hz cadence beyond the widened band", () => {
+    expect(classify(walk(12000, { stepHz: 0.4 })).activity).toBe("STILL");
+  });
+
+  // Case 12b — 72 steps/min, the old documented design floor. Two peaks plus
+  // the 500 ms debounce (audit 24) put entry at ~1.6 s.
   it("admits the slowest designed-for walk at 1.2 Hz", () => {
     const s = classify(walk(9000, { stepHz: 1.2 }));
     expect(s.activity).toBe("MOVING");
-    expect(s.lastTransitionT).toBeGreaterThanOrEqual(2500);
-    expect(s.lastTransitionT).toBeLessThanOrEqual(4500);
+    expect(s.lastTransitionT).toBeGreaterThanOrEqual(1200);
+    expect(s.lastTransitionT).toBeLessThanOrEqual(2200);
   });
 
   // Case 12c — the demo's reason for existing (audit 22): a phone reporting
@@ -272,12 +279,18 @@ describe("cadence gate", () => {
     expect(s.activity).toBe("MOVING");
   });
 
-  // Case 27 — the interval-consistency rule on its own, independent of the fold.
+  // Case 27 — the interval-consistency rule on its own, independent of the
+  // fold. Audit 24: two peaks with ONE in-band interval suffice, so the pinned
+  // truth table shrank on the reject side — what still refuses is a lone peak,
+  // an interval below stepMinMs, or one beyond stepMaxMs.
   it.each([
     [[0, 400, 800], true],
     [[0, 1500, 3000], true],
-    [[0, 400, 2200], false],
-    [[0, 400], false],
+    [[0, 400], true],
+    [[0, 2000], true],
+    [[0], false],
+    [[0, 300], false],
+    [[0, 2100], false],
     [[0, 300, 600], false],
   ] as const)("cadenceGate(%j) === %s", (peaks, expected) => {
     expect(cadenceGate(peaks, MOTION_TUNABLES)).toBe(expected);
@@ -285,23 +298,22 @@ describe("cadence gate", () => {
 });
 
 describe("hysteresis", () => {
-  // Case 5 — fails immediately if entry and exit debounce were equal. The rest
-  // gap is 1800 ms: each burst yields an in-band peak pair (mid-lobe max plus
-  // the cut-off boundary), but one pair is a single interval and the
-  // 2-consecutive rule refuses it, while the ~1965 ms cross-burst gap sits
-  // beyond the audit-22 stepMaxMs of 1700. (The old 600 ms gap put the burst
-  // period at 1200 ms, which the widened band now legitimately reads as a slow
-  // walk — that is the retune working, not this test's subject.)
-  it("does not flap when the signal oscillates across the gate", () => {
+  // Case 5 — the anti-flap criterion, restated under the audit-24 bias. Short
+  // movement bursts every 2.4 s are now legitimately MOVEMENT (each 900 ms
+  // burst yields a solid in-band peak pair), so the right answer is a single
+  // entry that then HOLDS through the 1.5 s rests — entering and leaving per
+  // burst would restart the board's patterns constantly. One transition, zero
+  // flapping.
+  it("holds MOVING through intermittent movement without flapping", () => {
     const samples = chain(
       30,
       ...Array.from({ length: 10 }, () => [
-        (t0: number) => walk(600, { t0 }),
-        (t0: number) => rest(54, 30, t0),
+        (t0: number) => walk(900, { t0 }),
+        (t0: number) => rest(45, 30, t0),
       ]).flat(),
     );
-    expect(classify(samples).activity).toBe("STILL");
-    expect(flips(samples)).toBe(0);
+    expect(classify(samples).activity).toBe("MOVING");
+    expect(flips(samples)).toBe(1);
   });
 
   // Case 9 — "placing it down returns to STILL". Exit ≈ 6 s under audit 22:
@@ -438,12 +450,17 @@ describe("timestamp handling", () => {
     expect(Number.isFinite(s.rateHz)).toBe(true);
   });
 
-  // Case 18 — the wrap criterion. The reset fires on the first backwards sample.
-  it("resets and resolves STILL when time goes backwards", () => {
+  // Case 18 — the wrap criterion. The reset fires on the first backwards
+  // sample and resolves STILL at that instant; audit 24's ~1.7 s entry then
+  // legitimately re-detects the continuing walk INSIDE the 2 s tail, so the
+  // assertion is the full sequence rather than the final value — the reset
+  // still happened, and recovery is now fast enough to observe.
+  it("resets to STILL when time goes backwards, then re-detects the walk", () => {
     const samples = [...walk(6000), ...walk(2000, { t0: 1000 })];
+    const seen = transitions(samples);
+    expect(seen.map((x) => x.activity)).toEqual(["MOVING", "STILL", "MOVING"]);
+    expect(seen[1].t).toBe(1000);
     const s = classify(samples);
-    expect(s.activity).toBe("STILL");
-    expect(s.lastTransitionT).toBe(1000);
     expect(s.peaks.every((p) => Number.isFinite(p) && p >= 0)).toBe(true);
     expect(Number.isFinite(s.lastT)).toBe(true);
     expect(Number.isFinite(s.bias)).toBe(true);
@@ -452,12 +469,14 @@ describe("timestamp handling", () => {
     expect(s.rejected).toBeGreaterThan(0);
   });
 
-  // Case 19 — a backgrounded tab. A stale window must never assert MOVING.
-  it("resets and resolves STILL across a 30 s gap", () => {
+  // Case 19 — a backgrounded tab. A stale window must never carry MOVING over
+  // the gap: the reset resolves STILL at the gap and the tail walk has to
+  // re-earn the state on fresh evidence.
+  it("resets to STILL across a 30 s gap, then re-detects the walk", () => {
     const samples = [...walk(6000), ...walk(2000, { t0: 36000 })];
-    const s = classify(samples);
-    expect(s.activity).toBe("STILL");
-    expect(s.lastTransitionT).toBe(36000);
+    const seen = transitions(samples);
+    expect(seen.map((x) => x.activity)).toEqual(["MOVING", "STILL", "MOVING"]);
+    expect(seen[1].t).toBe(36000);
   });
 
   // Case 21 — total-function guard.
@@ -476,12 +495,13 @@ describe("timestamp handling", () => {
   });
 
   // Case 23 — delivered rate varies ~1–67 Hz in the wild. This is what the
-  // time-constant EMA buys; a fixed-N moving average would fail it.
+  // time-constant EMA buys; a fixed-N moving average would fail it. Entry
+  // measured 1233–1800 ms across the rates under audit 24.
   it.each([10, 15, 20, 30, 60])("reaches MOVING at %i Hz delivery", (hz) => {
     const s = classify(walk(6000, { hz }));
     expect(s.activity).toBe("MOVING");
-    expect(s.lastTransitionT).toBeGreaterThanOrEqual(2400);
-    expect(s.lastTransitionT).toBeLessThanOrEqual(3100);
+    expect(s.lastTransitionT).toBeGreaterThanOrEqual(1000);
+    expect(s.lastTransitionT).toBeLessThanOrEqual(2000);
   });
 });
 
@@ -498,19 +518,24 @@ describe("fold properties", () => {
     expect(JSON.stringify(samples)).toBe(snapshot);
   });
 
-  // Case 24 — pins finding 1 as KNOWN behaviour rather than a bug found at
-  // 2 a.m. The baseline EMA converges onto a one-sided magnitude's mean, so the
-  // effective raw threshold is ~2.9× the configured one and amp 3 sits inside
-  // the marginal band: it fires on the first-step transient, then loses it.
-  it("fires and then reverts on a marginal amplitude", () => {
+  // Case 24 — under the 1.2 m/s² prominence, amp 3 sat in a marginal band
+  // (fired on the transient, then lost it). The audit-24 drop to 0.45 puts the
+  // effective raw threshold near 1.3 m/s², so amp 3 is now comfortably above
+  // it: one clean entry, held for the whole walk. The gentle-walk row below is
+  // the user-facing point of the retune.
+  it("detects a formerly marginal amplitude cleanly", () => {
     const seen = transitions(walk(15000, { amp: 3 }));
-    expect(seen.map((x) => x.activity)).toEqual(["MOVING", "STILL"]);
-    expect(seen[0].t).toBeGreaterThanOrEqual(2000);
-    expect(seen[0].t).toBeLessThanOrEqual(3500);
-    // The revert lands later under audit 22: the transient's peaks linger in
-    // the 5000 ms window for twice as long before the exit debounce can start.
-    expect(seen[1].t).toBeGreaterThanOrEqual(7000);
-    expect(seen[1].t).toBeLessThanOrEqual(9500);
+    expect(seen.map((x) => x.activity)).toEqual(["MOVING"]);
+    expect(seen[0].t).toBeGreaterThanOrEqual(1000);
+    expect(seen[0].t).toBeLessThanOrEqual(2200);
+  });
+
+  // The audit-24 regression the retune exists for: a GENTLE walk — the bench
+  // complaint was having to walk hard before anything registered. amp 1.5 is
+  // half the old marginal amplitude and an eighth above the new effective raw
+  // threshold.
+  it.each([1.5, 2])("detects a gentle walk at amp %s", (amp) => {
+    expect(classify(walk(8000, { amp })).activity).toBe("MOVING");
   });
 });
 

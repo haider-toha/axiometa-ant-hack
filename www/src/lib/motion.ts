@@ -106,15 +106,26 @@ export interface MotionTunables {
 export const MOTION_TUNABLES: MotionTunables = {
   smoothTauMs: 100,
   biasTauMs: 1500,
-  peakProminence: 1.2,
-  peakProminenceGravity: 0.6,
+  // SENSITIVITY RETUNE (audit 24): the bench complaint after audit 22 was the
+  // inverse of the first one — the cadence band now admits slow walking, but
+  // the user still had to walk HARD for the amplitude gate to see any peaks.
+  // Demo bias, stated by the user: any real movement should read MOVING;
+  // STILL is reserved for genuinely motionless. So prominence drops ~2.5×
+  // (1.2 → 0.45, gravity 0.6 → 0.25), the gate needs two peaks with one
+  // in-band interval instead of three-with-two, entry confirms in 500 ms, and
+  // the band ceiling stretches to a 2 s shuffle. Cost, accepted deliberately:
+  // hand tremor while holding the phone up can now read as MOVING, which
+  // suppresses BUS/NUMBER on the board until the user is genuinely still —
+  // "Force still" on the capture page is the escape hatch.
+  peakProminence: 0.45,
+  peakProminenceGravity: 0.25,
   peakCooldownMs: 300,
   stepMinMs: 350,
-  stepMaxMs: 1700,
+  stepMaxMs: 2000,
   cadenceWindowMs: 5000,
-  minPeaks: 3,
-  minInBandIntervals: 2,
-  entryDebounceMs: 1200,
+  minPeaks: 2,
+  minInBandIntervals: 1,
+  entryDebounceMs: 500,
   exitDebounceMs: 2000,
   gapResetMs: 2000,
   minRateHz: 10,
@@ -220,17 +231,15 @@ function readRotationMagnitude(s: MotionSample): number | null {
 }
 
 /**
- * Periodicity, not amplitude.
- *
- * Three peaks alone are too weak — hand jitter can produce three peaks in a
- * 5 s window — so the count is paired with an inter-peak interval consistency
- * test [10 §6]. The 350–1700 ms band covers ~0.59–2.86 Hz peak rates: the
- * documented 1.4–2.3 Hz step frequency PLUS the 40–50 peaks/min actually
- * measured on real phones, where the magnitude channel frequently registers
- * only every other heel strike (audit 22). Three peaks in 5 s demands
- * 0.6 peaks/s (36/min) at minimum, so the floor is now well below normal
- * walking cadence — the interval-consistency run is what still separates a
- * walk from random jitter at that rate.
+ * Periodicity, not amplitude — though under the audit-24 sensitivity bias the
+ * periodicity demand is the MINIMUM that still means anything: two peaks with
+ * one interval inside 350–2000 ms. The band's floor still rejects cooldown
+ * aliasing (a 6 Hz shake lands at 333 ms and refuses) and its ceiling still
+ * rejects isolated bumps more than 2 s apart, but any two plausibly-spaced
+ * peaks now read as movement. That is the stated demo requirement: STILL is
+ * reserved for a genuinely motionless phone, and the stationary-noise suite
+ * (±0.05–0.6 m/s², 60 s, zero flips) pins that random jitter still cannot
+ * fake even this reduced periodicity through the EMA smoothing.
  */
 export function cadenceGate(peaks: readonly number[], tun: MotionTunables): boolean {
   if (peaks.length < tun.minPeaks) return false;

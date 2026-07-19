@@ -28,6 +28,10 @@ let serialEvents: EventTarget;
 let handlers: SessionHandlers[];
 let sessions: Array<{ close: ReturnType<typeof vi.fn> }>;
 
+function outputRecord(leftHz: number, rightHz: number, upMs: number): string {
+  return `TACTA_OUTPUT ${JSON.stringify({ v: 1, leftHz, rightHz, upMs })}\n`;
+}
+
 beforeEach(() => {
   vi.clearAllMocks();
   handlers = [];
@@ -102,5 +106,65 @@ describe("OutputMonitor serial lifecycle", () => {
     fireEvent.click(screen.getByRole("button", { name: "Connect device" }));
     await waitFor(() => expect(serialMocks.openOutputSerialSession).toHaveBeenCalledTimes(2));
     expect(screen.getByText("USB connected")).toBeInTheDocument();
+  });
+
+  it("shows a completed short pulse as recent while keeping zero hertz literal", async () => {
+    serialMocks.getGrantedOutputPort.mockResolvedValue({} as SerialPort);
+    render(<OutputMonitor />);
+    await screen.findByText("USB connected");
+
+    act(() => {
+      handlers[0].onText(
+        outputRecord(0, 0, 1_000) +
+          outputRecord(2_350, 0, 2_000) +
+          outputRecord(0, 0, 2_120),
+      );
+    });
+
+    expect(screen.getByText("RECENT")).toBeInTheDocument();
+    expect(screen.getByLabelText("Left output frequency")).toHaveTextContent("0 Hz");
+    expect(
+      screen.getByRole("region", { name: "Five-second output timeline" }),
+    ).toHaveAccessibleDescription("Left: 1 pulse, 120 milliseconds. Right: no pulses.");
+  });
+
+  it("clears pulse history and afterglow when board uptime moves backwards", async () => {
+    serialMocks.getGrantedOutputPort.mockResolvedValue({} as SerialPort);
+    render(<OutputMonitor />);
+    await screen.findByText("USB connected");
+
+    act(() => {
+      handlers[0].onText(
+        outputRecord(2_350, 0, 2_000) + outputRecord(0, 0, 2_120),
+      );
+    });
+    expect(screen.getByText("RECENT")).toBeInTheDocument();
+
+    act(() => handlers[0].onText(outputRecord(0, 0, 10)));
+
+    expect(screen.queryByText("RECENT")).not.toBeInTheDocument();
+    expect(
+      screen.getByRole("region", { name: "Five-second output timeline" }),
+    ).toHaveAccessibleDescription("Left: no pulses. Right: no pulses.");
+  });
+
+  it("clears the trace on manual disconnect", async () => {
+    serialMocks.getGrantedOutputPort.mockResolvedValue({} as SerialPort);
+    render(<OutputMonitor />);
+    await screen.findByText("USB connected");
+
+    act(() => {
+      handlers[0].onText(
+        outputRecord(0, 0, 1_000) +
+          outputRecord(0, 3_050, 2_000) +
+          outputRecord(0, 0, 2_120),
+      );
+    });
+    expect(screen.getByText("RECENT")).toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole("button", { name: "Disconnect" }));
+
+    expect(screen.queryByText("RECENT")).not.toBeInTheDocument();
+    expect(screen.getByText("Waiting for a pulse")).toBeInTheDocument();
   });
 });

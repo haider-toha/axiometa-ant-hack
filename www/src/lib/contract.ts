@@ -426,7 +426,7 @@ export function chooseEvent(
  * Two commands are "the same event" when every device-visible field matches.
  *
  * This is the edge-trigger, and for navigation it is load-bearing rather than an
- * optimisation. LEFT and RIGHT are 800 ms step tables and AHEAD is 1000 ms
+ * optimisation. LEFT and RIGHT are 800 ms step tables and AHEAD is 600 ms
  * (`patterns.h`), against a ~500 ms capture tick. A caller that re-POSTs an
  * unchanged bearing bumps `seq`, the board restarts the table from step 0, and
  * neither pattern ever reaches its second pulse — LEFT and RIGHT collapse into

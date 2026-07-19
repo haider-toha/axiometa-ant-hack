@@ -286,7 +286,7 @@ claiming tactile output.
 - Pure tests for frame and selected-person-box validation and structured-output
   normalization.
 - Route tests for invalid input, low confidence, invalid model output, timeout,
-  and successful left/right/ahead responses without making live API calls.
+  and successful left/right responses without making live API calls.
 - Pure state-machine tests proving person guidance is MOVING-only, bus wins,
   stale generations are rejected, failures clear guidance, and reversals require
   confirmation.

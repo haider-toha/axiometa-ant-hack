@@ -36,7 +36,7 @@ The current AX22-0018 buzzers are audible proxies. This implementation validates
 
 ## Verification Evidence
 
-- Web unit suite: 13 files, 370 tests passed.
+- Web unit suite: 13 files, 380 tests passed.
 - Web lint: passed with no warnings.
 - Next.js 16 production build: passed. Local build emitted the expected missing-Upstash-environment warnings.
 - Firmware native suite: 13 suites, 116 tests passed.
@@ -66,6 +66,18 @@ Bus and person scenes cannot be reproduced under controlled conditions with the 
 5. Switch to `MOVING` with the bus still visible and confirm bus direction remains available while bus-information patterns are suppressed by the board.
 
 Environmental variation, model latency, and detector confidence may change what is observed. A missed or uncertain detection is evidence for tuning, not evidence that the mode contract is wrong; a wrong-mode output or stale direction is a software defect.
+
+## Live P1-Only Incident
+
+During development, the connected board produced frequent P1-only pulses that sounded nearly continuous. Live `/api/state` evidence identified the source without guessing:
+
+- relay command: `UNKNOWN`, not LEFT;
+- activity: `MOVING`;
+- telemetry: `playing: PROXIMITY`;
+- ToF: approximately 715-721 mm, inside the 1200 mm proximity threshold;
+- output trace: nine P1 pulses totaling about 1081 ms over five seconds, P3 idle.
+
+The physical board was still running the older one-channel proximity firmware. The USB output monitor was disconnected to release the serial port, then service command `x` stopped all output. The next telemetry snapshot reported `playing: NONE`. This does not reproduce on the branch contract: native tests require active proximity to drive both channels and inactive proximity to drive neither. The board must be flashed with this branch before physical cue verification; compilation alone does not update the connected device.
 
 ## Deployment State
 

@@ -7,12 +7,12 @@ export function TopBar() {
       <Link href="/" className="rounded-sm outline-none focus-visible:ring-2 focus-visible:ring-ring">
         <h1 className="sr-only">tacta</h1>
         <Image
-          src="/logo.png"
+          src="/tacta-wide.png"
           alt=""
-          width={1254}
-          height={1254}
+          width={590}
+          height={63}
           priority
-          className="h-8 w-auto dark:invert"
+          className="h-6 w-auto dark:invert"
         />
       </Link>
     </header>

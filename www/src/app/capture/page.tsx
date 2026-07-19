@@ -139,6 +139,8 @@ interface NavView {
   /** What kind of detection is driving the bearing this frame. Bus is always
    *  preferred; person is the fallback when no bus is in view. */
   targetKind: "bus" | "person" | null;
+  /** True while a /api/person-direction call is in-flight. */
+  personAnalyzing: boolean;
 }
 
 const NAV_IDLE: NavView = {
@@ -151,6 +153,7 @@ const NAV_IDLE: NavView = {
   sentNav: false,
   busPattern: "NONE",
   targetKind: null,
+  personAnalyzing: false,
 };
 
 /** The last direction that actually left the phone. */
@@ -224,6 +227,9 @@ export default function CapturePage() {
   const [forceNav, setForceNav] = useState(false);
   const bearingVoteRef = useRef<BearingVote>(initialBearingVote());
   const forceNavRef = useRef(false);
+  const personDirectionRef = useRef<MotionBearing | null>(null);
+  const lastPersonCallRef = useRef<number>(0);
+  const personAnalyzingRef = useRef<boolean>(false);
 
   const toggleForceNav = useCallback(() => {
     const next = !forceNavRef.current;
@@ -587,15 +593,64 @@ export default function CapturePage() {
             .filter((d) => d.kind === "person")
             .sort((a, b) => b.confidence - a.confidence)[0]
         : undefined;
-      const target = busTarget ?? personTarget;
       const targetKind: NavView["targetKind"] = busTarget
         ? "bus"
         : personTarget
           ? "person"
           : null;
-      const observed = bearingFromBox(target?.box);
-      const vote = voteBearing(bearingVoteRef.current, observed);
-      bearingVoteRef.current = vote;
+
+      let observed: MotionBearing | null;
+      let vote: BearingVote;
+
+      if (busTarget) {
+        // Bus: go toward it. bearingFromBox + voteBearing unchanged.
+        observed = bearingFromBox(busTarget.box);
+        vote = voteBearing(bearingVoteRef.current, observed);
+        bearingVoteRef.current = vote;
+        // Clear person state so a stale direction doesn't carry over.
+        personDirectionRef.current = null;
+        personAnalyzingRef.current = false;
+      } else if (personTarget) {
+        // Person/obstacle: ask Haiku which direction is clear.
+        // Rate-limit to one call per 1500 ms; don't stack calls.
+        const now = Date.now();
+        if (now - lastPersonCallRef.current > 1500 && !personAnalyzingRef.current) {
+          lastPersonCallRef.current = now;
+          personAnalyzingRef.current = true;
+          void fetch("/api/person-direction", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ frame_b64: frameB64 }),
+          })
+            .then((r) => r.json())
+            .then((data: { direction: string }) => {
+              const d = data.direction;
+              personDirectionRef.current =
+                d === "left" ? "left" : d === "right" ? "right" : "center";
+            })
+            .catch(() => {
+              // leave personDirectionRef unchanged; Haiku returns ahead on error
+            })
+            .finally(() => {
+              personAnalyzingRef.current = false;
+            });
+        }
+        // Use the most recent Haiku result directly — no voteBearing needed.
+        observed = personDirectionRef.current;
+        vote = {
+          emitted: personDirectionRef.current,
+          candidate: null,
+          streak: 0,
+        };
+        // Don't update bearingVoteRef; keep bus vote state intact.
+      } else {
+        // No target visible: reset everything.
+        observed = bearingFromBox(null);
+        vote = voteBearing(bearingVoteRef.current, null);
+        bearingVoteRef.current = vote;
+        personDirectionRef.current = null;
+        personAnalyzingRef.current = false;
+      }
 
       // One command channel, two halves. `chooseEvent` (audit 23) owns the
       // precedence: a confirmed bearing is deliverable in BOTH phases — the
@@ -612,8 +667,8 @@ export default function CapturePage() {
 
       setNav({
         observed,
-        centroid: centroidX(target?.box),
-        detector: target?.bearing ?? "",
+        centroid: centroidX((busTarget ?? personTarget)?.box),
+        detector: (busTarget ?? personTarget)?.bearing ?? "",
         confirmed: vote.emitted,
         pending: vote.streak > 0 ? vote.candidate : null,
         streak: vote.streak,
@@ -622,6 +677,7 @@ export default function CapturePage() {
         sentNav: navPattern !== null,
         busPattern: busEvent.pattern,
         targetKind,
+        personAnalyzing: personAnalyzingRef.current,
       });
 
       // Translate to a device command, and POST only when the meaning changes.
@@ -685,6 +741,9 @@ export default function CapturePage() {
       // A new camera session must not inherit the last one's confirmed
       // direction, or the first frame diffs against a bearing from minutes ago.
       bearingVoteRef.current = initialBearingVote();
+      personDirectionRef.current = null;
+      personAnalyzingRef.current = false;
+      lastPersonCallRef.current = 0;
       setNav(NAV_IDLE);
       setRunning(true);
     } catch (e) {
@@ -702,6 +761,9 @@ export default function CapturePage() {
     setRunning(false);
     setDetections([]);
     bearingVoteRef.current = initialBearingVote();
+    personDirectionRef.current = null;
+    personAnalyzingRef.current = false;
+    lastPersonCallRef.current = 0;
     setNav(NAV_IDLE);
     const canvas = overlayRef.current;
     canvas?.getContext("2d")?.clearRect(0, 0, canvas.width, canvas.height);
@@ -740,6 +802,8 @@ export default function CapturePage() {
   const navCommand = nav.confirmed === null ? null : bearingToPattern(nav.confirmed);
   /** Human-readable label for whatever is driving the bearing this frame. */
   const targetLabel = nav.targetKind === "bus" ? "bus" : nav.targetKind === "person" ? "person" : null;
+  /** True while the person-direction Haiku call is in-flight. */
+  const personAnalyzing = nav.personAnalyzing;
 
   return (
     <main className="flex-1 bg-background px-4 py-6 font-sans text-foreground sm:px-6 sm:py-8">
@@ -938,19 +1002,21 @@ export default function CapturePage() {
                   <p className="mt-1 text-sm text-muted-foreground">
                     {!running
                       ? "Start the camera to look for a bus or person."
-                      : nav.confirmed === null && nav.observed === null
-                        ? "No bus or person in view."
-                        : nav.confirmed === null
-                          ? `${targetLabel ? (targetLabel.charAt(0).toUpperCase() + targetLabel.slice(1)) : "Target"} in view — confirming (${nav.streak}/${BEARING_CONFIRM_FRAMES}).`
-                          : navHeld
-                            ? `${navCommand} ready — held while ${nav.busPattern} (bus info) plays. It sends when that clears; Force send overrides.`
-                            : nav.streak > 0 && nav.pending !== null
-                              ? `Sent. Checking a change to ${bearingToPattern(nav.pending)} (${nav.streak}/${BEARING_CONFIRM_FRAMES}).`
-                              : nav.streak > 0
-                                ? `Sent. ${targetLabel ? (targetLabel.charAt(0).toUpperCase() + targetLabel.slice(1)) : "Target"} may have left view (${nav.streak}/${BEARING_CONFIRM_FRAMES}).`
-                                : walking
-                                  ? "Sent to the board."
-                                  : "Sent to the board — start walking and it keeps updating."}
+                      : personAnalyzing && nav.confirmed === null
+                        ? "Person detected — analyzing safe direction\u2026"
+                        : nav.confirmed === null && nav.observed === null
+                          ? "No bus or person in view."
+                          : nav.confirmed === null
+                            ? `${targetLabel ? (targetLabel.charAt(0).toUpperCase() + targetLabel.slice(1)) : "Target"} in view — confirming (${nav.streak}/${BEARING_CONFIRM_FRAMES}).`
+                            : navHeld
+                              ? `${navCommand} ready — held while ${nav.busPattern} (bus info) plays. It sends when that clears; Force send overrides.`
+                              : nav.streak > 0 && nav.pending !== null
+                                ? `Sent. Checking a change to ${bearingToPattern(nav.pending)} (${nav.streak}/${BEARING_CONFIRM_FRAMES}).`
+                                : nav.streak > 0
+                                  ? `Sent. ${targetLabel ? (targetLabel.charAt(0).toUpperCase() + targetLabel.slice(1)) : "Target"} may have left view (${nav.streak}/${BEARING_CONFIRM_FRAMES}).`
+                                  : walking
+                                    ? "Sent to the board."
+                                    : "Sent to the board — start walking and it keeps updating."}
                   </p>
                 </div>
               </div>

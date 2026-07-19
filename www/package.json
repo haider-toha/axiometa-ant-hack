@@ -12,6 +12,7 @@
     "demo:readiness": "node scripts/demo-readiness.mjs"
   },
   "dependencies": {
+    "@anthropic-ai/sdk": "^0.112.3",
     "@base-ui/react": "^1.6.0",
     "@upstash/redis": "^1.38.0",
     "class-variance-authority": "^0.7.1",

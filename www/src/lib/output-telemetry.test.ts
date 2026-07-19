@@ -7,6 +7,8 @@ import {
 
 const LEFT = 'TACTA_OUTPUT {"v":1,"leftHz":2350,"rightHz":0,"upMs":123}';
 const RIGHT = 'TACTA_OUTPUT {"v":1,"leftHz":0,"rightHz":3050,"upMs":456}';
+const PROXIMITY =
+  'TACTA_OUTPUT {"v":2,"leftHz":2350,"rightHz":0,"upMs":789,"state":"ACTIVE","source":"LOCAL_TOF","pattern":"PROXIMITY","activity":"MOVING","reason":"PLAYING","tofMm":444,"outputMode":"AUDIBLE"}';
 
 describe("parseOutputTelemetryLine", () => {
   it("parses a protocol-v1 output record", () => {
@@ -18,10 +20,45 @@ describe("parseOutputTelemetryLine", () => {
     });
   });
 
+  it("parses a strict protocol-v2 output reason record", () => {
+    expect(parseOutputTelemetryLine(PROXIMITY)).toEqual({
+      v: 2,
+      leftHz: 2350,
+      rightHz: 0,
+      upMs: 789,
+      state: "ACTIVE",
+      source: "LOCAL_TOF",
+      pattern: "PROXIMITY",
+      activity: "MOVING",
+      reason: "PLAYING",
+      tofMm: 444,
+      outputMode: "AUDIBLE",
+    });
+  });
+
+  it("accepts null when the board has no valid ToF sample", () => {
+    const line = PROXIMITY.replace('"tofMm":444', '"tofMm":null');
+
+    expect(parseOutputTelemetryLine(line)).toEqual(
+      expect.objectContaining({ v: 2, tofMm: null }),
+    );
+  });
+
   it.each([
     "BOOT board_firmware",
     "TACTA_OUTPUT not-json",
     'TACTA_OUTPUT {"v":2,"leftHz":2350,"rightHz":0,"upMs":1}',
+    PROXIMITY.replace('"state":"ACTIVE"', '"state":"BROKEN"'),
+    PROXIMITY.replace('"source":"LOCAL_TOF"', '"source":"CLOUD"'),
+    PROXIMITY.replace('"pattern":"PROXIMITY"', '"pattern":""'),
+    PROXIMITY.replace('"pattern":"PROXIMITY"', '"pattern":"lowercase"'),
+    PROXIMITY.replace('"activity":"MOVING"', '"activity":"WALKING"'),
+    PROXIMITY.replace('"reason":"PLAYING"', '"reason":"UNKNOWN"'),
+    PROXIMITY.replace('"tofMm":444', '"tofMm":-1'),
+    PROXIMITY.replace('"tofMm":444', '"tofMm":65536'),
+    PROXIMITY.replace('"tofMm":444', '"tofMm":1.5'),
+    PROXIMITY.replace('"outputMode":"AUDIBLE"', '"outputMode":"SILENT"'),
+    PROXIMITY.replace('"v":2', '"v":3'),
     'TACTA_OUTPUT {"v":1,"leftHz":-1,"rightHz":0,"upMs":1}',
     'TACTA_OUTPUT {"v":1,"leftHz":65536,"rightHz":0,"upMs":1}',
     'TACTA_OUTPUT {"v":1,"leftHz":1.5,"rightHz":0,"upMs":1}',
@@ -48,6 +85,27 @@ describe("OutputTelemetryDecoder", () => {
     expect(decoder.push(`BOOT ready\r\n${LEFT}\r\nAUDIO rms=12\n${RIGHT}\n`)).toEqual([
       { v: 1, leftHz: 2350, rightHz: 0, upMs: 123 },
       { v: 1, leftHz: 0, rightHz: 3050, upMs: 456 },
+    ]);
+  });
+
+  it("streams version 1 and version 2 records together", () => {
+    const decoder = new OutputTelemetryDecoder();
+
+    expect(decoder.push(`${LEFT}\n${PROXIMITY}\n`)).toEqual([
+      { v: 1, leftHz: 2350, rightHz: 0, upMs: 123 },
+      {
+        v: 2,
+        leftHz: 2350,
+        rightHz: 0,
+        upMs: 789,
+        state: "ACTIVE",
+        source: "LOCAL_TOF",
+        pattern: "PROXIMITY",
+        activity: "MOVING",
+        reason: "PLAYING",
+        tofMm: 444,
+        outputMode: "AUDIBLE",
+      },
     ]);
   });
 

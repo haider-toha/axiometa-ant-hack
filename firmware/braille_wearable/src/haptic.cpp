@@ -1,7 +1,6 @@
 #include <Arduino.h>
 
 #include "haptic.h"
-#include "output_telemetry_pure.h"
 #include "pins.h"
 
 namespace {
@@ -12,7 +11,6 @@ uint16_t currentP3Hz = UINT16_MAX;
 uint16_t hardwareP1Hz = UINT16_MAX;
 uint16_t hardwareP3Hz = UINT16_MAX;
 OutputMode currentOutputMode = DEFAULT_OUTPUT_MODE;
-uint32_t lastTelemetryMs = 0;
 
 void applyHardwareDrive() {
     const HapticDrive hardware = hardwareDriveFor(
@@ -39,33 +37,13 @@ bool hapticBegin() {
 }
 
 void hapticWrite(uint16_t p1Hz, uint16_t p3Hz) {
-    bool changed = false;
     if (p1Hz != currentP1Hz) {
         currentP1Hz = p1Hz;
-        changed = true;
     }
     if (p3Hz != currentP3Hz) {
         currentP3Hz = p3Hz;
-        changed = true;
     }
     applyHardwareDrive();
-
-    const uint32_t nowMs = millis();
-    if (outputTelemetryDue(changed, nowMs, lastTelemetryMs)) {
-        char telemetry[96];
-        const int length = formatOutputTelemetry(
-            telemetry,
-            sizeof(telemetry),
-            currentP1Hz,
-            currentP3Hz,
-            nowMs);
-        if (length > 0) {
-            Serial.write(
-                reinterpret_cast<const uint8_t *>(telemetry),
-                static_cast<size_t>(length));
-            lastTelemetryMs = nowMs;
-        }
-    }
 }
 
 void hapticStop() {
@@ -85,4 +63,11 @@ void hapticSetOutputMode(OutputMode mode) {
 
 OutputMode hapticOutputMode() {
     return currentOutputMode;
+}
+
+HapticDrive hapticHardwareDrive() {
+    return {
+        hardwareP1Hz == UINT16_MAX ? uint16_t{0} : hardwareP1Hz,
+        hardwareP3Hz == UINT16_MAX ? uint16_t{0} : hardwareP3Hz,
+    };
 }

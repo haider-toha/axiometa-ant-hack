@@ -56,6 +56,7 @@ struct SirenState {
     float noiseFloorEnergy = 0.0f;
     float energyHistory[SIREN_HISTORY_FRAMES] = {};
     uint8_t peakHistory[SIREN_HISTORY_FRAMES] = {};
+    bool tonalHistory[SIREN_HISTORY_FRAMES] = {};
     uint8_t historyHead = 0;
     uint8_t historyCount = 0;
     uint8_t consecutiveElevatedFrames = 0;
@@ -138,6 +139,7 @@ inline void resetSiren(SirenState& state) {
     for (uint8_t index = 0; index < SIREN_HISTORY_FRAMES; ++index) {
         state.energyHistory[index] = 0.0f;
         state.peakHistory[index] = 0;
+        state.tonalHistory[index] = false;
     }
 }
 
@@ -227,6 +229,21 @@ inline bool hasMonotonicPeakSweep(const SirenState& state) {
            (nonDecreasing || nonIncreasing);
 }
 
+inline bool hasSustainedTonalEvidence(const SirenState& state) {
+    if (state.historyCount < SIREN_SUSTAINED_FRAMES) {
+        return false;
+    }
+
+    const uint8_t start = sirenSustainedWindowStart(state);
+    uint8_t tonalFrames = 0;
+    for (uint8_t index = 0; index < SIREN_SUSTAINED_FRAMES; ++index) {
+        const uint8_t historyIndex = sirenHistoryIndex(
+            state, static_cast<uint8_t>(start + index));
+        tonalFrames += state.tonalHistory[historyIndex] ? 1 : 0;
+    }
+    return tonalFrames >= SIREN_ATTENTION_FRAMES;
+}
+
 inline bool hasRecentAttentionSweep(const SirenState& state) {
     if (state.historyCount < SIREN_ATTENTION_FRAMES) {
         return false;
@@ -293,6 +310,8 @@ inline bool hasUsableSirenNoiseFloor(const SirenState& state) {
 inline void appendSirenHistory(SirenState& state, const SirenFeatures& features) {
     state.energyHistory[state.historyHead] = features.bandEnergy;
     state.peakHistory[state.historyHead] = features.peakBin;
+    state.tonalHistory[state.historyHead] =
+        features.peakEnergyRatio >= SIREN_MIN_PEAK_ENERGY_RATIO;
     state.historyHead = static_cast<uint8_t>((state.historyHead + 1) & SIREN_HISTORY_MASK);
     if (state.historyCount < SIREN_HISTORY_FRAMES) {
         ++state.historyCount;
@@ -332,7 +351,8 @@ inline SirenDecision updateSiren(SirenState& state, const SirenFeatures& feature
             ? state.noiseFloorEnergy * SIREN_ENERGY_THRESHOLD_RATIO *
                   (1.0f - SIREN_THRESHOLD_RELATIVE_EPSILON)
             : SIREN_REFERENCE_ENERGY_EPSILON;
-        if (hasSustainedBandEnergyAbove(state, startupThreshold) && startupShapeConfirmed) {
+        if (hasSustainedBandEnergyAbove(state, startupThreshold) &&
+            hasSustainedTonalEvidence(state) && startupShapeConfirmed) {
             return hasRisingAmplitudeTrend(state) ? SirenDecision::DANGER
                                                    : SirenDecision::SIREN_WARNING;
         }
@@ -351,7 +371,7 @@ inline SirenDecision updateSiren(SirenState& state, const SirenFeatures& feature
             sirenModulationIndex(state) > SIREN_MODULATION_INDEX_THRESHOLD ||
             hasMonotonicPeakSweep(state);
         if (hasSustainedBandEnergyAbove(state, SIREN_REFERENCE_ENERGY_EPSILON) &&
-            shapeConfirmed) {
+            hasSustainedTonalEvidence(state) && shapeConfirmed) {
             return hasRisingAmplitudeTrend(state) ? SirenDecision::DANGER
                                                    : SirenDecision::SIREN_WARNING;
         }
@@ -390,7 +410,7 @@ inline SirenDecision updateSiren(SirenState& state, const SirenFeatures& feature
         sirenModulationIndex(state) > SIREN_MODULATION_INDEX_THRESHOLD ||
         hasMonotonicPeakSweep(state);
     if (state.consecutiveElevatedFrames >= SIREN_SUSTAINED_FRAMES &&
-        shapeConfirmed) {
+        hasSustainedTonalEvidence(state) && shapeConfirmed) {
         return hasRisingAmplitudeTrend(state) ? SirenDecision::DANGER
                                                : SirenDecision::SIREN_WARNING;
     }

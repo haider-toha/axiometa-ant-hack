@@ -45,6 +45,19 @@ import {
   type MotionPermission,
   type MotionState,
 } from "@/lib/motion";
+import {
+  acceptPersonDirection,
+  clearPersonGuidance,
+  initialPersonGuidanceState,
+  personGuidanceEligible,
+  personResultIsCurrent,
+  personTargetMatches,
+} from "@/lib/person-guidance";
+import {
+  isPersonBox,
+  type PersonBox,
+  type PersonDirectionResponse,
+} from "@/lib/person-direction";
 
 const CAPTURE_MS = 500; // 2 Hz – a bus pulling in is a multi-second event
 const JPEG_QUALITY = 0.85;
@@ -57,36 +70,11 @@ const VISIBLE_LABELS = 6; // how many detections the list shows under the video
  * own DRAW_CONF_MIN is set to 0.10 too (vision/service.py), so this matches
  * the server floor and no valid person box is dropped between the two.
  *
- * The safety argument for the very low floor: the fast centroid-inverted
- * path (see invertBoxBearing below) resolves the direction on the SAME
- * 500 ms tick the person appears, without waiting for Claude. A false
- * positive at 0.10 confidence therefore costs at most one LEFT/RIGHT tick
- * before the next frame either confirms or clears it — as opposed to a
- * Claude-latency-long incorrect turn.
+ * This low score is only an analysis trigger. It never becomes a direction by
+ * itself: a current, high-confidence structured Claude result is still required
+ * before LEFT or RIGHT can reach the relay.
  */
 const PERSON_MIN_CONFIDENCE = 0.1;
-
-/**
- * Invert a box bearing to a route-around instruction.
- *
- * A person's centroid on the LEFT third of the frame means the human is over
- * there — the wearer should walk toward the RIGHT to pass safely. Similarly
- * for the right side. A dead-centre person is the ambiguous case where both
- * sides are equally viable; we bias to RIGHT (pedestrian norm in the UK, and
- * an arbitrary consistent choice matters more than which side) and let Claude
- * override if it thinks the other side is clearer.
- *
- * This exists so the wearer feels a direction on the SAME 500 ms frame the
- * person appears in. Claude runs in the background and refines the answer if
- * it disagrees. Opus 4.5 with a 1.5 MP JPEG takes 2–3 s round-trip; without a
- * fast path the phone was silent for that whole window.
- */
-function invertBoxBearing(bearing: MotionBearing | null): MotionBearing | null {
-  if (bearing === null) return null;
-  if (bearing === "left") return "right";
-  if (bearing === "right") return "left";
-  return "right"; // dead-centre person: default to right, Claude may override
-}
 
 /**
  * Activity heartbeat, well under the board's CLOUD_ACTIVITY_LEASE_MS = 120000
@@ -265,9 +253,28 @@ export default function CapturePage() {
   const [forceNav, setForceNav] = useState(false);
   const bearingVoteRef = useRef<BearingVote>(initialBearingVote());
   const forceNavRef = useRef(false);
-  const personDirectionRef = useRef<MotionBearing | null>(null);
+  const personGuidanceRef = useRef(initialPersonGuidanceState());
+  const personGenerationRef = useRef(0);
+  const personAbortRef = useRef<AbortController | null>(null);
+  const personRequestBoxRef = useRef<PersonBox | null>(null);
+  const personGuidanceBoxRef = useRef<PersonBox | null>(null);
+  const personSceneRef = useRef<{ hasBus: boolean; personBox: PersonBox | null }>({
+    hasBus: false,
+    personBox: null,
+  });
   const lastPersonCallRef = useRef<number>(0);
   const personAnalyzingRef = useRef<boolean>(false);
+
+  const invalidatePersonGuidance = useCallback(() => {
+    personGenerationRef.current += 1;
+    personAbortRef.current?.abort();
+    personAbortRef.current = null;
+    personRequestBoxRef.current = null;
+    personGuidanceBoxRef.current = null;
+    personSceneRef.current = { hasBus: false, personBox: null };
+    personGuidanceRef.current = clearPersonGuidance(personGuidanceRef.current);
+    personAnalyzingRef.current = false;
+  }, []);
 
   const toggleForceNav = useCallback(() => {
     const next = !forceNavRef.current;
@@ -382,24 +389,28 @@ export default function CapturePage() {
 
   /** The single setter. The classifier and the manual buttons both go through
    *  it, so the sensor can be switched off on stage without touching the relay. */
-  const applyActivity = useCallback((a: UserActivity, source: "manual" | "sensor") => {
-    if (source === "sensor" && modeRef.current !== "auto") return;
-    // Below ~10 Hz delivered, peak detection is operating on unusable data and
-    // the derived state is noise. Audit 10 §4: "declare the sensor degraded and
-    // fall back to manual rather than emitting a state derived from unusable
-    // data." The classifier still transitions — it reports, we decide — but a
-    // degraded transition must not reach the relay and flip the board.
-    if (source === "sensor" && motionRef.current.degraded) return;
-    activityRef.current = a;
-    setActivityState(a);
-    // Both clocks are seeded here, in a callback, so the readout starts at
-    // "0s ago" rather than showing "–" until the first interval fires — and so
-    // neither Date.now() call lands in a render body or an effect body.
-    const at = Date.now();
-    setLastTransitionAt(at);
-    setNowMs(at);
-    postRef.current(a, source);
-  }, []);
+  const applyActivity = useCallback(
+    (a: UserActivity, source: "manual" | "sensor") => {
+      if (source === "sensor" && modeRef.current !== "auto") return;
+      // Below ~10 Hz delivered, peak detection is operating on unusable data and
+      // the derived state is noise. Audit 10 §4: "declare the sensor degraded and
+      // fall back to manual rather than emitting a state derived from unusable
+      // data." The classifier still transitions — it reports, we decide — but a
+      // degraded transition must not reach the relay and flip the board.
+      if (source === "sensor" && motionRef.current.degraded) return;
+      activityRef.current = a;
+      if (a === "STILL") invalidatePersonGuidance();
+      setActivityState(a);
+      // Both clocks are seeded here, in a callback, so the readout starts at
+      // "0s ago" rather than showing "–" until the first interval fires — and so
+      // neither Date.now() call lands in a render body or an effect body.
+      const at = Date.now();
+      setLastTransitionAt(at);
+      setNowMs(at);
+      postRef.current(a, source);
+    },
+    [invalidatePersonGuidance],
+  );
 
   const setManual = useCallback(
     (a: UserActivity) => {
@@ -621,16 +632,21 @@ export default function CapturePage() {
       }).catch(() => {});
 
       // --- which way to the bus or person ----------------------------------
-      // Bus (target: true) is always preferred. If no bus is in view, fall back
-      // to the highest-confidence person detection so the direction system stays
-      // active for proximity awareness even when no bus is present.
+      // Bus (target: true) is always preferred. Person avoidance is a MOVING-only
+      // fallback; while STILL, visible people do not become navigation targets.
       const detections = m.detections ?? [];
       const busTarget = detections.find((d) => d.target);
-      const personTarget = !busTarget
+      const personTarget = !busTarget && activityRef.current === "MOVING"
         ? detections
-            .filter((d) => d.kind === "person" && d.confidence >= PERSON_MIN_CONFIDENCE)
+            .filter(
+              (d) =>
+                d.kind === "person" &&
+                d.confidence >= PERSON_MIN_CONFIDENCE &&
+                isPersonBox(d.box),
+            )
             .sort((a, b) => b.confidence - a.confidence)[0]
         : undefined;
+      const personBox = personTarget && isPersonBox(personTarget.box) ? personTarget.box : null;
       const targetKind: NavView["targetKind"] = busTarget
         ? "bus"
         : personTarget
@@ -639,65 +655,114 @@ export default function CapturePage() {
 
       let observed: MotionBearing | null;
       let vote: BearingVote;
+      const trackedBox = personAnalyzingRef.current
+        ? personRequestBoxRef.current
+        : personGuidanceBoxRef.current;
+      if (personBox && trackedBox && !personTargetMatches(trackedBox, personBox)) {
+        invalidatePersonGuidance();
+        lastPersonCallRef.current = 0;
+      }
+      personSceneRef.current = { hasBus: Boolean(busTarget), personBox };
 
       if (busTarget) {
         // Bus: go toward it. bearingFromBox + voteBearing unchanged.
         observed = bearingFromBox(busTarget.box);
         vote = voteBearing(bearingVoteRef.current, observed);
         bearingVoteRef.current = vote;
-        // Clear person state so a stale direction doesn't carry over.
-        personDirectionRef.current = null;
-        personAnalyzingRef.current = false;
-      } else if (personTarget) {
-        // Person/obstacle: TWO signals, in priority order.
-        //
-        //   1. Fast path (this tick, no round trip): the person's box centroid
-        //      inverted. Person on the left of the frame → wearer should turn
-        //      right to pass. This is deterministic and lets the device buzz
-        //      LEFT/RIGHT on the same 500 ms tick the person appears — same
-        //      responsiveness as the bus centroid path.
-        //   2. Refinement (2–3 s, background): Claude Opus 4.5 looks at the
-        //      whole frame and picks the side with the more walkable pavement.
-        //      If it disagrees with the centroid inversion — say a wall is on
-        //      the "obvious" side — it overwrites personDirectionRef, and the
-        //      next tick sends the corrected LEFT/RIGHT.
-        //
-        // The Claude call is rate-limited to one per 1500 ms and de-duped by
-        // personAnalyzingRef so 2 Hz capture cannot stack requests.
-        const fastBearing = invertBoxBearing(bearingFromBox(personTarget.box));
+        invalidatePersonGuidance();
+      } else if (personTarget && personBox) {
+        // Person/obstacle: ask Claude which direction is clear.
+        // Rate-limit to one call per 1500 ms; don't stack calls.
         const now = Date.now();
-        if (now - lastPersonCallRef.current > 1500 && !personAnalyzingRef.current) {
+        if (
+          personGuidanceEligible(activityRef.current, false, true) &&
+          now - lastPersonCallRef.current > 1500 &&
+          !personAnalyzingRef.current
+        ) {
           lastPersonCallRef.current = now;
           personAnalyzingRef.current = true;
+          const requestGeneration = personGenerationRef.current + 1;
+          personGenerationRef.current = requestGeneration;
+          const requestBox: PersonBox = [
+            personBox[0],
+            personBox[1],
+            personBox[2],
+            personBox[3],
+          ];
+          const controller = new AbortController();
+          personAbortRef.current = controller;
+          personRequestBoxRef.current = requestBox;
           void fetch("/api/person-direction", {
             method: "POST",
             headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({ frame_b64: frameB64 }),
+            body: JSON.stringify({
+              frame_b64: frameB64,
+              person_box: requestBox,
+            }),
+            signal: controller.signal,
           })
-            .then((r) => r.json())
-            .then((data: { direction: string }) => {
-              const d = data.direction;
-              // Claude returns "left" / "right" / "ahead"; the endpoint's
-              // prompt forbids "ahead" for a blocking obstacle, but the safe
-              // default on error is "ahead" so we still handle it. "ahead"
-              // means "no strong opinion" — keep whatever the centroid picked.
-              if (d === "left") personDirectionRef.current = "left";
-              else if (d === "right") personDirectionRef.current = "right";
-              // "ahead" and unknown: leave the fast-path answer in place.
+            .then(async (response) => {
+              if (!response.ok) throw new Error(`person direction returned ${response.status}`);
+              return (await response.json()) as PersonDirectionResponse;
+            })
+            .then((data) => {
+              const scene = personSceneRef.current;
+              if (
+                !personResultIsCurrent(
+                  requestGeneration,
+                  personGenerationRef.current,
+                  activityRef.current,
+                  scene.hasBus,
+                  requestBox,
+                  scene.personBox,
+                )
+              ) {
+                return;
+              }
+
+              if (
+                data.status === "ok" &&
+                (data.direction === "left" || data.direction === "right")
+              ) {
+                personGuidanceRef.current = acceptPersonDirection(
+                  personGuidanceRef.current,
+                  data.direction,
+                );
+                personGuidanceBoxRef.current = requestBox;
+              } else {
+                personGuidanceRef.current = clearPersonGuidance(personGuidanceRef.current);
+                personGuidanceBoxRef.current = null;
+              }
             })
             .catch(() => {
-              // Claude unreachable: the fast-path centroid answer stays live.
+              const scene = personSceneRef.current;
+              if (
+                personResultIsCurrent(
+                  requestGeneration,
+                  personGenerationRef.current,
+                  activityRef.current,
+                  scene.hasBus,
+                  requestBox,
+                  scene.personBox,
+                )
+              ) {
+                personGuidanceRef.current = clearPersonGuidance(personGuidanceRef.current);
+                personGuidanceBoxRef.current = null;
+              }
             })
             .finally(() => {
-              personAnalyzingRef.current = false;
+              if (requestGeneration === personGenerationRef.current) {
+                personAnalyzingRef.current = false;
+                personAbortRef.current = null;
+                personRequestBoxRef.current = null;
+              }
             });
         }
-        // Prefer Claude's refined answer if it has landed; otherwise the fast
-        // centroid inversion. Either way `observed` is never null while a
-        // person is in view — the UI and device get a direction immediately.
-        observed = personDirectionRef.current ?? fastBearing;
+        // Claude directions have their own reversal stabilizer; do not feed them
+        // through the bus centroid vote state.
+        observed = personGuidanceRef.current.direction;
         vote = {
-          emitted: observed,
+          emitted: personGuidanceRef.current.direction,
           candidate: null,
           streak: 0,
         };
@@ -707,8 +772,7 @@ export default function CapturePage() {
         observed = bearingFromBox(null);
         vote = voteBearing(bearingVoteRef.current, null);
         bearingVoteRef.current = vote;
-        personDirectionRef.current = null;
-        personAnalyzingRef.current = false;
+        invalidatePersonGuidance();
       }
 
       // One command channel, two halves. `chooseEvent` (audit 23) owns the
@@ -771,7 +835,7 @@ export default function CapturePage() {
     } finally {
       inFlight.current = false;
     }
-  }, [grabFrameB64, drawBoxes, sessionId]);
+  }, [grabFrameB64, drawBoxes, invalidatePersonGuidance, sessionId]);
 
   const start = useCallback(async () => {
     setError("");
@@ -800,8 +864,7 @@ export default function CapturePage() {
       // A new camera session must not inherit the last one's confirmed
       // direction, or the first frame diffs against a bearing from minutes ago.
       bearingVoteRef.current = initialBearingVote();
-      personDirectionRef.current = null;
-      personAnalyzingRef.current = false;
+      invalidatePersonGuidance();
       lastPersonCallRef.current = 0;
       setNav(NAV_IDLE);
       setRunning(true);
@@ -812,7 +875,7 @@ export default function CapturePage() {
           : "The camera could not start. Allow camera access for this site, then try again.",
       );
     }
-  }, [startMotion]);
+  }, [invalidatePersonGuidance, startMotion]);
 
   const stop = useCallback(() => {
     streamRef.current?.getTracks().forEach((t) => t.stop());
@@ -820,13 +883,12 @@ export default function CapturePage() {
     setRunning(false);
     setDetections([]);
     bearingVoteRef.current = initialBearingVote();
-    personDirectionRef.current = null;
-    personAnalyzingRef.current = false;
+    invalidatePersonGuidance();
     lastPersonCallRef.current = 0;
     setNav(NAV_IDLE);
     const canvas = overlayRef.current;
     canvas?.getContext("2d")?.clearRect(0, 0, canvas.width, canvas.height);
-  }, []);
+  }, [invalidatePersonGuidance]);
 
   useEffect(() => {
     if (!running) return;

@@ -21,7 +21,7 @@ export type PatternId =
   // are the board's `playing` telemetry values while a nav pattern runs.
   | "LEFT" // P11 bear left    — P1 only, 2350 Hz ·  800 ms
   | "RIGHT" // P12 bear right   — P3 only, 3050 Hz ·  800 ms
-  | "AHEAD"; // P13 keep going   — both channels    · 1000 ms
+  | "AHEAD"; // P13 keep going   — both channels    · 600 ms
 
 /**
  * Cloud-originated commands only. The five local patterns never cross the wire.
@@ -426,7 +426,7 @@ export function chooseEvent(
  * Two commands are "the same event" when every device-visible field matches.
  *
  * This is the edge-trigger, and for navigation it is load-bearing rather than an
- * optimisation. LEFT and RIGHT are 800 ms step tables and AHEAD is 1000 ms
+ * optimisation. LEFT and RIGHT are 800 ms step tables and AHEAD is 600 ms
  * (`patterns.h`), against a ~500 ms capture tick. A caller that re-POSTs an
  * unchanged bearing bumps `seq`, the board restarts the table from step 0, and
  * neither pattern ever reaches its second pulse — LEFT and RIGHT collapse into

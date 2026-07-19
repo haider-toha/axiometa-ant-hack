@@ -18,6 +18,12 @@ struct HapticDrive {
     uint16_t p3Hz;
 };
 
+inline constexpr HapticDrive proximityDrive(bool active) {
+    return active
+               ? HapticDrive{AUDIO_PROXY_LEFT_HZ, AUDIO_PROXY_RIGHT_HZ}
+               : HapticDrive{0, 0};
+}
+
 inline constexpr HapticDrive hardwareDriveFor(HapticDrive requested,
                                                OutputMode mode) {
     return mode == OutputMode::NIGHT ? HapticDrive{0, 0} : requested;

@@ -498,7 +498,8 @@ void serviceOutput(uint32_t nowMs) {
             return;
         }
         proximityToneOn = !proximityToneOn;
-        hapticWrite(proximityToneOn ? AUDIO_PROXY_LEFT_HZ : 0, 0);
+        const HapticDrive drive = proximityDrive(proximityToneOn);
+        hapticWrite(drive.p1Hz, drive.p3Hz);
         nextProximityTransitionMs = nowMs +
                                     (proximityToneOn ? PROXIMITY_PULSE_ON_MS : proximityGapMs);
         return;

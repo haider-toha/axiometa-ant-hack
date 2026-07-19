@@ -99,25 +99,9 @@ inline constexpr OutputStep NUMBER_STEPS[] = {
 };
 
 inline constexpr OutputStep WAIT_STEPS[] = {
-    {AUDIO_PROXY_LEFT_HZ, 0, 300}, {0, 0, 200},
-    {0, AUDIO_PROXY_RIGHT_HZ, 300}, {0, 0, 200},
-    {AUDIO_PROXY_LEFT_HZ, 0, 300}, {0, 0, 200},
-    {0, AUDIO_PROXY_RIGHT_HZ, 300}, {0, 0, 200},
-    {0, 0, 500},
-    {AUDIO_PROXY_LEFT_HZ, 0, 300}, {0, 0, 200},
-    {0, AUDIO_PROXY_RIGHT_HZ, 300}, {0, 0, 200},
-    {AUDIO_PROXY_LEFT_HZ, 0, 300}, {0, 0, 200},
-    {0, AUDIO_PROXY_RIGHT_HZ, 300}, {0, 0, 200},
-    {0, 0, 500},
-    {AUDIO_PROXY_LEFT_HZ, 0, 300}, {0, 0, 200},
-    {0, AUDIO_PROXY_RIGHT_HZ, 300}, {0, 0, 200},
-    {AUDIO_PROXY_LEFT_HZ, 0, 300}, {0, 0, 200},
-    {0, AUDIO_PROXY_RIGHT_HZ, 300}, {0, 0, 200},
-    {0, 0, 500},
-    {AUDIO_PROXY_LEFT_HZ, 0, 300}, {0, 0, 200},
-    {0, AUDIO_PROXY_RIGHT_HZ, 300}, {0, 0, 200},
-    {AUDIO_PROXY_LEFT_HZ, 0, 300}, {0, 0, 200},
-    {0, AUDIO_PROXY_RIGHT_HZ, 300}, {0, 0, 200},
+    {AUDIO_PROXY_LEFT_HZ, AUDIO_PROXY_RIGHT_HZ, 200},
+    {0, 0, 600},
+    {AUDIO_PROXY_LEFT_HZ, AUDIO_PROXY_RIGHT_HZ, 200},
 };
 
 inline constexpr OutputStep UNKNOWN_STEPS[] = {
@@ -127,9 +111,9 @@ inline constexpr OutputStep UNKNOWN_STEPS[] = {
 };
 
 inline constexpr OutputStep ERROR_STEPS[] = {
-    {AUDIO_PROXY_LEFT_HZ, 0, 600}, {0, 0, 300},
-    {AUDIO_PROXY_LEFT_HZ, 0, 150}, {0, 0, 300},
-    {AUDIO_PROXY_LEFT_HZ, 0, 600},
+    {AUDIO_PROXY_LEFT_HZ, AUDIO_PROXY_RIGHT_HZ, 600}, {0, 0, 300},
+    {AUDIO_PROXY_LEFT_HZ, AUDIO_PROXY_RIGHT_HZ, 150}, {0, 0, 300},
+    {AUDIO_PROXY_LEFT_HZ, AUDIO_PROXY_RIGHT_HZ, 600},
 };
 
 inline constexpr OutputStep LEFT_STEPS[] = {
@@ -143,9 +127,7 @@ inline constexpr OutputStep RIGHT_STEPS[] = {
 };
 
 inline constexpr OutputStep AHEAD_STEPS[] = {
-    {AUDIO_PROXY_LEFT_HZ, AUDIO_PROXY_RIGHT_HZ, 400},
-    {0, 0, 200},
-    {AUDIO_PROXY_LEFT_HZ, AUDIO_PROXY_RIGHT_HZ, 400},
+    {AUDIO_PROXY_LEFT_HZ, AUDIO_PROXY_RIGHT_HZ, 600},
 };
 
 template <size_t N>

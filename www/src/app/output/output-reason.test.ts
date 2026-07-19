@@ -132,6 +132,27 @@ describe("describeOutputReason", () => {
     );
   });
 
+  it("uses the board's actual activity for a still-phase bearing cue", () => {
+    expect(
+      describeOutputReason(
+        {
+          ...IDLE,
+          state: "ACTIVE",
+          source: "RELAY",
+          pattern: "RIGHT",
+          activity: "STILL",
+          reason: "PLAYING",
+        },
+        "live",
+      ),
+    ).toEqual(
+      expect.objectContaining({
+        description:
+          "The board accepted RIGHT while still; P3 carries its pulse pattern.",
+      }),
+    );
+  });
+
   it("makes local siren priority explicit", () => {
     expect(
       describeOutputReason(

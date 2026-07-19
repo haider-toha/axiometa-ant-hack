@@ -169,13 +169,14 @@ function distancePhrase(tofMm: number | null): string | null {
 }
 
 function relayDescription(pattern: string, activity: "MOVING" | "STILL" | "UNKNOWN") {
+  const phase = activity.toLowerCase();
   switch (pattern) {
     case "LEFT":
-      return "The board accepted LEFT while moving; P1 carries its pulse pattern.";
+      return `The board accepted LEFT while ${phase}; P1 carries its pulse pattern.`;
     case "RIGHT":
-      return "The board accepted RIGHT while moving; P3 carries its pulse pattern.";
+      return `The board accepted RIGHT while ${phase}; P3 carries its pulse pattern.`;
     case "AHEAD":
-      return "The board accepted AHEAD while moving; both channels carry its pulse pattern.";
+      return `The board accepted AHEAD while ${phase}; both channels carry its pulse pattern.`;
     case "BUS":
       return "The board accepted BUS while still; both channels carry the arrival pattern.";
     case "NUMBER":
@@ -187,6 +188,6 @@ function relayDescription(pattern: string, activity: "MOVING" | "STILL" | "UNKNO
     case "ERROR":
       return "The relay reported an error; P1 carries the degraded-state pattern.";
     default:
-      return `The board accepted ${pattern} while ${activity.toLowerCase()}.`;
+      return `The board accepted ${pattern} while ${phase}.`;
   }
 }

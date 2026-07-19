@@ -139,10 +139,6 @@ Deliver flat, no emphasis — the sentence does the work.
         <dt>Communicator-guide</dt>
         <dd>You book one in advance. The 07:42 won’t wait.</dd>
       </div>
-      <div class="ledger-row" data-reveal data-reveal-delay="240">
-        <dt>Arrival apps</dt>
-        <dd>They predict the bus; they can’t confirm it.</dd>
-      </div>
     </dl>
     <p class="credit" data-reveal data-reveal-delay="320">Guide Dogs · 2026</p>
    </div>
@@ -388,12 +384,47 @@ Slides 6 to 10 are written to stand without the demo having worked.
 
 
   <!-- =====================================================================
-       6 · What you just saw
+       6 · Why Modal
+       The argument is state — not cost, and not cropping. The plan concedes both
+       of those, so claiming either invites the question the team would lose.
+
+       Both lines sit in --ink at equal weight. Line one briefly carried --accent
+       to promote it, which inverted the slide's own hierarchy: --accent is DARKER
+       than --ink, so the promoted line rendered greyer than the line it supports,
+       and on a projector the distinction vanished entirely. They are a couplet;
+       the 160 ms reveal stagger carries the rhythm instead.
+       ================================================================== -->
+  <section id="slide-6" class="slide" data-slide="6" aria-label="Why Modal">
+    <div class="statement-block">
+      <p class="statement" data-reveal data-reveal-delay="0">Detection is when.</p>
+      <p class="statement" data-reveal data-reveal-delay="160">Tacta is what.</p>
+    </div>
+    <script type="text/plain" class="notes" data-for="6">
+SCREEN: Detection is when. / Tacta is what.
+
+[P3] Claude reads the number off the front. YOLO tells us when to ask.
+[P3] So why a detector?   [CUTTABLE: setup line; the next line stands alone]
+[P3] A bus arriving isn't one frame. It's two seconds of frames.
+[P3] That needs history, debounce, and a latch that fires exactly once.
+[P3] The Claude API is stateless. Modal isn't.
+[P3] Detection is when. Tacta is what.
+
+NOTE: Do NOT argue cost, and do NOT argue that a GPU was needed for throughput.
+The plan concedes both: at 2 fps neither is true, and a judge who has seen forty
+projects will take the opening. State is the only argument that survives, so it
+is the only one made.
+
+NOTE: This slide credits Modal by name, which the brief requires, and earns it.
+    </script>
+  </section>
+
+  <!-- =====================================================================
+       7 · What you just saw
        Both figures are the mean of the plan's estimated latency budget:
        0.76-2.09 s, mean 1.38 -> 1.4 s; and 2.4-6.2 s, mean 3.8 -> 3.8 s.
        Do not quote the ranges on stage.
        ================================================================== -->
-  <section id="slide-6" class="slide" data-slide="6" aria-label="What you just saw">
+  <section id="slide-7" class="slide" data-slide="7" aria-label="What you just saw">
     <div class="stat stat--latency-first" data-reveal data-reveal-delay="0">
       <p class="eyebrow">Bus to first signal</p>
       <p class="figure"><span class="figure-unit">~</span><span data-count-to="1.4" data-count-format="dec1">1.4</span> <span class="figure-unit">s</span></p>
@@ -403,7 +434,7 @@ Slides 6 to 10 are written to stand without the demo having worked.
       <p class="figure"><span class="figure-unit">~</span><span data-count-to="3.8" data-count-format="dec1">3.8</span> <span class="figure-unit">s</span></p>
       <p class="credit">Estimated · latency budget</p>
     </div>
-    <script type="text/plain" class="notes" data-for="6">
+    <script type="text/plain" class="notes" data-for="7">
 SCREEN: ~1.4 s and ~3.8 s, counting up, with the estimate credit beneath.
 
 [P2] About a second and a half from bus to first signal.
@@ -435,12 +466,12 @@ phrased as what the system does, not as what just happened. Add nothing.
 
 
   <!-- =====================================================================
-       7 · Sensing — CAD orbit
+       8 · Sensing — CAD orbit
        80 frames, pin 4:1, holds 8 / 4. The overlay is intentionally empty:
        the outline's surface table gives this slide the canvas and nothing
        else, and the sensor names are spoken, not shown.
        ================================================================== -->
-  <section id="slide-7" class="slide slide--seq" data-slide="7"
+  <section id="slide-8" class="slide slide--seq" data-slide="8"
            data-seq="orbit" data-frames="80" data-pin="4"
            data-hold-start="8" data-hold-end="4"
            aria-label="Sensing">
@@ -448,7 +479,7 @@ phrased as what the system does, not as what just happened. Add nothing.
       <canvas class="seq-canvas"></canvas>
       <div class="seq-overlay"><!-- no callouts: the canvas is the whole surface --></div>
     </div>
-    <script type="text/plain" class="notes" data-for="7">
+    <script type="text/plain" class="notes" data-for="8">
 SCREEN: CAD orbit of the range sensor. 80 frames, pin 4:1.
 
 [P3] Two sensors on the board, one reason each.   [CUTTABLE if running long]
@@ -472,41 +503,6 @@ NOTE: The cane remains the primary mobility aid. This is supplementary.
     </script>
   </section>
 
-
-  <!-- =====================================================================
-       8 · Why Modal
-       The argument is state — not cost, and not cropping. The plan concedes both
-       of those, so claiming either invites the question the team would lose.
-
-       Both lines sit in --ink at equal weight. Line one briefly carried --accent
-       to promote it, which inverted the slide's own hierarchy: --accent is DARKER
-       than --ink, so the promoted line rendered greyer than the line it supports,
-       and on a projector the distinction vanished entirely. They are a couplet;
-       the 160 ms reveal stagger carries the rhythm instead.
-       ================================================================== -->
-  <section id="slide-8" class="slide" data-slide="8" aria-label="Why Modal">
-    <div class="statement-block">
-      <p class="statement" data-reveal data-reveal-delay="0">Detection is when.</p>
-      <p class="statement" data-reveal data-reveal-delay="160">Tacta is what.</p>
-    </div>
-    <script type="text/plain" class="notes" data-for="8">
-SCREEN: Detection is when. / Claude is what.
-
-[P3] Claude reads the number off the front. YOLO tells us when to ask.
-[P3] So why a detector?   [CUTTABLE: setup line; the next line stands alone]
-[P3] A bus arriving isn't one frame. It's two seconds of frames.
-[P3] That needs history, debounce, and a latch that fires exactly once.
-[P3] The Claude API is stateless. Modal isn't.
-[P3] Detection is when. Claude is what.
-
-NOTE: Do NOT argue cost, and do NOT argue that a GPU was needed for throughput.
-The plan concedes both: at 2 fps neither is true, and a judge who has seen forty
-projects will take the opening. State is the only argument that survives, so it
-is the only one made.
-
-NOTE: This slide credits Modal by name, which the brief requires, and earns it.
-    </script>
-  </section>
 
 
   <!-- =====================================================================

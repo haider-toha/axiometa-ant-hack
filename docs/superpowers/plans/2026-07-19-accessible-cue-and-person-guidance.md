@@ -35,7 +35,7 @@
 - Produces: `PersonDirectionResponse`, one of `ok`, `clear`, or `unavailable`.
 - Exports: `parsePersonDirectionRequest()`, `normalizePersonDecision()`, `createPersonDirectionPost()`.
 
-- [ ] **Step 1: Write failing domain tests**
+- [x] **Step 1: Write failing domain tests**
 
 Add tests that reject missing/empty/oversized frames and malformed boxes, then pin all model-result combinations:
 
@@ -60,7 +60,7 @@ expect(normalizePersonDecision({ obstructing: true, direction: "right", confiden
 });
 ```
 
-- [ ] **Step 2: Run the focused test and verify RED**
+- [x] **Step 2: Run the focused test and verify RED**
 
 Run:
 
@@ -71,7 +71,7 @@ pnpm vitest run src/lib/person-direction.test.ts
 
 Expected: FAIL because `@/lib/person-direction` does not exist.
 
-- [ ] **Step 3: Implement the closed domain contract**
+- [x] **Step 3: Implement the closed domain contract**
 
 Create these exact public types and functions:
 
@@ -105,13 +105,13 @@ export function normalizePersonDecision(value: unknown): PersonDirectionResponse
 
 Validation requires four finite `0..1` box coordinates with `x1 < x2` and `y1 < y2`. Normalization rejects unknown keys/types and inconsistent combinations such as `obstructing: true` with `direction: "none"`.
 
-- [ ] **Step 4: Run the domain test and verify GREEN**
+- [x] **Step 4: Run the domain test and verify GREEN**
 
 Run `pnpm vitest run src/lib/person-direction.test.ts`.
 
 Expected: PASS.
 
-- [ ] **Step 5: Write failing route orchestration tests**
+- [x] **Step 5: Write failing route orchestration tests**
 
 Test the injectable handler without a live Anthropic call:
 
@@ -128,13 +128,13 @@ expect(await response.json()).toEqual({ status: "ok", direction: "right" });
 
 Also pin HTTP 400 invalid input, HTTP 200 low confidence/clear, HTTP 502 invalid model output, HTTP 503 model error, and timeout cancellation. Assert the decider is never called for invalid input.
 
-- [ ] **Step 6: Run the route test and verify RED**
+- [x] **Step 6: Run the route test and verify RED**
 
 Run `pnpm vitest run src/app/api/person-direction/route.test.ts`.
 
 Expected: FAIL because `createPersonDirectionPost` is not exported.
 
-- [ ] **Step 7: Implement the route and structured Claude output**
+- [x] **Step 7: Implement the route and structured Claude output**
 
 Replace free-text parsing with `output_config.format`:
 
@@ -172,7 +172,7 @@ export const POST = createPersonDirectionPost(decideWithClaude);
 
 Return CORS headers on every path. Log duration/outcome only; do not log frames or secrets.
 
-- [ ] **Step 8: Run focused and full web tests**
+- [x] **Step 8: Run focused and full web tests**
 
 Run:
 
@@ -183,7 +183,7 @@ pnpm test
 
 Expected: all tests pass.
 
-- [ ] **Step 9: Commit the endpoint unit**
+- [x] **Step 9: Commit the endpoint unit**
 
 ```bash
 git add www/src/lib/person-direction.ts www/src/lib/person-direction.test.ts \
@@ -206,7 +206,7 @@ git commit -m "fix(web): fail closed on uncertain person guidance"
 - Produces: a stable `MotionBearing | null` for the existing `chooseEvent()` path.
 - Preserves: bus-first target selection and edge-triggered `/api/event` writes.
 
-- [ ] **Step 1: Write failing state-machine tests**
+- [x] **Step 1: Write failing state-machine tests**
 
 Pin eligibility and stabilization:
 
@@ -226,13 +226,13 @@ expect(clearPersonGuidance(state).direction).toBeNull();
 expect(personResultIsCurrent(4, 5, "MOVING", false, true)).toBe(false);
 ```
 
-- [ ] **Step 2: Run the focused test and verify RED**
+- [x] **Step 2: Run the focused test and verify RED**
 
 Run `pnpm vitest run src/lib/person-guidance.test.ts`.
 
 Expected: FAIL because the module does not exist.
 
-- [ ] **Step 3: Implement the pure state machine**
+- [x] **Step 3: Implement the pure state machine**
 
 Export:
 
@@ -265,13 +265,13 @@ export function personResultIsCurrent(
 
 The first direction applies immediately. A direct opposite direction requires two consecutive matching results. Same-direction results clear any pending reversal.
 
-- [ ] **Step 4: Run the state-machine test and verify GREEN**
+- [x] **Step 4: Run the state-machine test and verify GREEN**
 
 Run `pnpm vitest run src/lib/person-guidance.test.ts`.
 
 Expected: PASS.
 
-- [ ] **Step 5: Integrate the state machine into capture**
+- [x] **Step 5: Integrate the state machine into capture**
 
 Replace `personDirectionRef` with state, generation, and abort refs. Send the selected box:
 
@@ -289,7 +289,7 @@ const personBearing = state.direction; // "left" | "right" | null; never center
 
 Keep Haider's `PERSON_MIN_CONFIDENCE = 0.35`, generic phone copy, bus-first selection, 1500 ms request cadence, and existing `sameEvent()` edge-trigger.
 
-- [ ] **Step 6: Run web verification**
+- [x] **Step 6: Run web verification**
 
 ```bash
 pnpm test
@@ -299,7 +299,7 @@ pnpm run lint
 
 Expected: all pass with no new warnings.
 
-- [ ] **Step 7: Commit the capture unit**
+- [x] **Step 7: Commit the capture unit**
 
 ```bash
 git add www/src/lib/person-guidance.ts www/src/lib/person-guidance.test.ts \
@@ -323,7 +323,7 @@ git commit -m "fix(capture): reject stale person avoidance directions"
 - Preserves: output telemetry v1 and all `PatternId`/`CloudCommand` names.
 - Produces: P1-only LEFT, P3-only RIGHT, and both-channel non-directional cues.
 
-- [ ] **Step 1: Write failing pattern and invariant tests**
+- [x] **Step 1: Write failing pattern and invariant tests**
 
 Update exact waveform expectations:
 
@@ -338,7 +338,7 @@ assertStep(ERROR_PATTERN.steps[0], 2350, 3050, 600);
 
 Add an exhaustive pattern census that fails when any pattern other than LEFT contains P1-only output or any pattern other than RIGHT contains P3-only output. Add a haptic pure test requiring active proximity drive `{2350, 3050}`.
 
-- [ ] **Step 2: Run focused firmware tests and verify RED**
+- [x] **Step 2: Run focused firmware tests and verify RED**
 
 ```bash
 /Users/sebastian/.platformio/penv/bin/pio test -e native \
@@ -347,7 +347,7 @@ Add an exhaustive pattern census that fails when any pattern other than LEFT con
 
 Expected: FAIL on current AHEAD, WAIT, ERROR, and proximity behavior.
 
-- [ ] **Step 3: Implement minimal pattern changes**
+- [x] **Step 3: Implement minimal pattern changes**
 
 Use these exact tables:
 
@@ -381,7 +381,7 @@ inline constexpr HapticDrive proximityDrive(bool active) {
 
 Use `proximityDrive(proximityToneOn)` in `serviceOutput()` instead of writing only P1.
 
-- [ ] **Step 4: Run focused and full firmware tests**
+- [x] **Step 4: Run focused and full firmware tests**
 
 ```bash
 /Users/sebastian/.platformio/penv/bin/pio test -e native \
@@ -391,7 +391,7 @@ Use `proximityDrive(proximityToneOn)` in `serviceOutput()` instead of writing on
 
 Expected: all 11 native suites pass.
 
-- [ ] **Step 5: Build the board image without flashing**
+- [x] **Step 5: Build the board image without flashing**
 
 ```bash
 /Users/sebastian/.platformio/penv/bin/pio run -e board_firmware
@@ -399,7 +399,7 @@ Expected: all 11 native suites pass.
 
 Expected: firmware links successfully. Do not run `upload`.
 
-- [ ] **Step 6: Commit the firmware unit**
+- [x] **Step 6: Commit the firmware unit**
 
 ```bash
 git add firmware/braille_wearable/src/patterns.h \
@@ -423,7 +423,7 @@ git commit -m "feat(firmware): make output cue grammar unambiguous"
 **Interfaces:**
 - Documents the implemented truth without changing runtime contracts.
 
-- [ ] **Step 1: Update the authoritative plan and audit**
+- [x] **Step 1: Update the authoritative plan and audit**
 
 Add a latest revision that states:
 
@@ -436,7 +436,7 @@ bus bearing points toward the bus. Uncertain person guidance emits no command.
 
 Correct the P4, P7, P10, and P13 rows to match the implemented timings. Record test counts, build results, production smoke results, and the audible-proxy claim boundary in audit 26.
 
-- [ ] **Step 2: Run complete web verification**
+- [x] **Step 2: Run complete web verification**
 
 ```bash
 cd www
@@ -448,7 +448,7 @@ pnpm run build
 
 Expected: all commands pass. Local Upstash warnings are acceptable only if the build completes.
 
-- [ ] **Step 3: Run complete firmware verification**
+- [x] **Step 3: Run complete firmware verification**
 
 ```bash
 cd firmware/braille_wearable
@@ -467,7 +467,7 @@ curl -fsS -X POST https://tacta.space/api/person-direction \
 
 Expected after deployment: HTTP 400 with `status: "unavailable"`, `direction: null`, and `reason: "invalid_request"`. Before deployment, record the known old response `{"direction":"ahead"}` rather than treating it as branch failure.
 
-- [ ] **Step 5: Reconcile new main work and rerun affected checks**
+- [x] **Step 5: Reconcile new main work and rerun affected checks**
 
 Fetch `origin/main`, inspect every incoming capture/relay/person-direction change, and rebase only with a clean tree. Resolve semantically in favor of the approved spec while preserving unrelated Haider UI and relay-trace work. Rerun web tests after any reconciliation.
 

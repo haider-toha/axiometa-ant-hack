@@ -35,6 +35,8 @@ While the relay tab is selected, the browser polls `/api/state` every 500 ms wit
 
 Polling uses an in-flight guard and stops when the component unmounts. An HTTP error marks relay intent unavailable but does not affect the serial session or output monitor.
 
+Each successful poll also records endpoint evidence: HTTP status, browser receive time, request duration, and the `x-vercel-id` response header when Vercel provides it. This is displayed separately from command data so the demo can show that the deployed endpoint answered, not merely that stale state exists in the UI.
+
 ### Board-confirmed receipt
 
 The existing firmware logs sufficient structured key/value lines over USB:
@@ -69,7 +71,7 @@ The view follows the existing Tacta instrument styling and uses four restrained 
 
 1. A verdict strip with status, sequence comparison, and last board event age.
 2. Side-by-side `Relay outgoing` and `Board received` cards with aligned command fields.
-3. An `Activity and transport` row showing relay activity freshness, board activity/override state, Wi-Fi state, and the latest transport error.
+3. An `Activity and transport` row showing relay activity freshness, board activity/override state, Wi-Fi state, the latest transport error, `/api/state` HTTP status and response age, and the Vercel request id when available.
 4. A compact, newest-first event trace capped at 20 recognised relay events.
 
 Statuses use text and colour. Expected gating such as `SUPPRESSED` is not rendered as a failure; it is a valid board decision. `MISSED`, `MISMATCH`, relay unavailability, and parse/HTTP failures receive destructive treatment. Raw serial noise is not displayed.
@@ -104,6 +106,7 @@ Tests cover:
 - every comparison verdict, including independent activity mismatch;
 - tab switching without closing or reopening Web Serial;
 - relay polling success, failure, recovery, and in-flight protection;
+- captured endpoint status, duration, response time, and Vercel request id;
 - manual disconnect and reconnect state clearing;
 - accessible labels for tab selection, verdict, relay fields, board fields, and event trace.
 
@@ -118,6 +121,8 @@ pnpm run build
 ```
 
 No firmware build, board reset, or flash is required because the design parses the logs already emitted by the merged firmware.
+
+Before merge, the authenticated Vercel CLI will identify the linked project and preview deployment. Read-only smoke requests to the deployed `/api/state` and `/api/pull` endpoints must return HTTP 200 with the expected contract keys. Vercel runtime logs must show those requests reaching the deployment. After merge, repeat the read-only smoke against `https://tacta.space` and record the endpoint responses and request-log evidence in the PR/handoff. Never print environment values or authentication tokens.
 
 ## Non-goals
 

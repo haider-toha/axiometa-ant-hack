@@ -100,7 +100,7 @@ Every task's requirements implicitly include this section.
 6. **The microphone binds to `I2S_NUM_0`. Never `I2S_NUM_1`, never `I2S_NUM_AUTO`.** The PDM-to-PCM converter exists on I2S0 only, and binding I2S1 fails silently by yielding a raw bitstream [T3 §PDM capture, T4 §TRAP 1].
 7. **The ToF → output reflex and siren → output reflex are fully local.** No network in either path. ToF output is enabled only in `MOVING`, while siren output remains enabled in both phases. In the hack demo the output is an audible proxy; the product intent is local vibration output.
 8. **Power: a ≥1 A (≥5 W) USB-C source — kept for margin, but its old binding reason is gone.** That constraint was 2 × ERM inrush [T1 §Old Global Constraints row 3]. Two MLT-8530 buzzers draw on the order of ~30 mA each with no inertial inrush, so the rail is comfortable now; ESP32-S3 + Wi-Fi transients dominate. Keep ≥1 A anyway — headroom is free.
-9. **The ESP32 is outbound-only.** It polls `https://bus-stop-awareness.vercel.app/api/pull` every 300 ms and never accepts an inbound connection.
+9. **The ESP32 is outbound-only.** It polls `https://tacta.space/api/pull` every 300 ms and never accepts an inbound connection.
 10. **Serverless is stateless; all shared state lives in Upstash Redis.** The one exception is the Modal container's own arrival state machine, which is safe only because `max_containers=1` pins it to a single process.
 11. **Pin versions exactly for isolated hardware runners:** `adafruit/Adafruit_VL53L0X@1.2.5`. The integrated dependency set remains `modal==1.5.2`, `anthropic==0.117.0`, `kosme/arduinoFFT@^2.0.4`, `bblanchon/ArduinoJson@^7.4.3`, `next@16.2.10`, `@upstash/redis@^1.38.0` until its lockfiles are refreshed deliberately.
 12. **Use Anthropic's first-class structured outputs** (`output_config.format` + `json_schema`). Prompt-only JSON is the weakest available mechanism and **assistant prefill now returns 400** on Opus 4.8 [T2 §Claude Vision 3].
@@ -213,11 +213,11 @@ The directory keeps its legacy name to avoid churning PlatformIO paths. Nothing 
 | `www/src/lib/redis.ts` | **REUSE (implemented)** | Preserve the **MSET-before-INCR** ordering. It prevents readers from observing a new sequence with the previous payload |
 | `www/src/app/api/pull/route.ts` | **REUSE (implemented)** | Outbound board polling plus telemetry; preserve no-store/CORS behavior |
 | `www/src/app/api/event/route.ts` | **REUSE (implemented)** | Sanitises camera-derived bus commands and writes relay state; do not add direction commands |
-| `www/src/lib/contract.ts` | **MODIFY by George** | Add independent `UserActivity`, `activitySeq`, and `activityTs` fields while preserving the existing six-value `CloudPattern` |
+| `www/src/lib/contract.ts` | **REUSE (implemented)** | Independent `UserActivity`, `activitySeq`, and `activityTs` fields plus the nine-value cloud command vocabulary |
 | `www/src/app/page.tsx` | **REUSE (implemented)** | Device/relay monitor |
 | `www/src/app/capture/page.tsx` | **REUSE for capture/Modal submission** | Existing camera host remains active in both phases. A separate activity setter may be added, but do not gate frame submission or translate target bearing into device commands |
 | `www/package.json` · `www/pnpm-lock.yaml` | **REUSE** | Active Next.js 16 dependency surface |
-| Vercel project link + Upstash env | **REUSE unchanged** | `haider-projects/bus-stop-awareness`, stable alias `bus-stop-awareness.vercel.app`, `UPSTASH_*` already set at Production scope |
+| Vercel project link + Upstash env | **REUSE unchanged** | `haider-projects/bus-stop-awareness`, production domain `tacta.space`, `UPSTASH_*` already set at Production scope |
 | `www/src/app/api/state/route.ts` · `api/detector/route.ts` | **REUSE (implemented)** | Debug-screen state surfaces |
 
 ### Vision — `vision/` (net-new directory)
@@ -324,7 +324,8 @@ export type PatternId =
 
 /** Cloud-originated commands only. Local safety patterns never cross the wire. */
 export type CloudPattern =
-  | "NONE" | "BUS" | "NUMBER" | "WAIT" | "UNKNOWN" | "ERROR";
+  | "NONE" | "LEFT" | "RIGHT" | "AHEAD"
+  | "BUS" | "NUMBER" | "WAIT" | "UNKNOWN" | "ERROR";
 
 export type UserActivity = "STILL" | "MOVING";
 
@@ -340,7 +341,7 @@ export interface DeviceCommand {
   seq:       number;                 // monotonic; the device's edge-trigger
   pattern:   CloudPattern;
   activity:  UserActivity;
-  activitySeq: number;               // changes only on MOVING/STILL transition
+  activitySeq: number;               // advances on transitions and heartbeats
   activityTs: number;                // independent freshness for the activity gate
   route:     string;
   dest:      string;
@@ -372,7 +373,7 @@ export const ROUTE_MAX_DIGITS = 3;
 /** Quinary encoding covers digits only. A route containing a letter is rejected server-side. */
 export const ROUTE_RE = /^[0-9]{1,3}$/;
 export const CLOUD_PATTERNS: readonly CloudPattern[] =
-  ["NONE", "BUS", "NUMBER", "WAIT", "UNKNOWN", "ERROR"] as const;
+  ["NONE", "LEFT", "RIGHT", "AHEAD", "BUS", "NUMBER", "WAIT", "UNKNOWN", "ERROR"] as const;
 ```
 
 **The locked demo, in order, literally.**

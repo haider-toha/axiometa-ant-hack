@@ -92,8 +92,8 @@ void test_night_mode_mutes_hardware_without_changing_requested_output(void) {
     TEST_ASSERT_EQUAL_UINT16(3050, requested.p3Hz);
 }
 
-void test_firmware_output_mode_defaults_to_night(void) {
-    TEST_ASSERT_EQUAL_INT(static_cast<int>(OutputMode::NIGHT),
+void test_firmware_output_mode_defaults_to_audible(void) {
+    TEST_ASSERT_EQUAL_INT(static_cast<int>(OutputMode::AUDIBLE),
                           static_cast<int>(DEFAULT_OUTPUT_MODE));
 }
 
@@ -127,7 +127,7 @@ int main(int, char**) {
     RUN_TEST(test_preemption_clearing_gap_is_exact_and_wrap_safe);
     RUN_TEST(test_service_stop_latches_output_off_until_explicit_resume);
     RUN_TEST(test_night_mode_mutes_hardware_without_changing_requested_output);
-    RUN_TEST(test_firmware_output_mode_defaults_to_night);
+    RUN_TEST(test_firmware_output_mode_defaults_to_audible);
     RUN_TEST(test_audible_mode_passes_requested_output_to_hardware);
     RUN_TEST(test_local_siren_patterns_match_locked_timing_and_channels);
     return UNITY_END();

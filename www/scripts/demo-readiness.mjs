@@ -226,7 +226,7 @@ function parseBaseUrl(argv) {
     if (!value) throw new Error("--base-url requires a value");
     return value;
   }
-  return process.env.DEMO_BASE_URL ?? "https://bus-stop-awareness.vercel.app";
+  return process.env.DEMO_BASE_URL ?? "https://tacta.space";
 }
 
 async function main() {

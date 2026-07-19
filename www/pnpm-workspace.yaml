@@ -5,6 +5,9 @@
 # false = never run their postinstall scripts: both ship prebuilt binaries as
 # optional dependencies, so the scripts are unnecessary. Verified against a
 # fresh worktree install on pnpm 11.9.0.
+packages:
+  - "."
+
 allowBuilds:
   sharp: false
   unrs-resolver: false

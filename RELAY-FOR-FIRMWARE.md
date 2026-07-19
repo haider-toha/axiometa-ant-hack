@@ -1,6 +1,9 @@
 # Relay ↔ firmware — what the ESP32 polls
 
-Handoff spec for the wristband firmware on the live `www` relay. The command side is deployed. The independent `STILL`/`MOVING` activity extension described below is still a web-owned dependency; until it lands, service Serial provides deterministic mode control.
+Handoff spec for the wristband firmware on the live `www` relay. Commands and
+the independent `STILL`/`MOVING` activity channel are deployed. Haider owns the
+phone motion classifier and activity producer; service Serial remains available
+for deterministic board testing.
 
 **Source of truth for the types:** [`www/src/lib/contract.ts`](www/src/lib/contract.ts) (`DeviceCommand`, `Telemetry`, `CloudPattern`). Background: [`plan/2026-07-18-bus-stop-situational-awareness.md`](plan/2026-07-18-bus-stop-situational-awareness.md) → "Data Contracts → Contract C".
 
@@ -8,13 +11,13 @@ Handoff spec for the wristband firmware on the live `www` relay. The command sid
 
 ## TL;DR
 
-- **Host:** `bus-stop-awareness.vercel.app`. Set `VERCEL_HOST` to this in `secrets.h`.
+- **Host:** `tacta.space`, tracked in `network_config.h`; `secrets.h` contains only hotspot credentials.
 - The board **POSTs to `/api/pull` every ~300 ms**; the request body is telemetry, the response is the current command.
-- The command shape **changed**. It is now `{ seq, pattern, route, dest, conf, arrivalId, ts }` — **not** the old `{ seq, mode, msg, replies }`. Reparse it.
-- The pending activity extension adds `{ activity, activitySeq, activityTs }` alongside the command. Its version and freshness are independent from command `seq`/`ts`.
+- The response is `{ seq, pattern, route, dest, conf, arrivalId, ts, activity, activitySeq, activityTs }` — **not** the old `{ seq, mode, msg, replies }`.
+- Activity version and freshness are independent from command `seq`/`ts`; an activity heartbeat must never re-fire a command.
 - **`/api/reply` is gone.** Remove it. Telemetry now rides on the `/api/pull` POST body.
 - **`seq` is still the edge-trigger:** only act when `seq` advances past the last one you handled.
-- The board consumes new command edges in both phases. `MOVING` suppresses `BUS`, `WAIT`, `NUMBER`, and `UNKNOWN`; `STILL` accepts them. `ERROR` is global.
+- Camera bearings (`LEFT`, `RIGHT`, `AHEAD`) are accepted in both known activity phases. `MOVING` suppresses `BUS`, `WAIT`, `NUMBER`, and `UNKNOWN`; `STILL` accepts them. `ERROR` is global.
 - Only wire route `"88"` with `conf="high"` may drive the hardcoded route-88 pattern. A different route or lower confidence is consumed and logged without a false `88` signal.
 - The first command and activity snapshots after boot or a long outage are baselines and never fire output.
 
@@ -24,14 +27,14 @@ The old speech app at `app-eight-lyart-98.vercel.app` is **retired** — do not 
 
 ## The poll
 
-`POST https://bus-stop-awareness.vercel.app/api/pull` every ~300 ms.
+`POST https://tacta.space/api/pull` every ~300 ms.
 
 - **Request body** = telemetry (below). The relay stores it for the debug screen, then returns the command.
 - **Response** = the current `DeviceCommand`.
 - `GET /api/pull` also works (returns the command, writes no telemetry) — handy for `curl` smoke.
 
 ```bash
-curl -fsS https://bus-stop-awareness.vercel.app/api/pull
+curl -fsS https://tacta.space/api/pull
 # {"seq":20,"pattern":"UNKNOWN","route":"","dest":"","conf":"low","arrivalId":1,"ts":1784398000652}
 ```
 
@@ -46,13 +49,17 @@ curl -fsS https://bus-stop-awareness.vercel.app/api/pull
   "conf": "high",       // "high" | "low" | ""
   "arrivalId": 1,       // increments once per bus arrival
   "ts": 1784398000652,  // ms epoch of the server write — command timestamp
-  "activity": "STILL", // pending web extension: "MOVING" | "STILL"
-  "activitySeq": 4,     // changes only on an activity transition
+  "activity": "STILL", // "MOVING" | "STILL"
+  "activitySeq": 4,     // increments on transitions and 30 s heartbeats
   "activityTs": 1784397999000 // activity write time; independent of command ts
 }
 ```
 
-The currently deployed response may omit all three activity fields. Firmware continues parsing commands but keeps the bus-information gate closed unless service Serial has explicitly selected `STILL`. The first complete, valid activity snapshot establishes a non-rendering baseline; the phone/operator must then produce a fresh transition. All three fields are required together. Missing or invalid activity data immediately revokes prior cloud `STILL` authority. A newer `activityTs` with the same `activitySeq` is a heartbeat that refreshes the 120-second demo lease without touching command state; an unchanged timestamp does not refresh it, so stale activity falls back to `MOVING`.
+All three activity fields are required together. The first complete, valid
+snapshot establishes a non-rendering baseline. Missing, invalid, regressed, or
+older-than-120-second activity data falls back to `MOVING`. Every phone POST,
+including the 30-second heartbeat, advances `activitySeq` and refreshes
+`activityTs` without changing command `seq` or `ts`.
 
 ### Field → firmware struct
 
@@ -65,7 +72,7 @@ The currently deployed response may omit all three activity fields. Firmware con
 | `conf` | string | `uint8_t` enum | `""`→`CONF_NONE`, `"low"`→`CONF_LOW`, `"high"`→`CONF_HIGH`. |
 | `arrivalId` | number | `long` | For de-duping repeated arrivals if needed. |
 | `ts` | number | `long`/`int64` | Optional staleness guard — ignore commands older than N seconds. |
-| `activity` | string | `uint8_t` enum | Pending extension. Exact `MOVING` or `STILL`; missing/invalid closes the bus gate. |
+| `activity` | string | `uint8_t` enum | Exact `MOVING` or `STILL`; missing/invalid falls back to `MOVING`. |
 | `activitySeq` | number | `uint32_t` | Independent edge. Must not increment command `seq`. |
 | `activityTs` | number | `int64_t` | Activity write time. Must not refresh command `ts`. |
 
@@ -86,20 +93,24 @@ struct DeviceCommand {
 
 ### `pattern` values — the cloud vocabulary
 
-The relay only ever sends these six. Map each to your `PAT_*`:
+The relay sends these nine values. Map each to the corresponding firmware enum:
 
 | `pattern` | Meaning | Device pattern |
 | --- | --- | --- |
 | `NONE` | no active command | idle |
+| `LEFT` | camera target is left of frame | P1 proxy pattern |
+| `RIGHT` | camera target is right of frame | P3 proxy pattern |
+| `AHEAD` | camera target is centred | both-channel proxy pattern |
 | `BUS` | a bus is arriving | P5 BUS ARRIVING |
 | `NUMBER` | route is in `route` | P6 ROUTE NUMBER |
 | `WAIT` | reading the route now | P7 WAIT |
 | `UNKNOWN` | couldn't read / low confidence | P8 UNKNOWN |
 | `ERROR` | degraded | P10 ERROR |
 
-The **device-local** patterns — READY, DANGER, SIREN, ATTENTION, PROXIMITY, ACK — are generated on the board (siren FFT, ToF, button) and **never come over the wire**. Don't expect them in `pattern`.
-
-`LEFT`, `RIGHT`, and `AHEAD` are also not wire values. The current device has one forward ToF zone, so it cannot determine a safe bypass side. Its existing P1/P3 direction tones are service-only conceptual-channel simulations.
+The **device-local** patterns — READY, DANGER, SIREN, ATTENTION, PROXIMITY,
+ACK — are generated on the board and **never come over the wire**. Camera
+bearings are advisory target-location cues; the single forward ToF zone never
+derives a bypass direction.
 
 ### Activity gate and local sensing
 

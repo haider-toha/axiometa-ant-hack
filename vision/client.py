@@ -9,7 +9,7 @@ terminal instead of a phone browser.
 Run
     pip install -r vision/requirements-client.txt
     export MODAL_URL="https://<workspace>--vision-service.modal.run/ingest"
-    export VERCEL_URL="https://bus-stop-awareness.vercel.app"   # optional
+    export VERCEL_URL="https://tacta.space"   # optional
     python vision/client.py
 
 With VERCEL_URL unset it runs dry: the full state machine still advances and

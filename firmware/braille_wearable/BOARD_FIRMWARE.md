@@ -15,10 +15,11 @@ isolated buzzer and ToF runners for combined testing.
 The firmware boots operationally without a button. The buzzers simulate future
 vibration channels; they are not tactile actuators.
 
-Sensor servicing starts immediately. The firmware boots in `NIGHT` output mode:
-logical patterns and `TACTA_OUTPUT` telemetry continue, but both buzzer GPIO
-drives are held off. This also makes the deferred READY pattern silent. Use
-service Serial `v` to opt into audible output for a daytime demo.
+Sensor servicing starts immediately. The demo firmware boots in `AUDIBLE`
+output mode so a reset or power cycle cannot silently disable the buzzer proxy
+channels. Use service Serial `q` to enter `NIGHT` mode when quiet testing is
+required; logical patterns and `TACTA_OUTPUT` telemetry continue while both
+buzzer GPIO drives are held off. Use `v` to return to audible output.
 
 ## Build And Upload
 
@@ -48,7 +49,14 @@ The board boots operationally with an effective `MOVING` fallback while the inde
 | `v` | Service only | Enter `AUDIBLE` mode; send the current logical pattern to the buzzers |
 | `h` | Service only | Print controls |
 
-The relay parser accepts exactly `NONE`, `BUS`, `NUMBER`, `WAIT`, `UNKNOWN`, and `ERROR`. It rejects `LEFT`, `RIGHT`, `AHEAD`, and unknown strings. The first command snapshot is a non-rendering baseline. Commands received while `MOVING` still advance sequence state, so switching to `STILL` cannot replay an earlier camera result. Activity requires a complete valid `activity`/`activitySeq`/`activityTs` snapshot; missing, invalid, regressed, or locally stale activity revokes cloud `STILL` and falls back to `MOVING`.
+The relay parser accepts exactly `NONE`, `LEFT`, `RIGHT`, `AHEAD`, `BUS`,
+`NUMBER`, `WAIT`, `UNKNOWN`, and `ERROR`; unknown strings are rejected.
+Camera-derived bearings can render in either known activity phase, but bus
+information renders only while `STILL`. The first command snapshot is a
+non-rendering baseline. Commands received while gated still advance sequence
+state, so an activity change cannot replay an earlier camera result. Activity
+requires a complete valid `activity`/`activitySeq`/`activityTs` snapshot;
+missing, invalid, regressed, or locally stale activity falls back to `MOVING`.
 
 The route waveform is hardcoded for route 88. Firmware requires the `NUMBER` payload route to be exactly `"88"` and its confidence to be `"high"`; another number or lower confidence is consumed without playing the route-88 output.
 
@@ -69,7 +77,7 @@ The service stop command `x` silences outputs without stopping either sensor,
 which is useful for environmental false-positive testing. On `o`, a siren that
 is still classified active is eligible to resume immediately.
 
-`q` is the safe overnight test mode. Unlike `x`, it does not stop logical output
+`q` is the safe quiet-test mode. Unlike `x`, it does not stop logical output
 patterns: the laptop output view can still visualize their requested frequencies
 from `TACTA_OUTPUT`. The firmware does not attempt a "very quiet" PWM level,
 because these passive buzzer modules do not provide a calibrated volume control
@@ -77,11 +85,12 @@ that can guarantee inaudibility.
 
 ## Remaining Board Work
 
-1. Coordinate a board session, provide ignored `secrets.h` with the phone hotspot credentials, and run the end-to-end relay/activity soak. No upload or reboot should happen while another developer owns the board.
-2. Land the web-owned independent `activity`, `activitySeq`, and `activityTs` fields. The currently deployed command response omits them, so use `s`/`n` until that endpoint update is live.
-3. Validate the local siren classifier against labelled real siren recordings
+1. Run the end-to-end relay/activity soak with the phone capture page active so
+   its 30-second activity heartbeat stays inside the 120-second board lease.
+2. Validate the local siren classifier against labelled real siren recordings
    and a longer representative environmental-negative set.
-4. Confirm the web producer holds transient BUS long enough for a 300 ms latest-value poll, or add queue/ack semantics.
+3. Confirm the web producer holds transient BUS long enough for a 300 ms
+   latest-value poll, or add queue/ack semantics.
 
 ## Phone Hotspot Configuration
 

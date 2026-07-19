@@ -9,17 +9,17 @@ clearance; it cannot choose a safe left or right bypass.
 From `www/`, run:
 
 ```bash
-pnpm demo:readiness -- --base-url https://bus-stop-awareness.vercel.app
+pnpm demo:readiness -- --base-url https://tacta.space
 ```
 
 Do not start the audience demo until it prints `READY`. Haider owns the phone
 motion classifier and the relay activity heartbeat. This repo consumes that
 state; it does not replace the producer.
 
-The firmware merged in `main` boots in `NIGHT` mode. Logical patterns, sensors,
-relay handling, and `TACTA_OUTPUT` telemetry remain active, but P1 and P3 are
-electrically muted. This is the correct mode for silent rehearsal. The board
-must be flashed with that build before relying on this guarantee.
+The morning demo firmware boots in `AUDIBLE` mode so a reset or power cycle
+cannot silently disable P1/P3. Use service Serial `q` for a deliberate quiet
+rehearsal; sensors, relay handling, and `TACTA_OUTPUT` telemetry continue while
+the buzzer GPIO drives are muted.
 
 ## Hardware And Topology
 
@@ -40,9 +40,10 @@ same time. Close one before opening the other.
 
 ## Morning Setup
 
-1. Pull `main` and confirm it includes the night-mode firmware.
+1. Pull `main` and confirm it includes the audible-default demo firmware.
 2. Create ignored `firmware/braille_wearable/src/secrets.h` from
-   `secrets.example.h` with the phone hotspot SSID/password and deployed host.
+   `secrets.example.h` with only the phone hotspot SSID/password. The deployed
+   relay host is tracked in `network_config.h`.
 3. Enable the phone hotspot. On iPhone enable **Maximize Compatibility**; on
    Android choose the 2.4 GHz band.
 4. Build and upload `board_firmware`:
@@ -53,11 +54,12 @@ same time. Close one before opening the other.
    $HOME/.platformio/penv/bin/pio run -e board_firmware -t upload --upload-port /dev/cu.usbmodem1101
    ```
 
-5. Keep the board in its default `NIGHT` mode for the first rehearsal.
+5. Confirm the board boots in `AUDIBLE` mode. Send `q` only for an explicitly
+   quiet rehearsal, then send `v` before the audience demo.
 6. Open `/capture` on the phone, grant camera access, and frame the A4 bus prop.
 7. Open `/output` in desktop Chrome, select the ESP32, and confirm live idle
-   telemetry. In night mode the display shows requested logical frequencies
-   even though the buzzers remain physically muted.
+   telemetry. The display shows requested logical frequencies in either output
+   mode.
 8. Run the readiness command until every route, contract, and activity
    freshness check passes.
 9. After the board has observed its first activity baseline, make Haider's
@@ -103,9 +105,9 @@ Use service Serial only while `/output` is disconnected:
 | `c` | Clear diagnostic override and return control to Haider's relay state |
 | `b` / `w` / `8` | Diagnostic BUS/WAIT/NUMBER-88 inputs |
 
-Opening Serial can reset the board. With the new build that reset is silent
-because night mode is the boot default. After sending a control, close Serial
-Monitor before reconnecting `/output`.
+Opening Serial can reset the board. The morning demo build returns to audible
+output after that reset. After sending a control, close Serial Monitor before
+reconnecting `/output`.
 
 ## Fallbacks And Stop
 
@@ -124,7 +126,7 @@ Monitor before reconnecting `/output`.
 ## Five-Minute Rehearsal
 
 - Readiness command prints `READY`.
-- Board is flashed with hotspot credentials and starts silently.
+- Board is flashed with hotspot credentials and starts in audible mode.
 - `/capture` sees the complete A4 prop in stable light.
 - `/output` receives fresh telemetry in desktop Chrome.
 - Fresh `MOVING` produces ToF visualization; fresh `STILL` suppresses it.

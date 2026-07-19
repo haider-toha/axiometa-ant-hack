@@ -20,7 +20,7 @@ Related docs: [`MODAL-FOR-WWW.md`](MODAL-FOR-WWW.md) (the Modal contract) · [`p
 ## A. Web-app work still to do (our side, in `www/`)
 
 1. **Env wiring** — `www/.env.local` has the Upstash *token* but is missing `UPSTASH_REDIS_REST_URL` (both required by `Redis.fromEnv()`), plus `NEXT_PUBLIC_MODAL_URL` once Modal exists. Until the URL is set the relay 500s and the `curl /api/pull` smoke can't run.
-2. **Deploy `www` to Vercel** — live at [bus-stop-awareness.vercel.app](https://bus-stop-awareness.vercel.app). Confirm Upstash env at Production scope. Vercel HTTPS is also what makes `getUserMedia` work on the demo phone.
+2. **Deploy `www` to Vercel** — live at [tacta.space](https://tacta.space). Confirm Upstash env at Production scope. Vercel HTTPS is also what makes `getUserMedia` work on the demo phone.
 3. **Tests (vitest, per george-stack)** — not written. Highest ROI: `detectorToEvent()` (BUS→WAIT→NUMBER→UNKNOWN mapping + route regex) and the relay `mset`-before-`incr seq` ordering.
 4. **End-to-end smoke** — once env + deploy land: `curl` a locked-demo `/api/event` payload, confirm `/api/pull` returns the incremented command, then drive the capture page against a real Modal URL.
 5. **Real-phone rehearsal** — iOS Safari camera permission grant on the actual demo device (the plan flags this as the thing that still bites on stage).
@@ -33,7 +33,7 @@ Related docs: [`MODAL-FOR-WWW.md`](MODAL-FOR-WWW.md) (the Modal contract) · [`p
 | Dependency | Direction | Status / risk |
 | --- | --- | --- |
 | **Modal vision endpoint** (`vision/bus_vision.py`) | Blocks our capture→detection flow | Doesn't exist yet. Must match `MODAL-FOR-WWW.md` (response shape + CORS). Provides `NEXT_PUBLIC_MODAL_URL`. |
-| **Firmware polling host** | We block firmware | Board should poll `bus-stop-awareness.vercel.app/api/pull` — set `VERCEL_HOST` in `secrets.h`. The legacy speech app at `app-eight-lyart-98.vercel.app` is retired. |
+| **Firmware polling host** | We block firmware | Board polls `tacta.space/api/pull`; the host is tracked in `network_config.h`, while ignored `secrets.h` contains only hotspot credentials. The legacy speech app at `app-eight-lyart-98.vercel.app` is retired. |
 | **`DeviceCommand` struct mirrors `contract.ts`** | We block firmware | Firmware `net.h` must match our `CloudPattern` strings, `route` (`char[8]`), and `conf` values (`"high"`/`"low"`/`""` → `CONF_*`). Keep the two in lockstep. |
 | **Upstash Redis instance** | We depend on it | Plan says `UPSTASH_*` already provisioned at Production scope (old `app`). Confirm `www` uses the same instance; our key schema is new, so no collision. |
 | **Buzzer discrimination wear test** (merged PR #4) | Resolved for item A6 | Tactile output failed. L/R navigation remains in scope as an explicit 2350/3050 Hz audio simulation; it does not validate tactile or spatial discrimination. |
@@ -43,7 +43,7 @@ Related docs: [`MODAL-FOR-WWW.md`](MODAL-FOR-WWW.md) (the Modal contract) · [`p
 
 ## C. Decisions to lock before deploy
 
-1. **Vercel target for `www`** — **locked:** `bus-stop-awareness.vercel.app` (`haider-projects/bus-stop-awareness`). Firmware `VERCEL_HOST` must match.
+1. **Vercel target for `www`** — **locked:** `tacta.space` (`haider-projects/bus-stop-awareness`). Firmware `VERCEL_HOST` must match.
 2. **Same Upstash instance as old `app/`?** — if yes, confirm old speech-era keys won't confuse the debug screen (our reads default cleanly, so low risk).
 3. **L/R navigation is in scope for the web app.** The remaining decision is the detector-to-command threshold for left/centre/right; the plan proposes horizontal frame thirds.
 

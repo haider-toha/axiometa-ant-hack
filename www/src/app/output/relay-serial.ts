@@ -246,7 +246,9 @@ export function reduceBoardRelayState(
         };
         break;
       case "activity_baseline":
+        break;
       case "activity_invalidated":
+        next = { ...next, activity: null };
         break;
     }
   }

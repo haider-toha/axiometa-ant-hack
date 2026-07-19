@@ -208,6 +208,24 @@ describe("reduceBoardRelayState", () => {
     expect(state.events[0]).toMatchObject({ status: 524 });
     expect(state.events.at(-1)).toMatchObject({ status: 505 });
   });
+
+  it("clears a prior activity receipt when firmware invalidates cloud activity", () => {
+    const decoder = new RelaySerialDecoder();
+    let state = reduceBoardRelayState(
+      initialBoardRelayState(),
+      decoder.push("RELAY activity=STILL seq=5 override=0\n", 7_100),
+    );
+    expect(state.activity).toMatchObject({ activity: "STILL", seq: 5 });
+
+    state = reduceBoardRelayState(
+      state,
+      decoder.push(
+        "RELAY activity=invalidated reason=missing_invalid_or_stale\n",
+        7_200,
+      ),
+    );
+    expect(state.activity).toBeNull();
+  });
 });
 
 describe("compareRelayState", () => {

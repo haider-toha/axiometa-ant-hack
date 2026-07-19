@@ -111,8 +111,8 @@ export function describeOutputReason(
       ...context,
       title: "Local proximity",
       description: distance
-        ? `P1 is pulsing because an object is ${distance} away while moving.`
-        : "P1 is pulsing because the local proximity reflex is active while moving.",
+        ? `Both channels are pulsing because an object is ${distance} away while moving.`
+        : "Both channels are pulsing because the local proximity reflex is active while moving.",
       state: "active",
     };
   }
@@ -222,11 +222,11 @@ function relayDescription(pattern: string, activity: "MOVING" | "STILL" | "UNKNO
     case "NUMBER":
       return "The board accepted route 88; both channels carry the number pattern.";
     case "WAIT":
-      return "The board is waiting for the route reading; P1 and P3 alternate.";
+      return "The board is waiting for the route reading; both channels pulse together twice.";
     case "UNKNOWN":
       return "The route could not be read confidently; both channels carry the unknown pattern.";
     case "ERROR":
-      return "The relay reported an error; P1 carries the degraded-state pattern.";
+      return "The relay reported an error; both channels carry the long-short-long pattern.";
     default:
       return `The board accepted ${pattern} while ${phase}.`;
   }

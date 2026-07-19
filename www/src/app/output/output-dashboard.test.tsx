@@ -112,7 +112,7 @@ describe("OutputDashboard", () => {
     const reason = screen.getByRole("region", { name: "Why this output?" });
     expect(within(reason).getByRole("heading", { name: "Local proximity" })).toBeInTheDocument();
     expect(reason).toHaveTextContent(
-      "P1 is pulsing because an object is 444 mm away while moving.",
+      "Both channels are pulsing because an object is 444 mm away while moving.",
     );
     expect(reason).toHaveTextContent("MOVING");
     expect(reason).toHaveTextContent("LOCAL TOF");

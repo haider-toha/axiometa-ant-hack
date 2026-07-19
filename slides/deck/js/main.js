@@ -90,18 +90,35 @@
       Array.from(enterActions.keys()).forEach(runActions);
       return;
     }
+    // IntersectionObserver does not reliably observe SVG child elements — the
+    // slide-5 diagram is the only place data-reveal sits on <g>/<path>, and
+    // several browsers (Safari especially) never report those as intersecting,
+    // leaving the nodes, labels and arrows stuck at opacity 0. Observe the
+    // nearest HTML ancestor instead, and fan each entry back out to every
+    // registered element under it so each keeps its own stagger delay.
+    const targetEls = new Map(); // observed HTML element -> [registered els]
+    enterActions.forEach((_, el) => {
+      let target = el;
+      while (target instanceof SVGElement) target = target.parentElement;
+      if (!target) target = el; // detached; observe the element itself
+      const list = targetEls.get(target);
+      if (list) list.push(el);
+      else targetEls.set(target, [el]);
+    });
+
     const observer = new IntersectionObserver(
       (entries) => {
         for (let i = 0; i < entries.length; i++) {
           const entry = entries[i];
           if (!entry.isIntersecting) continue;
           observer.unobserve(entry.target);
-          runActions(entry.target);
+          const els = targetEls.get(entry.target);
+          if (els) for (let j = 0; j < els.length; j++) runActions(els[j]);
         }
       },
       { threshold: THRESHOLD }
     );
-    enterActions.forEach((_, el) => observer.observe(el));
+    targetEls.forEach((_, target) => observer.observe(target));
   }
 
   /* ------------------------------------------------------------------ reveals */

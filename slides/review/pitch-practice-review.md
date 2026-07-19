@@ -5,7 +5,14 @@ Reviewed 2026-07-19 against `slides/deck/index.html` as it stood after the ~01:3
 latest state, not the state at the start. Where a finding was closed by one of those edits
 I say so rather than raising it stale.
 
-**3 BLOCKER / 10 WARNING / 3 SUGGESTION.**
+**3 BLOCKER / 11 WARNING / 3 SUGGESTION.**
+
+This is a pitch-craft review, not another fact check. It does not repeat findings already
+made in `narrative-review.md`, `slop-review.md` or `visual-review.md`. **Two of its three
+blockers reopen items that `sign-off.md` consciously accepted** (slide 6's estimates, and
+the quiet close) — in both cases because the prior passes asked a different question than
+the one that decides a judged pitch. I say why in each finding rather than simply
+overruling them.
 
 Independent recount agrees with the ledger exactly: **P1 147 / P2 160 / P3 166 = 473 words;
 5:08 full, 4:49 tight.** The ledger's earlier double-count of the in-demo and contingency
@@ -163,15 +170,137 @@ hack work?"* at 25%. Slide 9 states that the output channel — the one thing th
 information on a DeafBlind person's body — does not work as designed. That is a direct hit
 on the largest or joint-largest bucket in most rubrics.
 
-**Net:** disclose, but understand what you are buying. You are buying protection on
-Technical/Completion in Q&A (where 33–60% of the score lives), and possible credit on an
-ethics/HHH criterion if one exists. You are not buying points for candour itself. See
-BLOCKER 3 for the placement problem this creates.
+**Now the persuasion literature, which arrived late and is less friendly than the folklore.**
+All of the following came via delegated research threads rather than my own fetching; I have
+preserved their confidence markers rather than laundering them into certainty.
+
+**First, stop citing the pratfall effect.** Aronson, Willerman & Floyd (1966) — the study
+everyone invokes for "a blunder makes a competent person more likable" — **was never
+statistically significant on that half. N = 48, p = .18, never replicated.** If a judge asks
+why you disclosed, do not reach for it.
+
+**The finding that matters most for slide 9 — two-sided messaging.** Disclosure pays **only
+when the counterargument is refuted**, not merely acknowledged: refutational **r = +.077**
+versus non-refutational **r = −.049**, k = 107. *Naming a weakness without answering it is,
+on this evidence, worse than not raising it at all.* This is the single most actionable
+result in the whole review, and it is a scalpel rather than a hammer — it does not say
+"don't disclose", it says "don't disclose bare".
+
+**Corroborated in a funding context.** Bolinger, Brownell & Covin, *Strategic
+Entrepreneurship Journal* 19:283–312 (N = 300/141/188),
+[doi](https://doi.org/10.1002/sej.1525), verbatim: *"**While risk disclosure may harm
+financing efforts**, we reveal that using a tactic we call '**compensation**' — in which
+risk disclosures are packaged with information meant to mitigate the risk — **enhances
+financing efforts**… entrepreneurs should disclose risk, but should take care to do so in a
+specific manner."* **Caveat: crowdfunding, not VC, not hackathons.**
+
+**And a boundary condition on which kind of flaw.** Howe & Menges, *OBHDP* 186 (2025),
+[doi](https://doi.org/10.1016/j.obhdp.2024.104388): *"Disclosing agency-excess flaws does not
+generate closeness or elicit investment… Disclosing agency-deficit flaws can generate
+closeness and result in investment, **but only among investors who possess the same flaw**."*
+Capability-deficit flaws only; overconfidence-type flaws never pay. *(Sample sizes
+unverified — ScienceDirect 403.)* The deck's disclosure is capability-deficit type, which is
+the better category to be in.
+
+**The strongest null, and a calibration warning.** Kalvapalle, Phillips & Cornelissen (2024),
+*Academy of Management Annals* 18(2):550–599 reviews **252 pitching papers since 1986**. The
+words *candor, candour, honesty, weakness, humility* appear **zero times**; *disclosure*
+appears **once** ([PDF](https://escholarship.org/content/qt6994466p/qt6994466p.pdf)).
+**Anyone claiming "research shows investors reward admitting weakness" is overstating a
+literature of roughly two papers.** That includes anyone on this team defending slide 9 in
+Q&A.
+
+**The distinction that should change what the deck cuts.** Huang & Pearce (2015) found
+person-perception beat business data outright (β = 1.15, p < .01 vs β = .10, n.s.) — but the
+manipulation used to *create* the positive perception was a founder quote admitting
+near-total failure (months behind on the mortgage, unable to pay staff). That is **candour
+about struggle and persistence, not candour about a flaw in the product.** My researcher
+called this the most useful thing in the thread and I agree. See WARNING 11: the deck
+currently protects the bare product-flaw sentence and marks the struggle narrative
+`[CUTTABLE]`.
+
+**Practitioners disagree four ways — do not flatten this.**
+
+1. **Bolinger et al.** — bare disclosure harms; disclosure + mitigation helps.
+2. **Howe & Menges** — helps only for capability-deficit flaws, only with a matched judge.
+3. **Paul Graham**, [*How to Convince Investors*](http://www.paulgraham.com/convince.html) —
+   candid **if asked**, never volunteer a risks slide: *"the best response is neither to bluff
+   nor give up, but instead to explain how you'd figure out the answer"*; *"that worry will
+   now be out in the open instead of being a gotcha"*; *"As long as you stay on the territory
+   of truth, you're strong."* **This directly conflicts with Bolinger** on whether to disclose
+   proactively. Unresolved.
+4. **Sequoia / [Sam Altman](https://playbook.samaltman.com/)** — omit risk from the deck
+   entirely; *"Always explain why you could be a huge success."* No major VC firm recommending
+   a dedicated risks slide was found (degraded search — "not found", not "does not exist").
+
+**One more calibration point.** Parhankangas & Ehrlich (2014), *JBV* 29(4):543–564 found
+angels prefer *"the **moderate** use of positive language"* — **both extremes lose**, neither
+pure hype nor heavy self-deprecation. Slide 9 is 22 seconds of four consecutive negatives,
+which sits toward the self-deprecation end.
+
+**Two further threats to "honest substance gets judged on merit."** Cottle & Anderson (2020),
+*JBV Insights* 14:e00190: *"investors are unable to distinguish between the presence of a
+well-prepared script and an entrepreneur who is exaggerating"*; *"sometimes exaggeration
+works."* And Brooks, Huang, Kearney & Murray (2014), *PNAS* 111(12):4427–4431: investors
+preferred male-presented pitches *"even when the content of the pitch is the same."*
+
+**One finding that threatens the bet structurally.** Maxwell, Jeffrey & Lévesque (2011,
+*Journal of Business Venturing*) report that angel investors screen **non-compensatorily** —
+they reject on a *single fatal flaw* rather than weighing strengths against weaknesses. If
+that decision rule holds, volunteering an unrefuted weakness is far more dangerous than a
+"pros and cons net out" model implies, because there is no netting out. *(Relayed via my
+researcher; existence and ~480 citations verified, the underlying numbers not.)*
+
+**Two reasons I do not think this sinks slide 9, and one reason to take it seriously anyway.**
+First, non-compensatory screening is an *angel* finding, and hackathon judging is
+compensatory by construction — Devpost literally averages 1–5 stars across criteria
+(section A). A rubric cannot express "one flaw, reject". Second, the disclosed flaw is
+paired with a resolution path in the same breath ("Real motors next"), which is what
+separates a disclosed *constraint* from a disclosed *defect*. But third, and this is the
+part to take seriously: **the holistic prizes — "best overall", sponsor picks, anything
+decided by discussion rather than by sheet — are exactly where non-compensatory screening
+would apply.** Slide 9 is safest where the rubric is doing the work and most exposed where a
+room is arguing about a shortlist.
+
+**A related result on negative cues.** Elsbach & Kramer (2003, *AMJ* 46(3), 283–301,
+[PDF](https://leeds-faculty.colorado.edu/dahe7472/Elsbach%202003.pdf)) coded Hollywood pitch
+meetings and found a sharp asymmetry: **15 cues signalling creativity against only 4
+signalling uncreativity — and the 4 negatives were weighted far more heavily.** They also
+report irreversibility: *"it appears that pitchers could not recover from these early
+negative categorizations later in a pitch."* **Method caveat, which matters:** 36 informants
+but only **12 live pitches** (16 were re-enactments during interviews), qualitative, no
+effect sizes — and the widely-repeated "first few seconds" claim is an *inference from
+retrospective interviews*, not a timed measurement. Note also that Elsbach's negatives are
+about the *pitcher* reading as "too slick, mechanical, or rehearsed", not about candid
+disclosure of a project limitation, so do not over-transfer it.
+
+**Net.** The sentence is mandatory and it is true, so the question was never whether to say
+it. The evidence gives three specific instructions about *how*:
+
+1. **Never bare.** Refuted disclosure r = +.077, unrefuted r = −.049. Every disclosed
+   limitation needs its mitigation in the same breath — Bolinger's "compensation".
+2. **Prefer struggle to defect.** The candour that demonstrably moves people is candour about
+   what you fought and what it cost (Huang & Pearce), not an inventory of what is broken.
+3. **Moderate, not maximal.** Both extremes lose (Parhankangas & Ehrlich). Four consecutive
+   negatives is a lot.
+
+You are buying protection on Technical/Completion in Q&A (where 33–60% of the score lives)
+and possible credit on an ethics/HHH criterion if one exists. You are not buying points for
+candour itself — that literature is roughly two papers — and in holistic prize discussions
+you may be handing over a single-flaw rejection. See WARNING 11 for the specific line the
+deck has mis-prioritised, and BLOCKER 3 for the placement problem.
+
+**Overall caveat on everything in D and E.** McSweeney et al. (2025), *JBV*, systematically
+reviewed **173 pitching articles, 2000–2024** and reports: *"none of the articles in our
+review were replication studies"*
+([PDF](https://www.thallison.com/wp-content/uploads/2025/05/Pitching-Review-2025-JBV.pdf)).
+The *pattern* across these findings is consistent and worth acting on. **The individual
+coefficients are not trustworthy.** Do not quote a beta at a judge.
 
 ### E. What makes judges disengage
 
-Thin, and I want to be clear that it is thin. What I have is first-party judge commentary
-from Devpost's panel rather than the broader post-mortem literature:
+First-party judge commentary from Devpost's panel, then the academic work, which is more
+useful and considerably more unsettling.
 
 - Richard Moot (Square): *"The demo video gives the most amount of scope."* and *"A project
   that really stands out is one that was clearly considering the judging criteria."*
@@ -187,6 +316,58 @@ entries, and results otherwise depend on judging order
 ([design writeup](https://anishathalye.com/designing-a-better-judging-system/)). Order
 effects and score non-comparability in this setting are real enough that a major hackathon
 re-engineered around them.
+
+**The strongest quantitative result in this literature, and it is uncomfortable.** Tsay
+(2021), *Academy of Management Discoveries* 7(3), 343–366
+([PDF](https://discovery.ucl.ac.uk/id/eprint/10117864/3/Tsay_Visuals%20Dominate%20Investor%20Decisions%20about%20Entrepreneurial%20Pitches_AAM.pdf))
+— 12 studies, 1,855 participants, picking the real winner from three finalists (chance = 33%):
+
+| Condition | Correct |
+|---|---|
+| **Silent video** | **52.2%** (t(171) = 11.82, P < .001) |
+| Video with sound | 43.6% |
+| **Sound only** | **35.6% — indistinguishable from chance** (n.s.) |
+
+**Adding the audio made judges worse.** Meanwhile **63.5% of participants said auditory
+content was the most informative** (χ² = 228.95, P < .001). Clark (2008) found the same
+pattern in real angels: presentation score predicted follow-up, and angels explained their
+decisions purely in terms of substance, apparently unaware. **Pitch judges cannot introspect
+on what actually drives them.** For this deck that cuts two ways — it vindicates the visual
+investment, and it makes the dead visual channel during the 90-second demo (BLOCKER 1) the
+single most expensive omission in the pitch, because that is the channel that predicts
+outcomes.
+
+**Preparedness reads; theatre does not.** Chen, Yao & Kotha (2009), *AMJ* 52(1):199–214, a
+field study with 55 real investors: *"**preparedness, not passion, positively impacted
+decisions to fund ventures**"* — preparedness β = 1.69, p < .01; passion β = −0.09, n.s.
+**Caveats:** "passion" was actor-performed theatre over identical content, so this shows
+*added theatre* is worthless rather than that conviction is; and the paper does not test
+candour at all. It is nonetheless the closest thing to direct evidence that an unscripted
+demo costs you (BLOCKER 1).
+
+**On judge fatigue and order effects — two clean negatives.** My researcher found **no study
+of order effects within startup pitch competitions or demo days**, and **no rigorous
+empirical study of how human judges evaluate hackathon projects at all.** What exists is
+outcomes research (Medina Angarita & Nolte 2020, CSCW), large-scale project analysis that
+sidesteps judges entirely (Falk et al., CHI '25 — 193,353 projects, uses the winner tag as an
+*input feature* and never studies the judging that produced it), and two 2026 LLM
+auto-grading papers that never validate against human judges. Everything else is blog-level.
+**If someone tells you what hackathon judges do at pitch 40, they are guessing.**
+
+**Do not blend the two order-effect literatures — they point opposite ways.** Sequentially
+*scored* contests favour **later** performers. A two-item **forced choice** favoured the
+**first**: Brooks et al. Study 2, **57.97% (302/521) funded the pitch they watched first**,
+β = 0.177, SE = 0.039, P < 0.0001, order randomised. Eurovision (Antipov & Pokryshevskaya):
+later performers rank better, **televoting p = 0.020 (significant), jury p = 0.081 (not
+significant at .05)** — and two independent transcriptions disagree on the correlation
+magnitudes while the p-values match, so **cite the p-values, not the r's.**
+
+**One number to stop repeating.** Gompers et al. (2020), *JFE*, surveyed 885 VCs at 681
+firms: roughly **100 opportunities considered per closed deal**, and **95% cite the
+management team as important, 47% as the single most important factor** versus 37% for all
+business factors combined. But that paper does **not** measure screening speed — the widely
+circulated "investors spend 3 min 44 sec on a deck" figure is **DocSend marketing research,
+not peer-reviewed.**
 
 ### F. Presentation format and slide density
 
@@ -269,26 +450,35 @@ better than data." Do not defend the opening in Q&A with a number.
 
 ### H. What I could not source — read this before trusting Part 1
 
-**The session's web search budget was exhausted (200/200) part-way through.** Two of the four
-research streams I commissioned did not return. I have **no verified sources** for:
+**The session's web search budget was exhausted (200/200) part-way through**, and the
+research threads returned in stages. Two gaps remain, and one earlier gap has since closed:
 
-- **Accelerator guidance** — YC, Techstars, Sequoia, 500 Global. No time-split numbers, no
-  YC position on whether to demo at all, no Kevin Hale material. The brief asked for this
-  first and I do not have it. Sections A–F rest entirely on hackathon rubrics, which is the
-  more directly applicable body of evidence for this event but is not what was asked for.
-- **The psychology of disclosed weakness** — pratfall effect (Aronson), stealing thunder
-  (Williams et al.), inoculation / two-sided messaging. **Section D is grounded in rubrics
-  and judge quotes only, not in the persuasion literature.** Given that slide 9 is the
-  deck's biggest deliberate bet, this is the gap I would close first.
+- **Still missing — accelerator time-split guidance.** No YC / Techstars / Sequoia / 500
+  Global numbers for how a five-minute pitch should be divided, no YC position on whether to
+  demo at all. Sections A–F rest on hackathon rubrics, which is the more directly applicable
+  evidence for this event but is not what the brief asked for first. What *did* arrive from
+  that world is Graham, Altman and Sequoia on risk disclosure (section D), and Gompers on VC
+  screening (section E).
+- **Still missing — presentation science on structure.** Primacy/recency transfer to spoken
+  talks, retention figures, Duarte's sparkline, Mayer's redundancy principle, and evidence on
+  opening with silence were never retrieved. The narrative thread returned only on **story
+  versus data** (section G).
+- **Now closed — the psychology of disclosed weakness.** Section D was originally written
+  from rubrics and judge quotes alone. The persuasion literature arrived late and **partly
+  reversed** that draft: the pratfall effect turns out to be a null result, and the
+  refuted/unrefuted distinction (r = +.077 vs −.049) changed the recommendation from "keep it,
+  move it" to "keep it, never let it stand bare". WARNING 10 exists only because of that
+  late material.
 
-Partially covered: presentation science returned on **story vs data** (section G) but not on
-primacy/recency transfer to spoken talks, retention figures, Duarte's sparkline, Mayer's
-redundancy principle, or opening with silence.
+Where I reason about memory, endings and the black-screen open (BLOCKER 3, Q3, Q7, Q8), **I am
+reasoning from the deck's own structure, the rubric evidence, and the narrative and
+persuasion findings in D/E/G — not from cited research on serial position in talks.** Treat
+those as argued judgement, not sourced fact.
 
-Where I reason about memory, endings and the black-screen open below (BLOCKER 3, Q3, Q7, Q8),
-**I am reasoning from the deck's own structure, the rubric evidence and the narrative
-findings in G — not from cited research on serial position in talks.** Treat those as argued
-judgement, not sourced fact.
+**Two provenance notes.** Everything in D and E after the Devpost quotes came through
+delegated research threads rather than my own fetching; I have kept their unverified flags
+intact and marked them inline. And per McSweeney et al., the pitching literature contains
+**zero replication studies** — trust the pattern, not the coefficients.
 
 I have also not repeated fact-level findings already covered by
 `slides/review/narrative-review.md` and `slides/review/slop-review.md`; several remain open
@@ -380,11 +570,27 @@ Three consequences follow, and each is independently serious:
 presentation criterion at all. [Hack the North](https://hackthenorth2025.devpost.com/rules):
 the judging pitch "should be focused on a live demo of the project — not a slide show".
 
+Two academic results sharpen this considerably (section E). **Tsay (2021)**: judges shown
+*silent video* of pitches picked the real winner 52.2% of the time against 33% chance, while
+*audio only* scored 35.6% — statistically indistinguishable from guessing. The visible
+channel predicts outcomes; the audible one barely does. This deck's demo runs 90 seconds
+with its visible channel parked on a static diagram that `visual-review` 16 already called
+generic, while all the meaning is carried in audio the plan itself rates confusable. **That
+is the wrong way round on the one result with 1,855 participants behind it.** And **Chen, Yao
+& Kotha (2009)**, with 55 real investors: *"preparedness, not passion, positively impacted
+decisions to fund ventures"* (β = 1.69, p < .01). An unscripted ninety seconds is the most
+visible place in this pitch to look unprepared.
+
 **Fix** Script the demo to the same standard as the slides — roughly eight narration beats
 keyed to events, each under fifteen words, in the deck's own voice. Name every event as it
 fires so SIREN and BUS cannot be confused by ear. It must contain a line at the moment P6
 plays: **"That's the eighty-eight."** Optionally give the audience a legend — even a
 projected four-step tracker that ticks as each step completes.
+
+Note that `sign-off.md`'s top prep item — *"Record the demo working… If the live run fails,
+play the recording"* — is good advice and does **not** address this. A recording de-risks
+*failure*; it does nothing for the ninety seconds of unnarrated audio in the success case.
+The recording also needs the same script, or it inherits the same problem.
 
 ### 2. Slide 6 shows unmeasured estimates 19 seconds after the audience watched it run
 
@@ -399,11 +605,21 @@ This is not the same kind of admission as slide 9: the buzzer limitation is a re
 constraint that cannot be resolved in the time; the latency figure is a number they could
 have obtained with a stopwatch during rehearsal.
 
-**Evidence** Open after two prior review passes. `narrative-review` pass 2 states the case
-exactly: *"A tilde and a credit line change the number's status, not its presence."* The
-deck's own note orders the fix and it has not been done: *"TIME A REHEARSAL RUN. Then
-replace both figures with what you actually saw."* Devpost judge Karen Bajza-Terlouw:
-*"Ambiguity is a red flag."*
+**Evidence** Open after two prior review passes, and now formally accepted: `sign-off.md`
+lists it under *accepted warnings* — *"Until then the tilde and credit stay."*
+`narrative-review` pass 2 states the case exactly: *"A tilde and a credit line change the
+number's status, not its presence."* The deck's own note orders the fix and it has not been
+done: *"TIME A REHEARSAL RUN. Then replace both figures with what you actually saw."*
+Devpost judge Karen Bajza-Terlouw: *"Ambiguity is a red flag."*
+
+**Why I am reopening what was accepted.** The prior passes judged this as a *compliance*
+question — is a hedged estimate honest enough. That framing is right and the answer was
+"nearly". The pitch-craft question is different and was not asked: this slide sits nineteen
+seconds after a live demo, so its audience has *just watched the event being estimated*.
+Everywhere else in the deck a hedge costs nothing. Here it costs the demo's credibility,
+because the obvious question — "you just ran it, why is this an estimate?" — has no good
+answer. `sign-off.md` already names the close-out and prices it at three rehearsal
+prop-raises. That is the cheapest high-value fix on the whole list.
 
 **Fix** Time three rehearsal runs, take the median, and change the credit to
 `Measured at rehearsal · <date>`. If that is genuinely impossible, **cut slide 6** and move
@@ -433,8 +649,24 @@ right call. It is an argument about **what follows it**.
 **Evidence** See section D: candour scores nothing on any rubric found, while Completion
 ("Does the hack work?") is 25% at MLH and technical implementation is 50–60% at Nova and
 Azure. Ending on the limitation spends the most valuable position in the pitch on the one
-message that has no scoring home. *(Reasoning from rubric weights and deck structure —
-the presentation-retention literature that would strengthen this was not sourced; see G.)*
+message that has no scoring home. Section G adds a second reason: the closing callback lands
+on a story that has been absent for 196 seconds (WARNING 9), so it is asked to do recall work
+that the narrative evidence says it can only do when it *carries* the content rather than
+surrounding it. *(Reasoning from rubric weights, deck structure and the narrative findings in
+G — serial-position research on spoken talks was not sourced; see H.)*
+
+**The team has already considered this and accepted it.** `sign-off.md` lists "The close is
+quiet" under accepted warnings, and defends it: Ralston says end "with a bang"; Chris
+Anderson calls the inspiring-call-to-action formula cliché and "emotionally manipulative";
+the deck follows Anderson.
+
+**That defence does not cover this objection.** Anderson's target is the *inspirational
+call to action* — the swelling appeal, the ask, the "join us". I am not asking for one, and
+adding an ask here would be wrong for a hackathon (section F). I am asking for **one clause
+of fact**: that the thing worked. "Today it told him the 88 had arrived" is not a call to
+action, is not emotionally manipulative, and is not a bang. It is the result. A deck can
+follow Anderson and still state its outcome; the two are not in tension. The callback,
+the composition and the refusal to say "thank you" all survive intact.
 
 **Fix** Keep slide 9 exactly as written. Change slide 10 to carry one clause of achievement
 before the aspiration — two beats, what was done and what has not been. Something with the
@@ -535,7 +767,29 @@ have asked anyone." This costs no extra time (the demo is unscripted anyway, BLO
 converts the story from bracket to spine, and makes the slide-10 callback land on something
 the audience watched rather than something they were told.
 
-### 10. The only mid-slide handoff buys nothing
+### 10. The cut list drops the two lines that make the honesty work
+
+`sign-off.md` states it plainly: **"The tight run is the run."** So every `[CUTTABLE]` line
+goes by default, not as a fallback. Two of the six are load-bearing in a way the cut list
+does not price:
+
+- **Cut #6, slide 9: *"We drove them down to seventy hertz. Still nothing."*** The outline
+  classifies this as "detail, not the claim". On the two-sided-messaging evidence it is
+  precisely the opposite: it is the **refutation**. Refuted disclosure scores r = +.077,
+  unrefuted r = −.049 — and this nine-word line is the only thing in the deck that turns "the
+  buzzers cannot be felt" from a bare admission of failure into evidence that the team
+  attacked the problem and measured the result. It is also **candour about struggle**, which
+  is the category Huang & Pearce found actually moves people, as opposed to candour about a
+  product defect, which has essentially no supporting literature (Kalvapalle's null).
+- **Cut #5, slide 1: *"I'll come back to that."*** Already noted in WARNING 7 — the forward
+  reference that makes slide 9 read as planned rather than defensive.
+
+**Fix** Reclassify both as never-cut, alongside the mandatory sentence. Find the 19 seconds
+in slide 6 instead (BLOCKER 2). If something on slide 9 must go, cut *"So those two tones
+stand in for two vibration channels"* — that claim is already made verbatim on slide 4 and
+again in the demo line, so it is the only genuinely redundant sentence in the block.
+
+### 11. The only mid-slide handoff buys nothing
 
 P1 → P2 lands mid-slide-3 on the communicator-guide line, and the deck flags that it needs
 rehearsal. Moving it to the 3/4 boundary is strictly better: P1 asks *"which bus is this?"*
@@ -594,18 +848,43 @@ build. The real risk is not the black screen; it is that **the device is not des
 saying what this is (WARNING 2). *(No sourced evidence on opening with silence specifically
 — see H.)*
 
-**4. Does the honesty on slide 9 help or hurt?** Mixed, and the honest answer is less
-flattering than "it's your differentiator". **On the scorecard it buys nothing** — no rubric
-found scores acknowledging limitations, and none penalises overclaiming as a named
-criterion. **It costs you on Completion** ("Does the hack work?", 25% at MLH), because the
-thing disclosed is not peripheral: the tactile channel is the entire mechanism by which a
-DeafBlind person receives the answer. **It protects you in Q&A**, which is where the
-technical score is really settled, and where "Ambiguity is a red flag" gets applied.
-**And at this specific event it may score directly** — the Anthropic Claude 2 Hackathon
-scored "helpful, harmless, and **honest**", and Claude @ Imperial scored Ethical Alignment.
-Keep it. Do not let it be the last thing said (BLOCKER 3). Note also that slide 9's kind of
-honesty is load-bearing and correct, while slide 6's is a hedge around a number you could
-simply measure — judges read those two very differently.
+**4. Does the honesty on slide 9 help or hurt?** It helps *as delivered on the full script*
+and **hurts on the tight script you are actually going to run** — and that is a much more
+specific answer than "honesty is your differentiator", which the evidence does not support.
+
+**The framing to drop first.** Do not defend this in Q&A by saying research shows investors
+reward candour. Kalvapalle et al. reviewed 252 pitching papers since 1986 and found the words
+*candor / honesty / weakness / humility* **zero times**. The supporting literature is roughly
+two papers. And do not cite the pratfall effect — its famous half was **never significant**
+(N = 48, p = .18).
+
+**The one rule that actually matters:** disclosure pays only when the weakness is
+**refuted**, not merely named — refutational r = +.077, non-refutational **r = −.049**.
+Bare disclosure is worse than silence. Bolinger et al. found the same in a funding context:
+risk disclosure harms *unless* packaged with mitigation.
+
+**Apply that to the actual slide.** On the full script, slide 9 passes: failure stated,
+effort evidenced ("we drove them down to seventy hertz"), reframed, then a forward path.
+On the tight script — which `sign-off.md` says *is* the run — the effort evidence is cut, and
+what remains is closer to a bare inventory. **That single nine-word cut is the difference
+between a refuted disclosure and an unrefuted one** (WARNING 10).
+
+**What it costs and buys.** It costs you on Completion ("Does the hack work?", 25% at MLH),
+because what is disclosed is not peripheral — the tactile channel is the whole mechanism by
+which a DeafBlind person receives the answer. It exposes you in holistic prize discussions,
+where non-compensatory single-flaw screening applies (Maxwell et al.) in a way a rubric
+cannot. It protects you in Q&A, where "ambiguity is a red flag". And at *this* event it may
+score directly — the Anthropic Claude 2 Hackathon scored "helpful, harmless, and **honest**".
+
+**Also note the category.** Huang & Pearce's effect came from candour about *struggle*, not
+about a product defect. The deck's most persuasive honesty is therefore the 70 Hz line and
+the tactile-failure story — not the mandatory sentence, which is a compliance obligation you
+should meet and move past. Keep it; never let it stand bare; do not let it be the last thing
+said (BLOCKER 3).
+
+**And keep it separate from slide 6.** Slide 9's honesty is about a constraint that could not
+be resolved in the time. Slide 6's is a hedge around a number you could get with a stopwatch.
+Judges read those very differently, and only one of them is admirable.
 
 **5. Is 11 slides right for 5 minutes?** Yes. It is ~19 s per slide, which sounds fast but
 isn't, because each surface holds one statement that takes 2–4 s to read. The count is not
@@ -653,6 +932,15 @@ It is 29% of the pitch. It is the only stretch where the criteria that actually 
 demonstrated rather than asserted. And it currently contains **nine scripted words, against
 39 for the failure branches**. Everything else in this deck has been counted, sourced and
 defended to the word. The most important ninety seconds has not been written at all.
+
+**One refinement the late research forces.** Tsay (2021) found judges shown *silent video*
+picked the real winner 52.2% of the time, while *audio only* scored 35.6% — chance. So the
+demo does not only need a script; **it needs something to look at.** Narration fixes
+legibility and preparedness (Chen et al.: preparedness β = 1.69, p < .01); it does not fix a
+dead visible channel. Give the room something that visibly changes as each step fires — the
+board in someone's hand held up and pointed at, a projected step tracker, anything that is
+not the same static diagram for ninety seconds. Script *and* stagecraft, in that order of
+effort but not of importance.
 
 Narrating it through the person rather than the hardware is what makes it the highest-leverage
 change rather than merely a necessary one, because it fixes four things at once:

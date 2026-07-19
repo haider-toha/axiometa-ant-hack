@@ -41,7 +41,12 @@ Cut them in this order, worst first:
 3. Slide 5, P2 — *"Which matters in a moment."* Pure transition.
 4. Slide 8, P3 — *"So why a detector?"* Setup; the next line stands without it.
 5. Slide 1, P1 — *"I'll come back to that."* Slide 9 pays it off regardless.
-6. Slide 9, P3 — *"We drove them down to seventy hertz. Still nothing."* Detail, not the claim.
+
+**Removed from this list:** *"We drove them down to seventy hertz. Still nothing."*
+It was cut #6 and that was wrong. It is the only evidence-of-effort in slide 9, and
+O'Keefe's split means a disclosure that is named but not refuted scores **worse than
+silence** (r = −.049 vs +.077). Cutting it inverted the value of the deck's best
+thirty seconds. Never mark it cuttable again.
 
 **Never cut** the mandatory validation sentence on slide 9, or the callback on slide 10.
 Those are the two things a judge remembers.
@@ -84,7 +89,7 @@ diagram. Nothing else.** No bullet lists anywhere.
 | 3 | four-row ledger: subject / disqualifier | staggered row reveal |
 | 4 | **CAD explode, 90 frames, pin 5:1** | canvas sequence |
 | 5 | system diagram — 5 nodes, 4 edges | edge draw-on |
-| 6 | two figures: `1.4 s` / `3.8 s` | count-up |
+| 6 | two figures: `~1.4 s` / `~3.8 s` + estimate credit | count-up |
 | 7 | **CAD orbit, 80 frames, pin 4:1** | canvas sequence |
 | 8 | `Detection is when.` / `Claude is what.` | two-line reveal |
 | 9 | `We have not validated this with DeafBlind users.` | static, held |

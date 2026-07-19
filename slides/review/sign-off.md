@@ -10,7 +10,7 @@ against published research.
 | | |
 |---|---|
 | Slides | 11 (0–10), 18 viewports — inside `spec.md`'s 16–21 target |
-| Runtime | **5:12 full · 4:54 with `[CUTTABLE]` lines dropped.** Slot is 5:00 |
+| Runtime | **5:12 full · 4:58 with `[CUTTABLE]` lines dropped.** Slot is 5:00 |
 | Presenter split | P1 147 · P2 160 · P3 176 words |
 | Frames | 230 · explode 90, orbit 80, detail 60 · max 42.9 KB · max RGB 191/201/183 |
 | Palette | exactly `#0A0B0C` `#F2F4F5` `#9AA3A8` `#CFD9E0` |
@@ -21,6 +21,13 @@ against published research.
 
 **The tight run is the run.** The deck only fits the slot with every `[CUTTABLE]` line
 dropped. Treat those cuts as default and the full script as the overrun case.
+
+> **That policy nearly broke slide 9.** The cut list originally included *"We drove them
+> down to seventy hertz. Still nothing."* — the only evidence-of-effort in the block, and
+> therefore the only thing making the disclosure *refutational*. Under O'Keefe a named-but-
+> unrefuted weakness scores **worse than silence**. A default-cut policy and a cut list
+> compiled by word count are safe only if nothing load-bearing is on the list; that line was.
+> It is no longer cuttable, and the deck still fits at 4:58.
 
 ---
 
@@ -119,14 +126,20 @@ This is a judgement call against one credible source and with another.
 
 ## Before you present
 
-1. **Record the demo working.** Highest-value prep available. If the live run fails, play
+1. **Put the debug screen up during the demo** — not the static diagram. Tsay (2021,
+   n=1,855): judges given silent video picked the real winner 52.2% of the time; audio-only
+   scored 35.6%, indistinguishable from chance. Ninety seconds of a motionless slide, with
+   all meaning in two tones the plan itself calls confusable, is the wrong way round.
+   `/api/state` exists for this: the plan says it is "what makes the siren tier visible to
+   an audience". Say the payload out loud too — "that's the eighty-eight".
+2. **Record the demo working.** Highest-value prep available. If the live run fails, play
    the recording — do not skip to slide 6 and do not troubleshoot on stage.
-2. **Time three rehearsal prop-raises** and replace slide 6's two estimates.
-3. **Check Gloock on the actual projector.** Hairlines are the first thing a projector
+3. **Time three rehearsal prop-raises** and replace slide 6's two estimates.
+4. **Check Gloock on the actual projector.** Hairlines are the first thing a projector
    loses; 108 px light-on-dark is in our favour, but verify.
-4. **Rehearse the mid-slide P1→P2 handoff** on slide 3 — the only voice change inside a
+5. **Rehearse the mid-slide P1→P2 handoff** on slide 3 — the only voice change inside a
    slide.
-5. Confirm the deck opens by **double-clicking `index.html`** on the presenting machine.
+6. Confirm the deck opens by **double-clicking `index.html`** on the presenting machine.
 
 ---
 

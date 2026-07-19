@@ -153,8 +153,34 @@ NOTE: Last line hands into the demo. Don't pause after it.
 
 -------------------------------------------------------------------------------
 DEMO · P2 · 90 s
-SCREEN: hold this slide. Do not advance. The diagram is a legend for what's
-happening.
+
+SCREEN: PUT THE DEBUG SCREEN UP. Do not hold this static diagram for 90 seconds.
+
+This is the single most important staging decision in the deck, and it is
+evidence-backed. Tsay (2021), 1,855 participants: judges shown SILENT video of
+a pitch picked the real winner 52.2% of the time, while judges given AUDIO ONLY
+scored 35.6% — statistically indistinguishable from chance. The visible channel
+is what a judgement actually runs on.
+
+Our demo is currently the wrong way round: ninety seconds of a motionless
+diagram while every piece of meaning rides on two buzzer tones that the plan's
+own discriminability analysis rates confusable. A room that cannot see anything
+change has to take the whole thing on faith.
+
+The project already built the answer. Contract D, /api/state, exists for exactly
+this — the plan says of it verbatim: "This is what makes the siren tier visible
+to an audience - without it the FFT is invisible and judges have to take the
+buzz on faith." Put that screen on the projector for the demo and return to the
+deck with 6 afterwards.
+
+Whatever is on screen, something must visibly change as each step fires: the ToF
+range falling, the FFT band lighting up, BUS then WAIT then NUMBER 88 landing.
+
+NARRATE THROUGH THE PERSON, and say the payload out loud. When route 88 comes
+through, say "that's the eighty-eight" — do not let the only statement of the
+result be a sound the audience cannot interpret.
+
+The diagram on this slide is a legend for what is happening, not the show.
 
 Locked order, plan Revision 2026-07-18e §5:
 1. Start in MOVING. Show the range sensor finding an obstacle — pulse cadence
@@ -297,11 +323,18 @@ NOTE: This slide credits Modal by name, which the brief requires, and earns it.
 SCREEN: We have not validated this with DeafBlind users. Held, static, alone.
 
 [P3] The buzzers we were given can be heard. They cannot be felt.
-[P3] We drove them down to seventy hertz. Still nothing.   [CUTTABLE: detail, not the claim]
+[P3] We drove them down to seventy hertz. Still nothing.
 [P3] So those two tones stand in for two vibration channels.
 [P3] We have not validated this with DeafBlind users.
 [P3] What this build proves is the sensing and the routing.
 [P3] Real motors and real users are the next one.
+
+NOTE — DO NOT MARK THE SEVENTY-HERTZ LINE CUTTABLE. It was, briefly, and that
+was the single most damaging edit made to this deck. It is nine words and it is
+the only EVIDENCE OF EFFORT in the block: it is what turns "the buzzers don't
+work" from an admission into a refuted disclosure. Cut it and slide 9 crosses
+from r = +.077 to r = -.049 — from the deck's strongest thirty seconds to worse
+than saying nothing. If you are over time, cut anywhere else.
 
 NOTE — WHY EACH LIMITATION IS ANSWERED, NOT JUST NAMED. O'Keefe's 1999
 meta-analysis (107 effect sizes, 20,111 respondents) found two-sided messages
@@ -364,9 +397,9 @@ device does.
 | P3 | 176 |
 | **Total** | **483** |
 
-At 130 wpm: **223 s (3:42)** full, **204 s (3:24)** with every `[CUTTABLE]` line dropped (41 words).
+At 130 wpm: **223 s (3:42)** full, **208 s (3:28)** with every `[CUTTABLE]` line dropped (32 words).
 
-With a 90 s demo: **5:12 full** / **4:54 tight**. The slot is 5:00.
+With a 90 s demo: **5:12 full** / **4:58 tight**. The slot is 5:00.
 
 Excluded from the runtime above, and why:
 

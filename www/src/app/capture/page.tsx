@@ -51,6 +51,19 @@ const JPEG_QUALITY = 0.85;
 const VISIBLE_LABELS = 6; // how many detections the list shows under the video
 
 /**
+ * Client-side confidence floor for the person / obstacle fallback path.
+ *
+ * The Modal detector emits every box above DRAW_CONF_MIN = 0.20 so the overlay
+ * has something to draw before a detection is trustworthy. Without a floor
+ * here, a jittery 0.22 person box triggers a full /api/person-direction round
+ * trip, then disappears next frame — the wearer feels a burst of LEFT/RIGHT
+ * that has no obstacle behind it. 0.35 matches the Modal hazard threshold
+ * (CONF_MIN) and requires the detector to actually commit to the box before
+ * Claude is asked which way to route.
+ */
+const PERSON_MIN_CONFIDENCE = 0.35;
+
+/**
  * Activity heartbeat, well under the board's CLOUD_ACTIVITY_LEASE_MS = 120000
  * (firmware/braille_wearable/src/relay_pure.h).
  *
@@ -590,7 +603,7 @@ export default function CapturePage() {
       const busTarget = detections.find((d) => d.target);
       const personTarget = !busTarget
         ? detections
-            .filter((d) => d.kind === "person")
+            .filter((d) => d.kind === "person" && d.confidence >= PERSON_MIN_CONFIDENCE)
             .sort((a, b) => b.confidence - a.confidence)[0]
         : undefined;
       const targetKind: NavView["targetKind"] = busTarget
@@ -800,9 +813,13 @@ export default function CapturePage() {
   const navHeld = nav.confirmed !== null && !nav.sentNav;
   /** What the confirmed bearing translates to — shown even when held. */
   const navCommand = nav.confirmed === null ? null : bearingToPattern(nav.confirmed);
-  /** Human-readable label for whatever is driving the bearing this frame. */
-  const targetLabel = nav.targetKind === "bus" ? "bus" : nav.targetKind === "person" ? "person" : null;
-  /** True while the person-direction Haiku call is in-flight. */
+  /** Whether a target of ANY kind is driving the bearing this frame. The two
+   *  code paths (bus vs person) diverge internally — bus uses the detector's
+   *  centroid, person asks Claude which way is clear — but the phone screen
+   *  and the wearer's ear both hear one thing: a direction to a target. */
+  const hasTarget = nav.targetKind !== null;
+  /** True while the person-direction Claude call is in-flight. Shown as a
+   *  generic "analyzing" state so the UI does not leak the branch. */
   const personAnalyzing = nav.personAnalyzing;
 
   return (
@@ -962,17 +979,16 @@ export default function CapturePage() {
               </div>
             )}
 
-            {/* 2. DIRECTION TO BUS OR PERSON. Point the phone at a bus or a
-                person and watch it decide: raw centroid → widened bearing →
-                confirmation streak → the command that left the phone. Bus is
-                always preferred; a person is the fallback when no bus is in
-                view. Every step is on screen because "it isn't doing anything"
-                and "it decided AHEAD" are otherwise indistinguishable. */}
+            {/* 2. DIRECTION TO TARGET. The frontend deliberately does not
+                distinguish the two internal paths — bus (centroid) vs person
+                (Claude-picked side around the obstacle) — because the wearer
+                does not need to know which one is active. Only the direction
+                matters. Every step below the header is on screen because "it
+                isn't doing anything" and "it decided AHEAD" are otherwise
+                indistinguishable. */}
             <section className="rounded-lg border border-border bg-card p-4 text-card-foreground">
               <div className="flex items-baseline justify-between gap-3">
-                <h2 className="text-sm font-medium">
-                  {targetLabel ? `Direction to ${targetLabel}` : "Direction"}
-                </h2>
+                <h2 className="text-sm font-medium">Direction</h2>
                 <span className="font-mono text-xs tabular-nums text-muted-foreground">
                   {forceNav ? "force-send on" : walking ? "sending · walking" : "sending · scanning"}
                 </span>
@@ -993,27 +1009,23 @@ export default function CapturePage() {
                       nav.confirmed === null || navHeld ? "text-muted-foreground" : ""
                     }`}
                   >
-                    {nav.confirmed === null
-                      ? targetLabel
-                        ? `NO ${targetLabel.toUpperCase()}`
-                        : "NONE"
-                      : bearingToPattern(nav.confirmed)}
+                    {nav.confirmed === null ? "NONE" : bearingToPattern(nav.confirmed)}
                   </div>
                   <p className="mt-1 text-sm text-muted-foreground">
                     {!running
-                      ? "Start the camera to look for a bus or person."
+                      ? "Start the camera to look for a target."
                       : personAnalyzing && nav.confirmed === null
-                        ? "Person detected — analyzing safe direction\u2026"
+                        ? "Target detected — choosing a safe direction\u2026"
                         : nav.confirmed === null && nav.observed === null
-                          ? "No bus or person in view."
+                          ? "Nothing in view."
                           : nav.confirmed === null
-                            ? `${targetLabel ? (targetLabel.charAt(0).toUpperCase() + targetLabel.slice(1)) : "Target"} in view — confirming (${nav.streak}/${BEARING_CONFIRM_FRAMES}).`
+                            ? `Target in view — confirming (${nav.streak}/${BEARING_CONFIRM_FRAMES}).`
                             : navHeld
-                              ? `${navCommand} ready — held while ${nav.busPattern} (bus info) plays. It sends when that clears; Force send overrides.`
+                              ? `${navCommand} ready — held while ${nav.busPattern} plays. It sends when that clears; Force send overrides.`
                               : nav.streak > 0 && nav.pending !== null
                                 ? `Sent. Checking a change to ${bearingToPattern(nav.pending)} (${nav.streak}/${BEARING_CONFIRM_FRAMES}).`
                                 : nav.streak > 0
-                                  ? `Sent. ${targetLabel ? (targetLabel.charAt(0).toUpperCase() + targetLabel.slice(1)) : "Target"} may have left view (${nav.streak}/${BEARING_CONFIRM_FRAMES}).`
+                                  ? `Sent. Target may have left view (${nav.streak}/${BEARING_CONFIRM_FRAMES}).`
                                   : walking
                                     ? "Sent to the board."
                                     : "Sent to the board — start walking and it keeps updating."}
@@ -1023,8 +1035,14 @@ export default function CapturePage() {
 
               <dl className="mt-4 grid grid-cols-2 gap-3">
                 <Diag
-                  label={targetLabel ? `${targetLabel.charAt(0).toUpperCase() + targetLabel.slice(1)} in view` : "Target in view"}
-                  value={nav.observed === null ? "no" : `yes · ${nav.observed}`}
+                  label="Target in view"
+                  value={
+                    nav.observed === null
+                      ? hasTarget
+                        ? "yes · resolving"
+                        : "no"
+                      : `yes · ${nav.observed}`
+                  }
                 />
                 <Diag
                   label="Box centre"

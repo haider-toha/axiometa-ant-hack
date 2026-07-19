@@ -154,19 +154,54 @@ VOTES_KEY = "det:votes"  # JSON array of raw text strings
 
 # Appended to LVIS, not replacing it. LVIS class 172 is
 # "bus/bus vehicle/autobus/charabanc/double-decker/motorbus/motorcoach" and
-# already covers a bus, but these two were hand-tuned against the actual demo
-# prop and cost two embeddings to keep.
-EXTRA_PROMPTS = ["double decker bus", "bus front"]
+# already covers a bus, and LVIS also has "person" — but the base single-word
+# prompts were finicky on the demo scene. Synonyms give YOLO-World's text
+# encoder more anchors for the same visual class; whichever fires the
+# strongest wins, then `TARGET_LABELS` / `HAZARD_LABELS` collapse the family
+# back to one meaning so the phone sees one label group.
+#
+# Bus synonyms are hand-tuned against a London red double-decker prop.
+# Person synonyms give three more angles on a standing / walking figure —
+# "person" alone sometimes scored below the 0.35 hazard floor.
+EXTRA_PROMPTS = [
+    # Bus family — all resolve to `target: true` via TARGET_LABELS below.
+    "double decker bus",
+    "bus front",
+    "red bus",
+    "london bus",
+    "single decker bus",
+    "bus side",
+    # Person family — all resolve to `kind: "person"` via HAZARD_LABELS below.
+    "pedestrian",
+    "human",
+    "walking person",
+]
 
 # Which labels are the arrival target. Resolved by name, so reordering or
-# regenerating the vocabulary cannot silently repoint them.
-TARGET_LABELS = {"bus", "school bus", "double decker bus", "bus front"}
+# regenerating the vocabulary cannot silently repoint them. Every synonym in
+# EXTRA_PROMPTS that names a bus is listed here so a strong hit on any of
+# them counts as an arrival — otherwise adding "red bus" to the prompt list
+# would raise its score but leave `target: false`, which is worse than not
+# adding it.
+TARGET_LABELS = {
+    "bus",
+    "school bus",
+    "double decker bus",
+    "bus front",
+    "red bus",
+    "london bus",
+    "single decker bus",
+    "bus side",
+}
 
 # Coarse safety class for the wearable's future navigation patterns. A label
 # absent from this map is still detected, still drawn, and still named on
 # screen — it simply carries no `kind` and raises no hazard.
 HAZARD_LABELS = {
     "person": "person",
+    "pedestrian": "person",
+    "human": "person",
+    "walking person": "person",
     "bicycle": "bicycle",
     "dirt bike": "bicycle",
     "car": "vehicle",
@@ -268,6 +303,10 @@ def _bake_detector() -> None:
     from ultralytics import YOLO
 
     vocab = _vocab()
+    # Bump this comment when EXTRA_PROMPTS changes to force Modal to re-hash
+    # the closure and rebake the vocabulary. Current vocab family: LVIS 1203
+    # + bus synonyms (double decker / bus front / red / london / single decker
+    # / bus side) + person synonyms (pedestrian / human / walking person).
     m = YOLO("yolov8s-worldv2.pt")  # auto-downloads from ultralytics/assets
     m.set_classes(vocab)
     m.save(BAKED_WEIGHTS)

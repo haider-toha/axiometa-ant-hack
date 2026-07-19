@@ -22,6 +22,20 @@
 
 ---
 
+## Revision 2026-07-19g — Stop-to-direction arbitration
+
+This revision supersedes every older statement that all local proximity output always outranks every cloud direction. Post-demo evidence is recorded in `audit/bus-stop-situational-awareness/27-post-demo-navigation-arbitration.md`.
+
+**1. ToF warns first; camera guidance resolves the bypass.** While `MOVING`, active ToF proximity produces the repeated both-channel stop/obstacle cadence. A fresh camera-derived LEFT or RIGHT then suspends only the ToF output, inserts a 150 ms all-off clearing gap, plays the one-sided direction pattern, inserts another 150 ms clearing gap, and resumes proximity automatically if the obstacle remains in range. ToF sampling never stops.
+
+**2. AHEAD never contradicts local proximity.** AHEAD means the path or target is centered and clear enough to continue. It is accepted for bus guidance in either known activity phase, but it cannot interrupt an active ToF warning. Person avoidance while an obstacle is present produces LEFT or RIGHT, never AHEAD.
+
+**3. Siren remains absolute priority.** Any active siren output cancels a pending or playing cloud direction. Emergency stop, activity changes, and a relay `NONE` edge also cancel a pending direction cleanly.
+
+**4. The grammar is intentionally sequential.** The learnable sequence is `STOP -> silence -> LEFT/RIGHT -> silence -> STOP if still blocked`. Bus alignment while `STILL` remains `LEFT`, `RIGHT`, or `AHEAD` with ToF output suppressed by the activity rule.
+
+---
+
 ## Revision 2026-07-19f — Learnable cue grammar and fail-closed person avoidance
 
 This revision supersedes Revision 2026-07-18e wherever that revision cuts camera-guided navigation, and supersedes older one-channel PROXIMITY, WAIT, ERROR, and AHEAD waveforms. The detailed approved contract is `docs/superpowers/specs/2026-07-19-accessible-cue-and-person-guidance-design.md`; implementation evidence is in `audit/bus-stop-situational-awareness/26-accessible-cue-and-person-guidance.md`.

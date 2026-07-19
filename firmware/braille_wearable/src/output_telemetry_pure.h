@@ -42,6 +42,7 @@ struct OutputSemanticInputs {
     bool proximityActive;
     bool proximityCanRender;
     bool playerActive;
+    bool playerOverridesProximity;
     OutputTelemetrySource playerSource;
     const char* playerPattern;
     UserActivity activity;
@@ -120,6 +121,11 @@ inline OutputSemanticSnapshot selectOutputSemantics(
         snapshot.state = OutputTelemetryState::ACTIVE;
         snapshot.source = OutputTelemetrySource::LOCAL_SIREN;
         snapshot.pattern = outputTelemetryPattern(inputs.sirenPattern);
+        snapshot.reason = OutputTelemetryReason::PLAYING;
+    } else if (inputs.playerActive && inputs.playerOverridesProximity) {
+        snapshot.state = OutputTelemetryState::ACTIVE;
+        snapshot.source = inputs.playerSource;
+        snapshot.pattern = outputTelemetryPattern(inputs.playerPattern);
         snapshot.reason = OutputTelemetryReason::PLAYING;
     } else if (inputs.proximityCanRender) {
         snapshot.state = OutputTelemetryState::ACTIVE;

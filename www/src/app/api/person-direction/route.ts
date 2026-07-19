@@ -32,9 +32,9 @@ export async function POST(request: Request): Promise<Response> {
 
     const message = await client.messages.create({
       model: "claude-haiku-4-5",
-      max_tokens: 10,
+      max_tokens: 20,
       system:
-        "You are a navigation assistant for a visually impaired pedestrian using a white cane. Analyze the camera frame and determine the safest direction to walk. The frame shows a person or obstacle ahead. Reply with exactly one word — left, right, or ahead — indicating the clearest direction to proceed. Never explain your reasoning.",
+        "You are a navigation assistant for a visually impaired pedestrian. A person or obstacle is blocking the path ahead. Your job is to identify which side of the frame has MORE OPEN SPACE so the pedestrian can walk around the obstacle. Look at the left side and the right side of the image. Whichever side has more open, unobstructed floor or pavement is the correct answer. Reply with exactly one word: 'left', 'right', or 'ahead' (ahead only if the path is clearly wide enough to pass without turning). Never explain.",
       messages: [
         {
           role: "user",
@@ -49,7 +49,7 @@ export async function POST(request: Request): Promise<Response> {
             },
             {
               type: "text",
-              text: "Which direction is clearest — left, right, or ahead?",
+              text: "A person is blocking the path. Which side has more open space to walk around them — left or right? Reply with one word only.",
             },
           ],
         },
@@ -58,10 +58,13 @@ export async function POST(request: Request): Promise<Response> {
 
     const firstContent = message.content[0];
     if (!firstContent || firstContent.type !== "text") {
+      console.error("[person-direction] unexpected Haiku response shape");
       return safeDefault;
     }
 
     const text = firstContent.text.toLowerCase().trim();
+    console.log(`[person-direction] Haiku raw: "${firstContent.text.trim()}"`);
+
     let direction: "left" | "right" | "ahead" = "ahead";
     if (text.includes("left")) {
       direction = "left";
@@ -69,8 +72,10 @@ export async function POST(request: Request): Promise<Response> {
       direction = "right";
     }
 
+    console.log(`[person-direction] resolved: ${direction}`);
     return Response.json({ direction }, { headers: CORS });
-  } catch {
+  } catch (err) {
+    console.error("[person-direction] Haiku error:", err);
     return safeDefault;
   }
 }

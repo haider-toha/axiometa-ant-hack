@@ -66,7 +66,7 @@ Expected: FAIL because `relay-serial.ts` does not exist.
 
 - [ ] **Step 3: Implement bounded decoding and typed state**
 
-Define exact unions for command dispositions (`baseline`, `accepted`, `suppressed`, `no_output`, `route_mismatch`, `low_confidence`, `rejected`), activity events, command gaps, and transport events. Parse only anchored known formats. Keep a 2,048-character line limit and discard an overlong partial line through the next newline.
+Define exact unions for command dispositions (`unchanged`, `baseline`, `accepted`, `suppressed`, `no_output`, `route_mismatch`, `low_confidence`, `rejected`), activity events, command gaps, and transport events. Parse only anchored known formats. Keep a 2,048-character line limit and discard an overlong partial line through the next newline.
 
 The reduced state must keep:
 

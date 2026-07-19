@@ -30,7 +30,7 @@ This revision supersedes Revision 2026-07-18e wherever that revision cuts camera
 
 **2. Person avoidance is MOVING-only and fail-closed.** With no bus target, the phone selects the highest-confidence person box and sends that normalized box with the frame to `/api/person-direction`. Claude may return only a high-confidence LEFT/RIGHT recommendation, a clear result, or unavailable. Invalid input, malformed output, low confidence, timeout, and model failure produce no direction; none may become AHEAD.
 
-**3. Async results cannot outlive their scene.** The phone aborts and invalidates person guidance on STILL, bus priority, person disappearance, camera stop, or a newer request. The first side applies immediately; reversing LEFT to RIGHT or RIGHT to LEFT requires two consecutive matching Claude results.
+**3. Async results cannot outlive their scene.** The phone aborts and clears person guidance on STILL, bus priority, person disappearance, camera stop, or a tracked-person change. A same-target refresh advances the generation and clears guidance if it fails. The first side applies immediately; reversing LEFT to RIGHT or RIGHT to LEFT requires two consecutive matching Claude results.
 
 **4. Bus direction remains available in both known activity states.** The user may scan for and approach the bus while STILL or MOVING. Existing bus-information precedence and the relay wire contract remain unchanged.
 

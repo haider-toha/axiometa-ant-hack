@@ -89,7 +89,7 @@ specific amplitude/frequency tuning and a new wear test.
 - Local siren detection is enabled and has priority over every cloud command.
 - A detected bus may emit LEFT/RIGHT/AHEAD toward the bus.
 - If no bus is selected and a person is detected, Claude may emit
-  LEFT/RIGHT/AHEAD for the clearer path around the person.
+  LEFT/RIGHT for the clearer path around the person.
 - BUS, WAIT, NUMBER, and UNKNOWN are received and sequence-consumed but remain
   suppressed by the existing firmware activity gate.
 - A cane or guide dog remains the primary means of confirming and negotiating
@@ -228,10 +228,18 @@ when:
 - a bus becomes the selected target;
 - the person disappears;
 - the camera stops;
-- a newer person request starts.
+- a newer person request starts for a different tracked target.
 
-Clear the last person instruction on every invalidation, `clear` response, or
-unavailable response. Never retain it as a fallback after a request failure.
+Treat the selected box as the same tracked target only while its intersection
+over union with the request box is at least `0.30`. This deliberately tolerates
+normal detector jitter while failing closed when selection jumps to a different
+person. The threshold is a prototype assumption, not a measured tracking model.
+
+Clear the last person instruction on every scene invalidation, `clear` response,
+or unavailable response. A refresh request for the same tracked target advances
+the generation token but may retain the current stabilized direction while it is
+in flight; if that refresh fails or becomes uncertain, it clears the direction.
+Never retain an instruction as a fallback after a request failure.
 
 The first successful high-confidence LEFT or RIGHT may publish immediately for
 responsiveness. A direct LEFT-to-RIGHT or RIGHT-to-LEFT reversal requires the

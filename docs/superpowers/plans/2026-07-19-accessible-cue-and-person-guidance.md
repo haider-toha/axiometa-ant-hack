@@ -223,7 +223,7 @@ expect(state.direction).toBe("left");
 state = acceptPersonDirection(state, "right");
 expect(state.direction).toBe("right");
 expect(clearPersonGuidance(state).direction).toBeNull();
-expect(personResultIsCurrent(4, 5, "MOVING", false, true)).toBe(false);
+expect(personResultIsCurrent(4, 5, "MOVING", false, requestBox, currentBox)).toBe(false);
 ```
 
 - [x] **Step 2: Run the focused test and verify RED**
@@ -259,8 +259,10 @@ export function personResultIsCurrent(
   currentGeneration: number,
   activity: UserActivity,
   hasBus: boolean,
-  hasPerson: boolean,
+  requestPersonBox: PersonBox,
+  currentPersonBox: PersonBox | null,
 ): boolean;
+export function personTargetMatches(a: PersonBox, b: PersonBox): boolean;
 ```
 
 The first direction applies immediately. A direct opposite direction requires two consecutive matching results. Same-direction results clear any pending reversal.
@@ -279,7 +281,7 @@ Replace `personDirectionRef` with state, generation, and abort refs. Send the se
 body: JSON.stringify({ frame_b64: frameB64, person_box: personTarget.box }),
 ```
 
-Only request when `personGuidanceEligible(activityRef.current, Boolean(busTarget), Boolean(personTarget))` is true. On response, require `response.ok`, validate `status`, and apply only when `personResultIsCurrent(...)` remains true. Clear and invalidate on `STILL`, bus selection, person disappearance, camera stop, `clear`, `unavailable`, or fetch failure.
+Only request when `personGuidanceEligible(activityRef.current, Boolean(busTarget), Boolean(personTarget))` is true. On response, require `response.ok`, validate `status`, and apply only when `personResultIsCurrent(...)` remains true for the same tracked box (`IoU >= 0.30`). Clear and invalidate on `STILL`, bus selection, person disappearance or replacement, camera stop, `clear`, `unavailable`, or fetch failure.
 
 Map accepted person directions into the existing bearing vocabulary:
 

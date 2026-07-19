@@ -51,8 +51,13 @@ import {
   initialPersonGuidanceState,
   personGuidanceEligible,
   personResultIsCurrent,
+  personTargetMatches,
 } from "@/lib/person-guidance";
-import type { PersonDirectionResponse } from "@/lib/person-direction";
+import {
+  isPersonBox,
+  type PersonBox,
+  type PersonDirectionResponse,
+} from "@/lib/person-direction";
 
 const CAPTURE_MS = 500; // 2 Hz – a bus pulling in is a multi-second event
 const JPEG_QUALITY = 0.85;
@@ -251,7 +256,12 @@ export default function CapturePage() {
   const personGuidanceRef = useRef(initialPersonGuidanceState());
   const personGenerationRef = useRef(0);
   const personAbortRef = useRef<AbortController | null>(null);
-  const personSceneRef = useRef({ hasBus: false, hasPerson: false });
+  const personRequestBoxRef = useRef<PersonBox | null>(null);
+  const personGuidanceBoxRef = useRef<PersonBox | null>(null);
+  const personSceneRef = useRef<{ hasBus: boolean; personBox: PersonBox | null }>({
+    hasBus: false,
+    personBox: null,
+  });
   const lastPersonCallRef = useRef<number>(0);
   const personAnalyzingRef = useRef<boolean>(false);
 
@@ -259,7 +269,9 @@ export default function CapturePage() {
     personGenerationRef.current += 1;
     personAbortRef.current?.abort();
     personAbortRef.current = null;
-    personSceneRef.current = { hasBus: false, hasPerson: false };
+    personRequestBoxRef.current = null;
+    personGuidanceBoxRef.current = null;
+    personSceneRef.current = { hasBus: false, personBox: null };
     personGuidanceRef.current = clearPersonGuidance(personGuidanceRef.current);
     personAnalyzingRef.current = false;
   }, []);
@@ -626,9 +638,15 @@ export default function CapturePage() {
       const busTarget = detections.find((d) => d.target);
       const personTarget = !busTarget && activityRef.current === "MOVING"
         ? detections
-            .filter((d) => d.kind === "person" && d.confidence >= PERSON_MIN_CONFIDENCE)
+            .filter(
+              (d) =>
+                d.kind === "person" &&
+                d.confidence >= PERSON_MIN_CONFIDENCE &&
+                isPersonBox(d.box),
+            )
             .sort((a, b) => b.confidence - a.confidence)[0]
         : undefined;
+      const personBox = personTarget && isPersonBox(personTarget.box) ? personTarget.box : null;
       const targetKind: NavView["targetKind"] = busTarget
         ? "bus"
         : personTarget
@@ -637,10 +655,14 @@ export default function CapturePage() {
 
       let observed: MotionBearing | null;
       let vote: BearingVote;
-      personSceneRef.current = {
-        hasBus: Boolean(busTarget),
-        hasPerson: Boolean(personTarget),
-      };
+      const trackedBox = personAnalyzingRef.current
+        ? personRequestBoxRef.current
+        : personGuidanceBoxRef.current;
+      if (personBox && trackedBox && !personTargetMatches(trackedBox, personBox)) {
+        invalidatePersonGuidance();
+        lastPersonCallRef.current = 0;
+      }
+      personSceneRef.current = { hasBus: Boolean(busTarget), personBox };
 
       if (busTarget) {
         // Bus: go toward it. bearingFromBox + voteBearing unchanged.
@@ -648,7 +670,7 @@ export default function CapturePage() {
         vote = voteBearing(bearingVoteRef.current, observed);
         bearingVoteRef.current = vote;
         invalidatePersonGuidance();
-      } else if (personTarget) {
+      } else if (personTarget && personBox) {
         // Person/obstacle: ask Claude which direction is clear.
         // Rate-limit to one call per 1500 ms; don't stack calls.
         const now = Date.now();
@@ -661,14 +683,21 @@ export default function CapturePage() {
           personAnalyzingRef.current = true;
           const requestGeneration = personGenerationRef.current + 1;
           personGenerationRef.current = requestGeneration;
+          const requestBox: PersonBox = [
+            personBox[0],
+            personBox[1],
+            personBox[2],
+            personBox[3],
+          ];
           const controller = new AbortController();
           personAbortRef.current = controller;
+          personRequestBoxRef.current = requestBox;
           void fetch("/api/person-direction", {
             method: "POST",
             headers: { "Content-Type": "application/json" },
             body: JSON.stringify({
               frame_b64: frameB64,
-              person_box: personTarget.box,
+              person_box: requestBox,
             }),
             signal: controller.signal,
           })
@@ -684,7 +713,8 @@ export default function CapturePage() {
                   personGenerationRef.current,
                   activityRef.current,
                   scene.hasBus,
-                  scene.hasPerson,
+                  requestBox,
+                  scene.personBox,
                 )
               ) {
                 return;
@@ -698,8 +728,10 @@ export default function CapturePage() {
                   personGuidanceRef.current,
                   data.direction,
                 );
+                personGuidanceBoxRef.current = requestBox;
               } else {
                 personGuidanceRef.current = clearPersonGuidance(personGuidanceRef.current);
+                personGuidanceBoxRef.current = null;
               }
             })
             .catch(() => {
@@ -710,16 +742,19 @@ export default function CapturePage() {
                   personGenerationRef.current,
                   activityRef.current,
                   scene.hasBus,
-                  scene.hasPerson,
+                  requestBox,
+                  scene.personBox,
                 )
               ) {
                 personGuidanceRef.current = clearPersonGuidance(personGuidanceRef.current);
+                personGuidanceBoxRef.current = null;
               }
             })
             .finally(() => {
               if (requestGeneration === personGenerationRef.current) {
                 personAnalyzingRef.current = false;
                 personAbortRef.current = null;
+                personRequestBoxRef.current = null;
               }
             });
         }

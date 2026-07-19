@@ -40,7 +40,7 @@ function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === "object" && value !== null && !Array.isArray(value);
 }
 
-function isPersonBox(value: unknown): value is PersonBox {
+export function isPersonBox(value: unknown): value is PersonBox {
   if (!Array.isArray(value) || value.length !== 4) return false;
   if (!value.every((coordinate) => Number.isFinite(coordinate) && coordinate >= 0 && coordinate <= 1)) {
     return false;

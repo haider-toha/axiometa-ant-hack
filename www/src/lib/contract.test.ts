@@ -484,7 +484,7 @@ describe("sameEvent", () => {
   //
   // For bus information the edge-trigger is hygiene: a re-fired NUMBER is
   // annoying. For navigation it is correctness. LEFT and RIGHT are 800 ms step
-  // tables and AHEAD is 1000 ms (firmware/braille_wearable/src/patterns.h),
+    // tables and AHEAD is 600 ms (firmware/braille_wearable/src/patterns.h),
   // against a ~500 ms capture tick. Re-post an unchanged bearing and `seq`
   // bumps, the board restarts the table at step 0, and no nav pattern ever
   // reaches its second pulse: LEFT and RIGHT both collapse to one continuous

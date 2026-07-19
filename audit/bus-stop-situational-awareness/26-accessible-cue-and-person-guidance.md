@@ -21,6 +21,7 @@ The current AX22-0018 buzzers are audible proxies. This implementation validates
 - Claude output uses Anthropic `output_config.format` with a strict JSON schema.
 - A usable person result must be high-confidence LEFT or RIGHT. AHEAD is not a person-avoidance result.
 - Invalid request, malformed model output, low confidence, timeout, model failure, non-obstructing person, stale result, bus priority, person disappearance, STILL, and camera stop all produce no person direction.
+- A response can apply only while the current selected person box overlaps its request box by at least 0.30 intersection-over-union; switching targets clears and aborts the old guidance.
 - The first direction applies immediately. A direct LEFT/RIGHT reversal needs two consecutive matching results.
 - The existing `/api/event` payload, Redis ordering, bus-first selection, and ESP32 parser remain unchanged.
 
@@ -41,6 +42,30 @@ The current AX22-0018 buzzers are audible proxies. This implementation validates
 - Firmware native suite: 13 suites, 116 tests passed.
 - `board_firmware` target: built successfully in the firmware implementation pass.
 - No board flash, sound playback, physical navigation trial, or representative-user test was performed in this pass.
+
+## Exact Mode Matrix
+
+| Behavior | `MOVING` | `STILL` |
+|---|---|---|
+| Person-derived LEFT/RIGHT | Eligible only with no bus target | Disabled and cleared |
+| Bus-derived LEFT/RIGHT/AHEAD | Eligible | Eligible |
+| BUS/WAIT/NUMBER/UNKNOWN output | Received but suppressed by firmware | Eligible under existing gates |
+| Local ToF proximity | Enabled, both-channel cadence | Sampled for health but output suppressed and cleared |
+| Local siren output | Enabled and highest priority | Enabled and highest priority |
+
+The web tests enumerate all eight activity/bus/person combinations. Firmware relay tests enumerate every activity/command combination and separately pin proximity suppression on entry to `STILL`.
+
+## Exploratory Live Trial
+
+Bus and person scenes cannot be reproduced under controlled conditions with the available props and environment. Treat the live camera run as exploratory confirmation only, not validation. Run it after deployment and record the phone screen, `/output`, and board Serial together:
+
+1. Select `MOVING`, point at a visible person with no bus, and confirm only LEFT or RIGHT can result from person analysis; uncertainty must produce no direction.
+2. Move the camera to a different person and confirm the previous direction does not carry across the target change.
+3. Select `STILL` with a person visible and confirm person analysis produces no direction.
+4. Present the bus prop while `STILL` and confirm bus direction remains available while BUS, WAIT, and NUMBER 88 retain priority.
+5. Switch to `MOVING` with the bus still visible and confirm bus direction remains available while bus-information patterns are suppressed by the board.
+
+Environmental variation, model latency, and detector confidence may change what is observed. A missed or uncertain detection is evidence for tuning, not evidence that the mode contract is wrong; a wrong-mode output or stale direction is a software defect.
 
 ## Deployment State
 

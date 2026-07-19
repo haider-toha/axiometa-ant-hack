@@ -136,6 +136,9 @@ interface NavView {
   /** What the bus-information half wanted this frame — names the pattern the
    *  bearing is held behind when sentNav is false. */
   busPattern: CloudPattern;
+  /** What kind of detection is driving the bearing this frame. Bus is always
+   *  preferred; person is the fallback when no bus is in view. */
+  targetKind: "bus" | "person" | null;
 }
 
 const NAV_IDLE: NavView = {
@@ -147,6 +150,7 @@ const NAV_IDLE: NavView = {
   streak: 0,
   sentNav: false,
   busPattern: "NONE",
+  targetKind: null,
 };
 
 /** The last direction that actually left the phone. */
@@ -572,13 +576,23 @@ export default function CapturePage() {
         body: JSON.stringify(detector),
       }).catch(() => {});
 
-      // --- which way to the bus -------------------------------------------
-      // The detector already found the target box; all that is missing is
-      // turning its position into a direction and holding that direction still
-      // enough to be worth sending. Both rules are pure and tested in
-      // @/lib/motion — bearingFromBox widens the AHEAD band, voteBearing
-      // requires consecutive agreement before the answer is allowed to change.
-      const target = (m.detections ?? []).find((d) => d.target);
+      // --- which way to the bus or person ----------------------------------
+      // Bus (target: true) is always preferred. If no bus is in view, fall back
+      // to the highest-confidence person detection so the direction system stays
+      // active for proximity awareness even when no bus is present.
+      const detections = m.detections ?? [];
+      const busTarget = detections.find((d) => d.target);
+      const personTarget = !busTarget
+        ? detections
+            .filter((d) => d.kind === "person")
+            .sort((a, b) => b.confidence - a.confidence)[0]
+        : undefined;
+      const target = busTarget ?? personTarget;
+      const targetKind: NavView["targetKind"] = busTarget
+        ? "bus"
+        : personTarget
+          ? "person"
+          : null;
       const observed = bearingFromBox(target?.box);
       const vote = voteBearing(bearingVoteRef.current, observed);
       bearingVoteRef.current = vote;
@@ -607,6 +621,7 @@ export default function CapturePage() {
         // "sent" vs "held behind NUMBER" truthfully instead of guessing.
         sentNav: navPattern !== null,
         busPattern: busEvent.pattern,
+        targetKind,
       });
 
       // Translate to a device command, and POST only when the meaning changes.
@@ -723,6 +738,8 @@ export default function CapturePage() {
   const navHeld = nav.confirmed !== null && !nav.sentNav;
   /** What the confirmed bearing translates to — shown even when held. */
   const navCommand = nav.confirmed === null ? null : bearingToPattern(nav.confirmed);
+  /** Human-readable label for whatever is driving the bearing this frame. */
+  const targetLabel = nav.targetKind === "bus" ? "bus" : nav.targetKind === "person" ? "person" : null;
 
   return (
     <main className="flex-1 bg-background px-4 py-6 font-sans text-foreground sm:px-6 sm:py-8">
@@ -881,14 +898,17 @@ export default function CapturePage() {
               </div>
             )}
 
-            {/* 2. DIRECTION TO THE BUS. Point the phone at a bus and watch it
-                decide: raw centroid → widened bearing → confirmation streak →
-                the command that left the phone. Every step is on screen because
-                "it isn't doing anything" and "it decided AHEAD" are otherwise
-                indistinguishable. */}
+            {/* 2. DIRECTION TO BUS OR PERSON. Point the phone at a bus or a
+                person and watch it decide: raw centroid → widened bearing →
+                confirmation streak → the command that left the phone. Bus is
+                always preferred; a person is the fallback when no bus is in
+                view. Every step is on screen because "it isn't doing anything"
+                and "it decided AHEAD" are otherwise indistinguishable. */}
             <section className="rounded-lg border border-border bg-card p-4 text-card-foreground">
               <div className="flex items-baseline justify-between gap-3">
-                <h2 className="text-sm font-medium">Direction to the bus</h2>
+                <h2 className="text-sm font-medium">
+                  {targetLabel ? `Direction to ${targetLabel}` : "Direction"}
+                </h2>
                 <span className="font-mono text-xs tabular-nums text-muted-foreground">
                   {forceNav ? "force-send on" : walking ? "sending · walking" : "sending · scanning"}
                 </span>
@@ -909,21 +929,25 @@ export default function CapturePage() {
                       nav.confirmed === null || navHeld ? "text-muted-foreground" : ""
                     }`}
                   >
-                    {nav.confirmed === null ? "NO BUS" : bearingToPattern(nav.confirmed)}
+                    {nav.confirmed === null
+                      ? targetLabel
+                        ? `NO ${targetLabel.toUpperCase()}`
+                        : "NONE"
+                      : bearingToPattern(nav.confirmed)}
                   </div>
                   <p className="mt-1 text-sm text-muted-foreground">
                     {!running
-                      ? "Start the camera to look for a bus."
+                      ? "Start the camera to look for a bus or person."
                       : nav.confirmed === null && nav.observed === null
-                        ? "No bus in view."
+                        ? "No bus or person in view."
                         : nav.confirmed === null
-                          ? `Bus in view — confirming (${nav.streak}/${BEARING_CONFIRM_FRAMES}).`
+                          ? `${targetLabel ? (targetLabel.charAt(0).toUpperCase() + targetLabel.slice(1)) : "Target"} in view — confirming (${nav.streak}/${BEARING_CONFIRM_FRAMES}).`
                           : navHeld
                             ? `${navCommand} ready — held while ${nav.busPattern} (bus info) plays. It sends when that clears; Force send overrides.`
                             : nav.streak > 0 && nav.pending !== null
                               ? `Sent. Checking a change to ${bearingToPattern(nav.pending)} (${nav.streak}/${BEARING_CONFIRM_FRAMES}).`
                               : nav.streak > 0
-                                ? `Sent. Bus may have left view (${nav.streak}/${BEARING_CONFIRM_FRAMES}).`
+                                ? `Sent. ${targetLabel ? (targetLabel.charAt(0).toUpperCase() + targetLabel.slice(1)) : "Target"} may have left view (${nav.streak}/${BEARING_CONFIRM_FRAMES}).`
                                 : walking
                                   ? "Sent to the board."
                                   : "Sent to the board — start walking and it keeps updating."}
@@ -933,7 +957,7 @@ export default function CapturePage() {
 
               <dl className="mt-4 grid grid-cols-2 gap-3">
                 <Diag
-                  label="Bus in view"
+                  label={targetLabel ? `${targetLabel.charAt(0).toUpperCase() + targetLabel.slice(1)} in view` : "Target in view"}
                   value={nav.observed === null ? "no" : `yes · ${nav.observed}`}
                 />
                 <Diag

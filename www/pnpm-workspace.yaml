@@ -1,9 +1,10 @@
-# pnpm 10+ reads settings from this file; the legacy `pnpm` key in
-# package.json is no longer honoured by pnpm 11, which is why CI failed with
-# ERR_PNPM_IGNORED_BUILDS despite the same list living there. sharp and
-# unrs-resolver ship prebuilt binaries as optional dependencies, so their
-# postinstall scripts stay skipped — this records that as an explicit
-# decision instead of an unanswered warning that CI escalates to an error.
-ignoredBuiltDependencies:
-  - sharp
-  - unrs-resolver
+# pnpm 11's build-script decisions. The pnpm-10 keys (ignoredBuiltDependencies,
+# or a `pnpm` block in package.json) are no longer honoured at install time, so
+# CI's `CI=true pnpm install --frozen-lockfile` failed with
+# ERR_PNPM_IGNORED_BUILDS until the decision was recorded in this form.
+# false = never run their postinstall scripts: both ship prebuilt binaries as
+# optional dependencies, so the scripts are unnecessary. Verified against a
+# fresh worktree install on pnpm 11.9.0.
+allowBuilds:
+  sharp: false
+  unrs-resolver: false

@@ -56,3 +56,6 @@ pnpm-debug.log*
 slides/build/mesh/
 slides/build/*.blend
 slides/build/*.blend[0-9]*
+
+# Modal CLI venv (local only, do not commit)
+.venv-modal/

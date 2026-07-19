@@ -26,9 +26,14 @@
   font-display: block;
 }
 
+/* Gloock, not Instrument Serif. Instrument Serif is OFL and would have been safe,
+   but it is the most saturated display serif of 2026 — a judge who has sat through
+   forty decks has very likely seen it three times already today. Gloock is the same
+   high-contrast editorial register with a heavier vertical stress, and is nowhere
+   near as worn. Also SIL OFL, fsType 0, so it commits cleanly. */
 @font-face {
-  font-family: "Instrument Serif";
-  src: url("../fonts/InstrumentSerif-Regular.ttf") format("truetype");
+  font-family: "Gloock";
+  src: url("../fonts/Gloock-Regular.ttf") format("truetype");
   font-weight: 400;
   font-style: normal;
   font-display: block;
@@ -56,7 +61,7 @@
 
   /* Fallback chains end in a generic family, never a named system face. */
   --font-sans: "Instrument Sans", sans-serif;
-  --font-serif: "Instrument Serif", serif;
+  --font-serif: "Gloock", serif;
 
   /* Layout. system.md §Layout — minimum 8vw / 10vh, nothing near an edge. */
   --margin-x: 8vw;
@@ -198,6 +203,13 @@ p {
   color: var(--ink);
 }
 
+/* DO NOT USE ON TEXT. Kept only to document why it is unused.
+   --accent (#CFD9E0, 13.75:1 on --bg) is DARKER than --ink (#F2F4F5, 17.85:1).
+   The two differ by just 1.30:1, so painting a line accent to *promote* it makes
+   it recede instead — slide 8 inverted its own hierarchy this way, and on a
+   projector the distinction disappeared altogether.
+   --accent is for STRUCTURE only: the slide-5 local-sensing path, edge highlights,
+   focus rings. Text hierarchy is --ink for primary, --muted for secondary. */
 .statement--accent {
   color: var(--accent);
 }

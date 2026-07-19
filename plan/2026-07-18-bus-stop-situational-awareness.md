@@ -503,11 +503,11 @@ Notation: `A` = Port 1 buzzer, `B` = Port 3 buzzer, `BOTH` = both (optional 30 m
 
 The original cut bundled two different claims together. The one that still holds is about **ToF**: a single forward ToF zone cannot choose a safe left/right bypass, so it must never emit a direction. That reasoning does not extend to the **camera**, which resolves the target's horizontal position directly — `vision/service.py` already returns `bearing: "left" | "center" | "right"` per detection with `target` marking the bus box, and has since the detector was written.
 
-P11–P13 are therefore live, not dormant: the phone maps the confirmed target bearing to LEFT/RIGHT/AHEAD and posts it to `/api/event`; the board accepts them **only while `activity == MOVING`**, mirroring how BUS/NUMBER/WAIT/UNKNOWN are accepted only while `STILL`. Bus information is the STILL payload; approach bearing is the MOVING payload.
+P11–P13 are therefore live, not dormant: the phone maps the confirmed target bearing to LEFT/RIGHT/AHEAD and posts it to `/api/event`; the board accepts them **in both known phases** (`MOVING` and `STILL`; `UNKNOWN` refuses — audit 23, amended 2026-07-19 from the original MOVING-only rule). The demo flow demands it: the user scans for the bus while STANDING STILL and needs the first direction before taking a step, then keeps receiving updates while walking. Precedence on the shared channel is owned by `chooseEvent` in `www/src/lib/contract.ts`: while `STILL`, BUS/NUMBER/UNKNOWN outrank the bearing so arrival and route-88 output still land, and the bearing fills the WAIT/NONE gaps; while `MOVING`, the bearing always wins because the board drops the bus-information half there anyway.
 
 What this still does **not** claim: that the wearer can localise the two buzzers spatially (33.941 mm is far below the two-point threshold — the cue is the 2350/3050 Hz frequency contrast, not position), that this is verified navigation, or that the device can confirm the user moved correctly. It is an advisory nudge toward a *dwelling* bus, not turn-by-turn guidance, and low detector confidence must still fire P8 UNKNOWN rather than a guessed direction. The MOVING phase demonstrates obstacle awareness, siren awareness, **and** coarse camera-derived bus bearing.
 
-See `audit/bus-stop-situational-awareness/19-track-a-nav-contract.md` and `20-track-c-nav-firmware.md`.
+See `audit/bus-stop-situational-awareness/19-track-a-nav-contract.md`, `20-track-c-nav-firmware.md`, and `23-still-phase-bearing-delivery.md` (the 2026-07-19 both-phases amendment).
 
 ### Discriminability analysis
 

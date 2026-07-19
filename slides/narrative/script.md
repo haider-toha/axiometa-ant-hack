@@ -1,18 +1,20 @@
 # Speaker script
 
-Three voices, marked `[P1]` / `[P2]` / `[P3]`. Spoken pace **130 wpm**.
-Every line is under 15 words. Nothing here appears on a slide surface — these are
-presenter notes only.
+> **Generated from `slides/deck/index.html` by `slides/build/sync_script.py`.**
+> Do not edit the per-slide sections here — edit the deck's `class="notes"`
+> blocks and re-run the script. The deck is what the presenter actually reads,
+> so it is the source of truth. Appendices at the end are authored by hand and
+> are preserved.
 
-**Fields in `«guillemets»` are pending `slides/research/facts.md`.** Any figure still in
-guillemets at rehearsal must be cut, not guessed. A slide with a missing number is
-survivable; a slide with an invented one is not.
+Three voices, marked `[P1]` / `[P2]` / `[P3]`. Spoken pace **130 wpm**.
+Nothing here appears on a slide surface — these are presenter notes only.
 
 ---
 
-## 0 — Black · P1 · 18 s · 37 words
+## Slide 0 · P1 · 36 spoken words
 
-> **Screen: nothing.** `#0A0B0C`, edge to edge. No logo, no title, no cursor.
+```
+SCREEN: nothing. #0A0B0C, edge to edge. No logo, no title, no cursor.
 
 [P1] It's 7:42 in the morning, at a bus stop in south London.
 [P1] A bus pulls in.
@@ -20,33 +22,34 @@ survivable; a slide with an invented one is not.
 [P1] He can't hear the driver call it.
 [P1] So he asks a stranger. Every time.
 
-> *Do not invite the audience to close their eyes.* Simulating disability to produce
-> sympathy is a well-criticised move and it reads as a stunt. The black screen is
-> **time**, not a simulation. Let it sit.
+NOTE: Do not invite the audience to close their eyes. Simulating disability to
+produce sympathy is a well-criticised move and it reads as a stunt. The black
+screen is time, not a simulation. Let it sit.
+    
+```
 
----
+## Slide 1 · P1 · 50 spoken words
 
-## 1 — The person · P1 · 24 s · 50 words
-
-> **Screen:** `Hasan's grandfather.`
+```
+SCREEN: Hasan's grandfather.
 
 [P1] Hasan is my friend. This is his grandfather.
 [P1] He's DeafBlind — no useful sight, no useful hearing.
 [P1] He isn't a persona we invented for a pitch.
 [P1] I spoke to him. That conversation is why this exists.
 [P1] He has never tried the device. Nobody DeafBlind has.
-[P1] I'll come back to that.
+[P1] I'll come back to that.   [CUTTABLE — slide 9 pays this off regardless]
 
-> Two verbs doing separate jobs, and they must not be blurred: **spoke to** (true, and the
-> origin of the project) and **tried** (has not happened). The last two lines set up
-> slide 9. Say them evenly — this is disclosure, not confession.
+NOTE: Two verbs doing separate jobs, and they must not be blurred: SPOKE TO
+(true, and the origin of the project) and TRIED (has not happened). The last two
+lines set up slide 9. Say them evenly — this is disclosure, not confession.
+    
+```
 
----
+## Slide 2 · P1 · 41 spoken words
 
-## 2 — Scale · P1 · 19 s · 41 words
-
-> **Screen:** `450,000`, large, counting up. Below it, small and muted:
-> `ESTIMATED · SENSE · 2022`.
+```
+SCREEN: 450,000, large, counting up. Credit beneath: ESTIMATED · SENSE · 2022.
 
 [P1] Sense estimates 450,000 deafblind people in the UK. Over 610,000 by 2035.
 [P1] The government's own definition names three difficulties.
@@ -54,217 +57,282 @@ survivable; a slide with an invented one is not.
 [P1] The law even requires buses to announce their route number.
 [P1] Only to the people already on board.
 
-> **Say "estimates".** The 450,000 is a model, not a count — Sense / Operational Research
-> Society 2017, built on Centre for Disability Research 2010 prevalence, applied to 2022 ONS
-> population. It is the best figure that exists and every UK deafblind charity uses it, but
-> if a judge asks where it comes from, that chain is the answer. Never say "there are".
->
-> The three difficulties are quoted from the **Department of Health's** statutory definition
-> — communication, access to information, **mobility**. The government already wrote down
-> the problem this device addresses. That is why this line beats any statistic.
->
-> The last two lines are the deck's hardest fact, and they are primary legislation:
-> **SI 2023/715 reg 7** requires the route number be given to passengers "on which they are
-> travelling", beginning when the doors open. It is an on-board duty. Delivered flat, no
-> emphasis — the sentence does the work.
+NOTE: Say "estimates". The 450,000 is a model, not a count — Sense / Operational
+Research Society 2017, on Centre for Disability Research 2010 prevalence, applied
+to 2022 ONS population. Best figure that exists; every UK deafblind charity uses
+it. If a judge asks where it comes from, that chain is the answer. Never say
+"there are".
 
----
+NOTE: The three difficulties are quoted from the Department of Health's statutory
+definition — communication, access to information, MOBILITY. The government
+already wrote down the problem this device addresses. That is why this line beats
+any statistic.
 
-## 3 — Why the existing tools don't answer this · P1 → P2 · 22 s · 48 words
+NOTE: The last two lines are the deck's hardest fact and they are primary
+legislation. SI 2023/715 reg 7 requires the route number be given to passengers
+"on which they are travelling", beginning when the doors open. An on-board duty.
+Deliver flat, no emphasis — the sentence does the work.
+    
+```
 
-> **Screen:** four-row ledger — subject, hairline rule, disqualifier. Rows reveal in
-> sequence. Not a bullet list: no markers, no discs, no leading dashes.
+## Slide 3 · P1/P2 · 48 spoken words
 
-[P1] A cane finds the kerb. It cannot read a bus.  ← *cuttable if running long*
+```
+SCREEN: four-row ledger — subject, hairline rule, disqualifier. Rows reveal in
+sequence. Not a bullet list: no markers, no discs, no leading dashes.
+
+[P1] A cane finds the kerb. It cannot read a bus.   [CUTTABLE if running long]
 [P1] A guide dog costs a hundred and two thousand pounds.
-[P2] An interpreter is three hundred pounds a day, booked ahead.
+[P2] A communicator-guide has to be booked. Not at 7:42.
 [P2] Apps predict arrivals. They don't confirm what actually pulled in.
 [P2] All good tools. None answers: which bus is this?
 
-> The handoff from P1 to P2 happens mid-slide, on the interpreter line. Rehearse it — it's
-> the only mid-slide voice change in the deck.
->
-> **£102,000** is Guide Dogs' own current figure: £77,000 to breed, raise and train, plus
-> £25,000 to support the partnership for its working life. **Do not say £55,000** — that
-> number circulates widely, is undated, and is less than the training cost alone.
-> **Do not say "£25,000 a year"** — the £25,000 covers the entire working life.
->
-> **£300 a day** is inside NUBSLI's Apr 2026 guidance range of £275–£375 for a registered
-> interpreter's full day. **Do not convert it to an hourly rate** — NUBSLI does not define
-> how many hours a "day" is, so any hourly figure would be an invented divisor.
->
-> Tone check: these are **not** weaknesses of a cane or a dog. They are different tools
-> solving different problems, and the script says so ("all good tools") before it pivots.
-> Getting this wrong makes the team sound like it doesn't know the domain.
+NOTE: The handoff from P1 to P2 happens mid-slide, on the communicator-guide
+line. Rehearse it — it's the only mid-slide voice change in the deck.
 
----
+NOTE: £102,000 is Guide Dogs' own current figure — £77,000 to breed, raise and
+train, plus £25,000 to support the partnership for its working life. DO NOT say
+£55,000: that number circulates widely, is undated, and is less than the training
+cost alone. DO NOT say "£25,000 a year" — it covers the entire working life.
 
-## 4 — The device · P2 · 16 s · 39 words
+NOTE: The row says COMMUNICATOR-GUIDE, not "interpreter", and carries no price.
+Both are deliberate. A BSL interpreter is the wrong role for a man with no useful
+sight — he cannot see BSL — and facts.md exists partly to stop that conflation:
+interpreter, communicator-guide and intervenor are three different jobs and must
+not be mixed. The role that matches acquired deafblindness has no national
+published rate (one provider, undated), so the row argues availability instead of
+cost. Availability is the real barrier at 7:42 anyway.
 
-> **Screen:** CAD explode. 90 frames, pin 5:1. Port callouts only.
+NOTE: Tone check. These are NOT weaknesses of a cane or a dog. They are
+different tools solving different problems, and the script says so ("all good
+tools") before it pivots. Getting this wrong makes the team sound like it
+doesn't know the domain.
+    
+```
+
+## Slide 4 · P2 · 42 spoken words
+
+```
+SCREEN: CAD explode. 90 frames, pin 5:1. Port callouts only.
 
 [P2] So we built the thing that answers it.
 [P2] A board you wear. Four ports.
 [P2] A range sensor. A microphone. Two output channels.
-[P2] Everything on it is there for one job.
+[P2] Those two channels are buzzers. They can be heard, not felt.
 [P2] It only ever calls out. Nothing can call in.
 
-> Last line is the outbound-only property (plan Global Constraint 9). It reads as a
-> security answer, which is what a judge will hear, and it's true.
+NOTE: The "hear them, not feel them" line lives HERE, not only in the demo.
+It used to sit only in the demo script, which meant that if no tone ever
+sounded it was never said at all — and slides 4 to 8 run about eighty seconds
+implying a working signal to a DeafBlind user before slide 9 corrects it. The
+claim boundary cannot depend on the demo working. Say it again on the first
+tone if the demo runs; saying it twice costs nothing.
 
----
+NOTE: Last line is the outbound-only property (plan Global Constraint 9). It
+reads as a security answer, which is what a judge will hear, and it's true.
 
-## 5 — The system · P2 · 22 s · 49 words
+NOTE: Do not name a part number for the microphone. The callout is
+PDM MICROPHONE and nothing more.
+    
+```
 
-> **Screen:** system diagram. Five nodes, four edges, drawn on.
+## Slide 5 · P2 · 72 spoken words
+
+```
+SCREEN: system diagram. Five nodes, four edges, drawn on.
 
 [P2] Your phone watches the road and sends frames to Modal.
 [P2] Modal decides when a bus has arrived.
 [P2] Claude reads the number off the front.
 [P2] That lands in a relay. The wrist device polls it, three times a second.
 [P2] Safety sensing never touches the network.
-[P2] Which matters in a moment.
+[P2] Which matters in a moment.   [CUTTABLE — pure transition into the demo]
 
-> "Three times a second" = the 300 ms poll. Accurate.
-> Last line hands into the demo. Don't pause after it.
+NOTE: "Three times a second" = the 300 ms poll. Accurate.
+NOTE: Last line hands into the demo. Don't pause after it.
 
----
+-------------------------------------------------------------------------------
+DEMO · P2 · 90 s
+SCREEN: hold this slide. Do not advance. The diagram is a legend for what's
+happening.
 
-## DEMO · P2 · 90 s
-
-> **Screen:** hold slide 5. Do not advance. The diagram is a legend for what's happening.
-
-Run the locked order from the plan (Revision 2026-07-18e §5):
-
-1. Start in **MOVING**. Show the range sensor finding an obstacle — pulse cadence slows as
-   the path clears.
+Locked order, plan Revision 2026-07-18e §5:
+1. Start in MOVING. Show the range sensor finding an obstacle — pulse cadence
+   slows as the path clears.
 2. Show the siren detection.
-3. Switch to **STILL**.
-4. *Only then* raise the bus prop. BUS → WAIT → NUMBER 88.
+3. Switch to STILL.
+4. Only then raise the bus prop. BUS, then WAIT, then NUMBER 88.
 
-**The one line that must be said during the demo**, when the tones fire:
+The one line that must be said during the demo, the first time a tone sounds —
+not at the end:
 
-[P2] These two tones stand in for two vibration channels. The buzzers can be heard, not felt.
+[P2] Those tones stand in for vibration. Heard, not felt.
 
-> Say it the first time a tone sounds, not at the end. If the audience hears an unexplained
-> beep and forms their own theory, slide 9 arrives too late to correct it.
+NOTE: Say it on the first tone. If the audience hears an unexplained beep and
+forms their own theory, slide 9 arrives too late to correct it.
 
-### DEMO — contingency
+DEMO CONTINGENCY — press 6 and use the line that matches WHAT failed. Do not
+blame the network by reflex: demo steps 1 and 2 are the range sensor and the
+on-board FFT, and neither touches the network. Slide 7 tells this same room
+"Both of those are local. No wifi in either path." Blaming wifi for a local
+failure hands them the counter-example.
 
-If the pipeline fails at any point, say this and press **6**:
-
+If the CAMERA / MODAL / RELAY leg failed (steps 3-4):
 [P2] That's a live network at a hackathon. The numbers are the same either way.
 
-> Fourteen words. It does not apologise, does not explain, does not troubleshoot on stage.
-> Slides 6–10 are written to stand without the demo having worked.
+If the LOCAL sensing failed (steps 1-2):
+[P2-ALT] That one's on us, not the network. It's local. Let me show you the rest.
 
----
+If you are not sure which failed:
+[P2-ALT] Live hardware. The rest of the deck stands without it.
 
-## 6 — What you just saw · P2 · 18 s · 38 words
+NOTE: Short, and none of them apologise, explain, or troubleshoot on stage.
+Slides 6 to 10 are written to stand without the demo having worked.
+    
+```
 
-> **Screen:** two figures — `1.4 s` and `3.8 s`. Count up.
+## Slide 6 · P2 · 41 spoken words
 
-[P2] About one and a half seconds from bus to first signal.
-[P2] About four seconds to the route number.
+```
+SCREEN: ~1.4 s and ~3.8 s, counting up, with the estimate credit beneath.
+
+[P2] About a second and a half from bus to first signal.
+[P2] About four to the first digit of the number.
 [P2] You learn a bus is here before you learn which one.
 [P2] That gap is deliberate. Knowing early is time to move.
 
-> Both figures are the **mean** of the plan's measured latency budget (`plan/…:767` gives
-> 0.76–2.09 s, mean 1.38; `:777` gives 2.4–6.2 s, mean 3.8). "About" is doing honest work —
-> do not say "exactly", and do not quote the ranges on stage.
->
-> **If the demo failed:** change the first two lines to past-conditional — *"It takes about
-> one and a half seconds…"* — and add nothing else. Do not re-run the demo.
+NOTE — READ BEFORE REHEARSAL. These are ESTIMATES from the plan's latency
+budget, whose tables are headed "Estimate". Audit T4 Open Risk 7 says verbatim:
+"Nothing in this architecture has been run. Every timing figure is arithmetic or
+citation, not measurement." Audit T2 says verbatim: "Do not put a latency number
+on a slide you have not measured."
 
----
+That is why the tilde and the credit line are on the slide, and why the spoken
+line says "about". Do not remove either. Do not say "we measured".
 
-## 7 — Sensing · P3 · 22 s · 47 words
+TIME A REHEARSAL RUN. Then replace both figures with what you actually saw and
+change the credit to "Measured at rehearsal · <date>". A real number you can
+defend beats an estimate you have to hedge.
 
-> **Screen:** CAD orbit of the range sensor. 80 frames, pin 4:1.
+NOTE: 3.8 s is to the FIRST DIGIT, not the finished number. P6 then takes 6.4 s
+to deliver "88" in full, so prop-raised to fully-delivered is 8.8-12.6 s. Saying
+"to the route number" would contradict the six seconds the audience just watched.
 
-[P3] Three sensors, one reason each.  ← *cuttable if running long*
+NOTE: If the demo failed, keep these lines exactly as written — they are already
+phrased as what the system does, not as what just happened. Add nothing.
+    
+```
+
+## Slide 7 · P3 · 49 spoken words
+
+```
+SCREEN: CAD orbit of the range sensor. 80 frames, pin 4:1.
+
+[P3] Two sensors on the board, one reason each.   [CUTTABLE if running long]
 [P3] Range sensor: forward clearance while you're walking.
 [P3] Microphone: sirens, detected on the board itself with an FFT.
 [P3] Both of those are local. No wifi in either path.
 [P3] If the network dies mid-street, the safety sensing doesn't.
 [P3] That was not a nice-to-have.
 
-> Do **not** claim the range sensor chooses a direction. It's a single forward cone; it
-> cannot tell left from right (plan Revision 2026-07-18e §6). "Forward clearance" is the
-> honest phrase and it is the only one to use.
+NOTE: "TWO sensors on the board", not three. The plan counts three sensor inputs
+because it includes the phone camera — but this slide is a CAD orbit of the
+board, the camera is not on it, and slide 4 already said "a range sensor, a
+microphone, two output channels". Saying three here names two and contradicts
+slide 4 in front of the same room.
 
----
+NOTE: Do NOT claim the range sensor chooses a direction. It is a single forward
+cone; it cannot tell left from right. "Forward clearance" is the honest phrase
+and it is the only one to use.
 
-## 8 — Why Modal · P3 · 22 s · 50 words
+NOTE: The cane remains the primary mobility aid. This is supplementary.
+    
+```
 
-> **Screen:** `Detection is when.` / `Claude is what.`
+## Slide 8 · P3 · 49 spoken words
+
+```
+SCREEN: Detection is when. / Claude is what.
 
 [P3] Claude reads a bus number better than YOLO ever could.
-[P3] So why a detector?
-[P3] Because a bus arriving isn't one frame. It's two seconds of frames.
+[P3] So why a detector?   [CUTTABLE — setup line; the next line stands alone]
+[P3] A bus arriving isn't one frame. It's two seconds of frames.
 [P3] That needs history, debounce, and a latch that fires exactly once.
 [P3] The Claude API is stateless. Modal isn't.
 [P3] Detection is when. Claude is what.
 
-> **Do not** argue cost, and **do not** argue that a GPU was needed for throughput. The
-> plan concedes both (`…:704–713`): at 2 fps neither is true, and a judge who has seen
-> forty projects will take the opening. State is the only argument that survives, so it's
-> the only one made.
->
-> This slide credits Modal by name, which the brief requires, and earns it.
+NOTE: Do NOT argue cost, and do NOT argue that a GPU was needed for throughput.
+The plan concedes both: at 2 fps neither is true, and a judge who has seen forty
+projects will take the opening. State is the only argument that survives, so it
+is the only one made.
 
----
+NOTE: This slide credits Modal by name, which the brief requires, and earns it.
+    
+```
 
-## 9 — What failed · P3 · 18 s · 48 words
+## Slide 9 · P3 · 48 spoken words
 
-> **Screen:** `We have not validated this with DeafBlind users.` Held, static, alone.
+```
+SCREEN: We have not validated this with DeafBlind users. Held, static, alone.
 
 [P3] The buzzers we were given can be heard. They cannot be felt.
-[P3] We drove them down to seventy hertz. Still nothing.
+[P3] We drove them down to seventy hertz. Still nothing.   [CUTTABLE — detail, not the claim]
 [P3] So those two tones stand in for two vibration channels.
 [P3] We have not validated this with DeafBlind users.
 [P3] Real motors next. Then the people who'd use it.
 
-> Line 4 is the mandatory sentence, verbatim, and it is on the screen as well as in the
-> mouth. It pays off slide 1.
->
-> "Can be heard, cannot be felt" is passive on purpose — it is T5's own claim-boundary
-> phrasing. The active alternative ("you can't feel them") asserts something about a
-> specific body that was never tested. Leave it passive.
->
-> 70 Hz is from T5's labelled sweep (70/100/150/220 Hz), driven deliberately low to try to
-> elicit a felt buzz. Do not quote 700 or 1400 Hz — superseded by Revision 2026-07-18c.
-> The demo tones are 2350 Hz and 3050 Hz.
->
-> Deliver this without apology and without a rueful smile. It is the most credible
-> thirty seconds in the deck.
+NOTE: Line 4 is the mandatory sentence, verbatim, and it is on the screen as
+well as in the mouth. It pays off slide 1.
 
----
+NOTE: "Can be heard, cannot be felt" is passive on purpose — it is the
+claim-boundary phrasing from the bench observation. The active alternative ("you
+can't feel them") asserts something about a specific body that was never tested.
+Leave it passive. Do not say "we measured" and do not quote a figure for it.
 
-## 10 — Close · P3 · 10 s · 17 words
+NOTE: 70 Hz is from the labelled sweep (70/100/150/220 Hz), driven deliberately
+low to try to elicit a felt buzz. Do NOT quote 700 or 1400 Hz — superseded. The
+demo tones are 2350 Hz and 3050 Hz.
 
-> **Screen:** `Hasan's grandfather.` — identical composition to slide 1.
+NOTE: Deliver this without apology and without a rueful smile. It is the most
+credible thirty seconds in the deck.
+    
+```
+
+## Slide 10 · P3 · 17 spoken words
+
+```
+SCREEN: Hasan's grandfather. — identical composition to slide 1.
 
 [P3] Hasan's grandfather still asks a stranger which bus just arrived.
 [P3] We'd like him to stop having to.
 
-> Stop. Do not add "thank you", do not add "any questions", do not add the team name.
-> The slide is already the same image the audience saw nine minutes of argument ago, and
-> the only thing that changed is that they now know what the device does.
+NOTE: Stop. Do not add "thank you", do not add "any questions", do not add the
+team name. The slide is already the same image the audience saw nine minutes of
+argument ago, and the only thing that changed is that they now know what the
+device does.
+    
+```
 
 ---
 
-## Word ledger
+## Ledger — computed, not asserted
 
-| Presenter | Slides | Words |
-|---|---|---|
-| P1 | 0, 1, 2, 3a | ~153 |
-| P2 | 3b, 4, 5, demo, 6 | ~149 + demo |
-| P3 | 7, 8, 9, 10 | ~162 |
+| Presenter | Spoken words |
+|---|---|
+| P1 | 147 |
+| P2 | 183 |
+| P3 | 163 |
+| **Total** | **493** |
 
-Even to within 8 %. P2 carries the lightest script because P2 carries the live demo.
+At 130 wpm: **228 s (3:47)** full, **209 s (3:28)** with every `[CUTTABLE]` line dropped (41 words).
 
----
+With a 90 s demo: **5:17 full** / **4:58 tight**. The slot is 5:00.
+
+Longest spoken line: **14 words**.
+
+No spoken line exceeds 15 words.
+
+<!-- APPENDICES — authored, preserved by sync_script.py -->
 
 ## Anticipated questions
 

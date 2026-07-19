@@ -5,53 +5,57 @@ Compiled 2026-07-19. Authority: `plan/2026-07-18-bus-stop-situational-awareness.
 
 ---
 
-## The timing problem, solved up front
+## The timing problem
 
 The brief's own timing table does not fit five minutes. Summed as written it is **340 s
-before slide 4 is allocated any time at all** — 5:40 against a 5:00 slot. That is not a
-rounding error, so the budget below is a real re-allocation, not the table restated.
+before slide 4 is allocated any time at all** — 5:40 against a 5:00 slot.
 
-Spoken pace is **130 words/minute** (the sign-off standard). Five minutes = 300 s. The live
-demo takes 90 s. Everything else must fit in **210 s ≈ 455 words**.
+> **Do not put a word budget in this file.** An earlier version of this section carried a
+> hand-maintained per-slide table and a presenter split. Both went stale within hours, both
+> disagreed with the deck, and the presenter split was simply wrong — it claimed P2 was the
+> lightest voice when P2 is in fact the heaviest.
+>
+> The live numbers are **computed from the deck itself** by
+> `slides/build/sync_script.py` and written into the ledger at the end of
+> `slides/narrative/script.md`. Read them there. Re-run the script after any change to a
+> presenter note.
 
-| # | Beat | Presenter | Seconds | Word budget |
-|---|---|---|---|---|
-| 0 | Black screen | P1 | 18 | 39 |
-| 1 | The person | P1 | 24 | 52 |
-| 2 | Scale, and the gap in the law | P1 | 19 | 41 |
-| 3 | Why the existing tools don't answer this | P1 → P2 | 22 | 48 |
-| 4 | The device | P2 | 16 | 35 |
-| 5 | The system | P2 | 22 | 48 |
-| — | **LIVE DEMO** | **P2** | **90** | — |
-| 6 | What you just saw | P2 | 18 | 39 |
-| 7 | Sensing | P3 | 22 | 48 |
-| 8 | Why Modal | P3 | 22 | 48 |
-| 9 | What failed | P3 | 18 | 39 |
-| 10 | Close | P3 | 10 | 22 |
-| | **Speech total** | | **212** | **461** |
-| | **+ demo** | | **302 s ≈ 5:02** | |
+Spoken pace is **130 words/minute**. Five minutes = 300 s, of which the live demo takes 90.
 
 ### Running-long lever
 
-If the demo overruns, cut these two lines and nothing else. They are the only lines in the
-deck that carry no unique argument:
+Lines that carry no unique argument are tagged `[CUTTABLE]` **inside the deck's own
+presenter notes**, and the ledger reports the runtime with all of them dropped. For the
+current figures see the ledger in `script.md` — do not copy them here, which is the mistake
+this section already made once.
 
-1. Slide 3, P1: *"A cane finds the kerb. It cannot read a bus."* — the cane point survives
-   in the closing line of the same slide. **−5 s**
-2. Slide 7, P3: *"Three sensors, one reason each."* — a signpost, not a claim. **−3 s**
+**The tight run is the run.** The deck only fits the slot with every `[CUTTABLE]` line
+dropped, so treat those cuts as the default and the full script as the overrun case, not
+the other way round.
 
-Recovers 8 s → **4:54**. Do not cut anything from slides 9 or 10; the honesty line and the
-callback are the two things a judge remembers.
+Cut them in this order, worst first:
+
+1. Slide 3, P1 — *"A cane finds the kerb. It cannot read a bus."* The cane point survives
+   in the closing line of the same slide.
+2. Slide 7, P3 — *"Two sensors on the board, one reason each."* A signpost, not a claim.
+3. Slide 5, P2 — *"Which matters in a moment."* Pure transition.
+4. Slide 8, P3 — *"So why a detector?"* Setup; the next line stands without it.
+5. Slide 1, P1 — *"I'll come back to that."* Slide 9 pays it off regardless.
+6. Slide 9, P3 — *"We drove them down to seventy hertz. Still nothing."* Detail, not the claim.
+
+**Never cut** the mandatory validation sentence on slide 9, or the callback on slide 10.
+Those are the two things a judge remembers.
 
 ### Presenter load
 
-| | Scripted words | Also owns |
-|---|---|---|
-| P1 | 154 | the opening, which sets the whole frame |
-| P2 | 150 | **the 90 s live demo** — highest-pressure slot, so fewest scripted words |
-| P3 | 157 | the close |
+P2 carries the most words **and** the 90 s live demo.
 
-Even to within 5 %. P2's lighter script is deliberate, not an accident of drafting.
+**Do not "fix" this by moving slide 6 to P3.** That was proposed here and it is wrong:
+it would take the split from roughly 147/161/164 to 143/205, which is far worse. P2's
+burden is the demo, not the word count, and no reshuffling of slides addresses that.
+
+If rehearsal feels lopsided, the real lever is to move a *slide-3* line from P2 back to P1
+— P1 is the lightest voice and already owns that slide's opening.
 
 ---
 
@@ -152,7 +156,10 @@ concedes both of those and so does the script. Claiming a GPU was needed for thr
 Hard constraint: **slides 6–10 must be presentable immediately after slide 5 regardless of
 what the demo does.**
 
-- Slide 6 states two latency figures from the plan's measured budget. If the demo failed,
+- Slide 6 states two latency figures from the plan's **estimated** budget — the plan's own
+  tables are headed "Estimate", and audit T4 Open Risk 7 says nothing in this architecture
+  has been run. They carry a tilde and a "not yet measured" credit until a rehearsal run
+  replaces them. If the demo failed,
   P2 says what the figures are and that the audience did not just see them. The numbers are
   sourced either way.
 - Nothing in slides 7–10 refers back to a demo event. Slide 7 says what the sensors are for,

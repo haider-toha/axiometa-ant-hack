@@ -1,862 +1,439 @@
 # Anti-slop review — `slides/deck/`
 
-Reviewed 2026-07-19 against `slides/design/system.md`.
+**Second pass, 2026-07-19.** Supersedes the first-pass document. All five first-pass blockers
+re-verified against the files and the font binaries, not against the summary of the fixes.
 
-Files read line by line: `slides/deck/index.html` (489 lines, all 11 `<script type="text/plain" class="notes">`
-blocks), `slides/deck/css/deck.css` (449 lines, every declaration), `slides/narrative/script.md`,
-`slides/design/system.md`. Cross-checked against `slides/design/dom-contract.md`,
-`slides/deck/js/main.js`, `slides/deck/js/canvas-sequence.js`, `slides/research/facts.md`,
-`plan/2026-07-18-bus-stop-situational-awareness.md`, and the shipped font binaries.
-
-Known-and-accepted items (empty `frames/detail/`, empty slide 0, slides 1 and 10 identical) are not
-reported.
+Re-read: `slides/deck/index.html`, `slides/deck/css/deck.css`, `slides/narrative/script.md`,
+`slides/design/system.md`, plus the new `slides/build/sync_script.py`, the diffs to
+`slides/deck/js/main.js` and `slides/deck/js/canvas-sequence.js`, and the `fvar` / `OS/2` /
+`cmap` tables of every shipped font.
 
 ---
 
-## Sections that are clean
+## Verdict on the five blockers
 
-I looked hard at each of these and found nothing. Stated explicitly so the clean result is on the
-record rather than inferred from silence.
+| # | First-pass blocker | Status |
+|---|---|---|
+| 1 | Slide 7 sensor miscount | **Fixed** — verified |
+| 2 | Slide 6 uncredited figures | **Fixed, and better than I asked** — one residual |
+| 3 | Contingency blames the network for local failures | **Fixed** — verified |
+| 4 | Weight ladder undeliverable | **Fixed** — verified from the binary; one new side effect |
+| 5 | Two canonical scripts | **Fixed structurally** — four residuals |
 
-**Monospace — clean.** Zero hits for `mono`, `Mono`, `monospace`, `ui-monospace`, `SFMono`, `Menlo`,
-`Monaco`, `Consolas`, `Courier`, `Cascadia`, `JetBrains`, `Geist`, `IBM Plex`, `Red Hat`, `Space
-Mono`, `Fira`, `Source Code` across `deck/`, including JS and font filenames. No `tabular-nums`, no
-`font-variant-numeric` anywhere. The three shipped faces are `InstrumentSans-Regular.ttf`,
-`InstrumentSans-Bold.ttf`, `InstrumentSerif-Regular.ttf`. The one place a mono would have been
-reached for by reflex — the slide-4 port callouts `P1 BUZZER` / `P2 RANGE` / `P3 BUZZER` /
-`P4 PDM MICROPHONE` — correctly uses the grotesque at `--t-micro` with `+0.08em`. This is the single
-biggest thing the deck gets right.
+### 1 — Sensor miscount. Fixed.
 
-**Banned words — clean.** Zero occurrences of any of the 21 banned words in visible copy or spoken
-lines. The only hits are `narrative/script.md:316-319`, which is the banned-word checklist listing
-them, and CSS `transform:` / `text-transform:` properties. Second-tier sweep (delve, tapestry,
-landscape, realm, testament, crucial, pivotal, meticulous, elevate, streamline, foster, showcase,
-harness, bespoke, curated, effortless, impactful, paradigm, world-class, end-to-end, frictionless,
-"it's not just X", "imagine a world", "under the hood", "deep dive") returns one hit only, reported
-as WARNING 11.
+`index.html:407` now reads `[P3] Two sensors on the board, one reason each.` It agrees with
+`Both of those are local` three lines later and with slide 4's `A range sensor. A microphone.
+Two output channels.` The note at `:414-418` records the reasoning, including why the plan's
+"three sensor inputs" is right for the plan and wrong for this slide. Clean.
 
-**Colour — clean.** Exactly four hex values in the entire CSS: `#0A0B0C`, `#F2F4F5`, `#9AA3A8`,
-`#CFD9E0`. No `rgb()`, no `hsl()`, no `color-mix()`, no named colours. `#000` appears once, at
-`deck/js/canvas-sequence.js:119`, inside a comment explaining why it is being avoided —
-`"an alpha:false canvas rests on #000, which is not in the palette"` — followed by
-`ctx.fillStyle = "#0A0B0C"`. That is the correct handling, not a violation.
+### 2 — Slide 6. Fixed, and you found something I missed.
 
-**Gradients / shadows / glows / blurs / radius — clean.** Zero hits for `gradient`, `box-shadow`,
-`text-shadow`, `drop-shadow`, `filter:`, `backdrop-filter`, `border-radius`, `blur(`. No card-like
-object exists in the CSS at all; slide 5's nodes are baseline rules, which
-`deck.css:337-339` justifies in the right terms.
+I called these "the team's own measurements". They are not measurements at all — the plan's
+tables are headed *Estimate*, and the note now quotes audit T4 Open Risk 7 verbatim: *"Nothing
+in this architecture has been run. Every timing figure is arithmetic or citation, not
+measurement."* My framing was too generous and the fix is stronger than my recommendation:
+tilde, `Estimated · latency budget · not yet measured`, and a rehearsal instruction to replace
+both with real timings.
 
-**AI-default sans faces — clean.** Zero hits for Inter, Roboto, Poppins, Montserrat, Raleway, Open
-Sans, Lato, Nunito, `system-ui`, `-apple-system`, Helvetica, Arial, Segoe. Both fallback chains end
-in a generic family (`deck.css:61-62`), exactly as `system.md:52-53` requires.
+The eyebrow correction `Bus to route number` → `Bus to first digit` is a real error I did not
+catch, and the note at `:379-381` explains why saying "route number" would have contradicted
+the six seconds the audience just watched.
 
-**Bullets, discs, leading dashes — clean.** No `<ul>`, `<ol>`, `<li>`, `list-style`, `::marker`, or
-dash/bullet glyph in any `content:` value. The slide-3 ledger is a real `<dl>` and its leader is
-`.ledger-row dd::before { content: ""; height: var(--hairline); background-color: var(--muted); }`
-(`deck.css:296-303`) — a drawn rule, not a typed character. This is the correct implementation and
-it survives the ledger exemption on its own merits.
+**Residual (WARNING).** The credit sits only under the *second* figure (`:355`).
+`stat--latency-first` (`:348-351`) still has none, and the two are separate grid cells
+(`grid-column: 1 / span 4` and `6 / span 5`), so a credit under the right-hand figure does not
+visually govern the left-hand one. This is the same "directly beneath it" problem I raised
+about slide 3, reproduced on slide 6. Either duplicate the credit or move it to a single line
+spanning both stats.
 
-**Paragraphs of body text on visible surfaces — clean.** All 32 rendered strings extracted and
-counted. The longest is `We have not validated this with DeafBlind users.` at 8 words. Nothing
-approaches a paragraph.
+### 3 — Contingency. Fixed.
 
-**Animation — clean.** Every animation in `main.js` carries narrative: reveal at 20% visible, ledger
-stagger 80 ms, count-up 900 ms ease-out, diagram edges drawn by `getTotalLength()` with the local
-sensing path last. No decorative motion, no parallax-for-its-own-sake, no hover flourishes.
-`linear` appears nowhere, per `main.js:12-13`. Reduced-motion is handled in both layers and never
-withholds content.
+`:320-336` branches on which leg failed, rules out reflex network-blaming, and names the
+counter-example explicitly: *"Slide 7 tells this same room 'Both of those are local. No wifi in
+either path.' Blaming wifi for a local failure hands them the counter-example."* That is the
+finding, closed properly.
 
-**Frame budgets — clean.** `explode/` 90 frames, `orbit/` 80, `detail/` 60 — matching `system.md`
-Motion exactly. Averages 37 / 33 / 38 KB, all inside the ≤45 KB budget.
-
-**Vague quantities — clean.** No "millions of people", "many", "a lot", "countless". Every quantity
-on a visible surface is a specific figure, and all four trace to `research/facts.md` (450,000 →
-`facts.md:33`; 610,000 → `:34`; £102,000 → `:62`; £275–£375 → `:65`; 1.4 s / 3.8 s → plan latency
-table). No figure is fabricated. Sourcing *placement* is a separate defect, reported as BLOCKER 2
-and WARNING 7.
-
----
-
-## BLOCKER
-
-### 1. Slide 7 says "three sensors", names two, then says "both" — and contradicts slide 4
-
-**Where:** `slides/deck/index.html:373-376`; same text at `slides/narrative/script.md:185-188`.
-Contradicts `slides/deck/index.html:203`.
-
-**Problem:** The deck counts its own hardware two different ways, four lines apart, out loud, in
-front of judges.
-
-**Evidence:**
-
-Slide 4 (`index.html:203`):
-
-> `[P2] A range sensor. A microphone. Two output channels.`
-
-Two sensors on the board. Then slide 7 (`index.html:373-376`):
-
-> `[P3] Three sensors, one reason each.   [CUTTABLE if running long]`
-> `[P3] Range sensor: forward clearance while you're walking.`
-> `[P3] Microphone: sirens, detected on the board itself with an FFT.`
-> `[P3] Both of those are local. No wifi in either path.`
-
-"Three sensors, one reason each" promises three reasons and delivers two. The next line but one says
-`Both of those` — which counts two. The sentence audits itself as wrong inside three lines.
-
-The number is not invented: `plan/…:7` says *"Three sensor inputs and two simulated output
-channels"*, counting the phone camera as the third. But slide 7 is a CAD orbit **of the board**, the
-two named sensors are **the board's**, and the camera is neither local nor on the device — so
-`Both of those are local` is the line that is actually correct, and `Three sensors` is the line that
-is wrong in this context. An audience that has just been told the board has a range sensor and a
-microphone hears a miscount.
-
-That the line is tagged `[CUTTABLE if running long]` is telling: the deck's own author marked the
-broken sentence as the first thing to throw away.
-
-**Fix:** Delete the line. It carries no information the following two lines don't. If a count is
-wanted, `[P3] Two sensors on the board, one reason each.` is true, matches slide 4, and matches
-`Both of those`.
-
----
-
-### 2. Slide 6's two figures carry no source credit — the deck breaks its own mandatory rule on its own least verifiable numbers
-
-**Where:** `slides/deck/index.html:327-334`. Rule at `slides/design/system.md:95-110`.
-
-**Problem:** `system.md` makes source credits mandatory and explains that the point of the rule is to
-make an unsourced number structurally awkward. Slide 6 is the one slide that skips it — and it skips
-it on the two numbers a judge cannot check, because they are the team's own measurements rather than
-a published figure.
-
-**Evidence:** The rule (`system.md:95-110`):
-
-> `### Source credits`
-> `Every statistic on a visible surface carries a credit line directly beneath it, at`
-> `--t-micro, --muted, uppercase, tracking +0.08em`
-> …
-> `It also makes it structurally awkward to put an unsourced number on a slide, which is the point.`
-
-Slide 6 as built (`index.html:327-334`):
+### 4 — Weight ladder. Fixed. Verified from the binary, not the claim.
 
 ```
-<div class="stat stat--latency-first" data-reveal data-reveal-delay="0">
-  <p class="eyebrow">Bus to first signal</p>
-  <p class="figure"><span data-count-to="1.4" data-count-format="dec1">1.4</span> <span class="figure-unit">s</span></p>
-</div>
+InstrumentSans-Variable.ttf   fvar: present
+   axis wght: 400..700 (default 400)
+   axis wdth:  75..100 (default 100)
+   usWeightClass=400  fsType=0
 ```
 
-No `.credit` element. Same for `stat--latency-second`. Compare slide 2 (`index.html:79-83`), which
-does it correctly with `<p class="credit">Estimated · Sense · 2022</p>`.
+`@font-face` declares `font-weight: 400 700` with `format("truetype-variations")`
+(`deck.css:21-27`), so `font-weight: 500` and `600` are now real instances. The static cuts are
+gone from disk. `Gloock-Regular.ttf` is static 400, `fsType 0`, which is correct for a
+Regular-only display face.
 
-The irony is sharp and a judge will find it: the deck credits Sense for a figure anyone can look up,
-and credits nothing for the figure that only this team can vouch for. The numbers are legitimate —
-plan latency table, `0.76–2.09 s mean 1.38` and `2.4–6.2 s mean 3.8` — but the audience is given no
-way to know they are measured rather than hoped, and the presenter note at `index.html:344-346`
-correctly worries about exactly this while the slide surface stays silent.
+One thing worth knowing: `InstrumentSans-Variable.ttf` was already tracked in `HEAD`. The two
+static cuts I reviewed were stray untracked files that had displaced it. So the ladder was
+authored correctly and then broken by a file swap — which is a better story than the spec being
+fiction, and worth a line in `system.md` so it does not recur.
 
-**Fix:** Add a credit under each figure, or one under the pair, in the documented
-`QUALIFIER · SOURCE · YEAR` shape. `MEASURED · MEAN OF 12-HOP BUDGET · 2026` is honest, fits
-`--t-micro`, and turns the slide's weakest moment into its second-strongest.
+**New side effect (WARNING).** See N4 below — `.diagram-label` was silently dropped from 500 to
+400 in the same pass.
+
+### 5 — Two scripts. Fixed structurally, with four residuals.
+
+`sync_script.py` regenerates `script.md` from the deck's own notes and preserves hand-authored
+appendices below a marker. The ledger is genuinely computed. Right shape.
+
+**Residual A (WARNING) — the docstring overclaims.** It says the two *"can never disagree
+again"*. They can, until someone runs the script. There is no `--check` mode and nothing
+enforces it. A `--check` flag that exits non-zero on drift would make the claim true and costs
+about six lines.
+
+**Residual B (WARNING) — `[P2-ALT]` is invisible to the generator.** `SPOKEN_RE` is
+`^\s*\[(P[123])\]\s*(.+?)\s*$`, which does not match the two new contingency lines at `:330` and
+`:333`. They survive into `script.md` because the whole body is dumped verbatim, but they are
+excluded from the word ledger, from the runtime, and from the over-15 check. `That one's on us,
+not the network. It's local. Let me show you the rest.` is exactly 15 words and nothing measured
+it. Widen the pattern to `\[(P[123])(?:-ALT)?\]`.
+
+**Residual C (WARNING) — the per-slide headers are still hand-written and now drift in five of
+eleven slides.** The generator computes the ledger but dumps each note body verbatim, including
+its authored `P2 · 22 s · 49 words` header. Computed against the generator's own `word_count`:
+
+```
+slide  declared  computed  delta
+    0        37        36     -1
+    4        39        43     +4
+    5        49        72    +23
+    6        40        41     +1
+    7        47        49     +2
+```
+
+Slide 5 is +23 because the demo's spoken lines live inside slide 5's note block. BLOCKER 5 is
+closed on the axis I raised and a new drift axis has opened inside the file.
+
+**Residual D (WARNING) — the ledger conflates three categories of line.** `495` counts
+`[P2] That's a live network at a hackathon…` (14 words), which is only spoken if the demo
+fails, and counts `[P2] Those tones stand in for vibration. Heard, not felt.` (9 words), which
+is spoken *inside* the 90 s demo that is then added on top — so it is counted twice. It excludes
+the two `[P2-ALT]` branches entirely. A clean run is 481 words → 3:42 → **5:12** with the demo,
+not 5:18. The numbers are close enough not to matter operationally; the problem is that a
+section headed **"Ledger — computed, not asserted"** carries more authority than its method
+earns, which is precisely the failure mode this review exists to catch.
 
 ---
 
-### 3. The demo contingency line blames the network for failures that cannot be the network — and slide 7 then contradicts it two slides later
+## NEW — introduced by the fixes
 
-**Where:** `slides/deck/index.html:309-315`; same at `slides/narrative/script.md:152-159`. Contradicted
-by `slides/deck/index.html:376-377`.
+### N1. BLOCKER — slide 4's new line uses the exact active construction slide 9 forbids
 
-**Problem:** The fallback line is scoped to *any* demo failure, but the first two demo steps have no
-network in them at all. If those are what fail, the line is false — and it destroys the deck's single
-strongest technical claim, which is delivered two slides later.
+**Where:** `slides/deck/index.html:208` against `slides/deck/index.html:483-486`.
 
-**Evidence:** The contingency, scoped to everything (`index.html:309-311`):
+**Problem:** Moving the claim boundary onto slide 4 was the right call and I should have caught
+the need for it. But the new line is written in the one voice the deck explicitly rules out, and
+the rule is still sitting in slide 9's notes contradicting it.
 
-> `DEMO CONTINGENCY — if the pipeline fails at any point, say this and press 6:`
-> `[P2] That's a live network at a hackathon. The numbers are the same either way.`
+**Evidence:** The new slide-4 line:
 
-The locked demo order (`index.html:294-299`):
+> `[P2] Those two channels are buzzers. You can hear them, not feel them.`
 
-> `1. Start in MOVING. Show the range sensor finding an obstacle — pulse cadence slows as the path clears.`
-> `2. Show the siren detection.`
-> `3. Switch to STILL.`
-> `4. Only then raise the bus prop. BUS, then WAIT, then NUMBER 88.`
-
-Steps 1 and 2 are the ToF reflex and the on-board FFT. `plan/…:101` — *"The ToF → output reflex and
-siren → output reflex are fully local. No network in either path."* Then slide 7 (`index.html:376-377`):
-
-> `[P3] Both of those are local. No wifi in either path.`
-> `[P3] If the network dies mid-street, the safety sensing doesn't.`
-
-So the failure mode is: the buzzer stays silent on the ToF step, P2 says "that's a live network at a
-hackathon", and ninety seconds later P3 tells the same room that the network cannot affect that path.
-The audience has just watched the counter-example. This is worse than having no contingency line,
-because it converts a hardware hiccup into a caught contradiction on the deck's load-bearing claim.
-
-**Fix:** Split the contingency by step. Local failure (steps 1–2) needs its own line that does not
-mention the network — e.g. `[P2] That one's on the bench, not the network. Moving on.` Keep the
-existing line for steps 3–4 only, where it is true. Change `if the pipeline fails at any point` to
-`if the camera pipeline fails`.
-
----
-
-### 4. The weight ladder in `system.md` cannot render — 500 resolves to 400 and 600 resolves to 700
-
-**Where:** `slides/deck/css/deck.css:150, 161, 173, 183, 350` against `deck.css:16-38` and the shipped
-font binaries. Spec at `slides/design/system.md:92-93`.
-
-**Problem:** `system.md` declares a three-step weight ladder and names weight as one of the four
-levers the whole hierarchy rests on. Only two of the three steps exist as files, so two of the five
-weight declarations in the CSS silently render as something else. One of them renders as the exact
-Bold the CSS comment argues against.
-
-**Evidence:** The spec (`system.md:92-93`):
-
-> `Weights: body 400 · label 500 · display 600.`
-
-and (`system.md:31`):
-
-> `Hierarchy comes from **size, weight, tracking, and colour**. Nothing else is needed.`
-
-The shipped faces, read from the binaries — no `fvar` table in any of the three, so all static, no
-weight axis:
-
-```
-InstrumentSans-Bold.ttf       usWeightClass = 700   (fvar: absent)
-InstrumentSans-Regular.ttf    usWeightClass = 400   (fvar: absent)
-InstrumentSerif-Regular.ttf   usWeightClass = 400   (fvar: absent)
-```
-
-`@font-face` registers exactly 400 and 700 (`deck.css:19, 27, 35`). Under CSS Fonts L4 weight
-matching:
-
-- `font-weight: 500` → target is in [400,500], so weights ≥ target up to 500 are checked (none
-  available), then weights below target descending → **400**. Affects `.eyebrow` (`:150`),
-  `.hw-label` (`:161`), `.credit` (`:173`), `.diagram-label` (`:350`).
-- `font-weight: 600` → target > 500, so weights ≥ target ascending → **700**. Affects `.figure`
-  (`:183`). No synthetic bolding, because a real bolder face exists.
-
-So every label in the deck renders at Regular, identical in weight to body — the "label 500" step
-does not exist. And `450,000`, `1.4` and `3.8` render in real Instrument Sans **Bold**.
-
-That second one matters because the CSS reasons explicitly about avoiding it, four lines below the
-declaration that causes it (`deck.css:193-195`):
-
-> `/* One short sentence, at display size. Weight stays at 400: the display-600`
-> `   weight in system.md is for figures; a sentence set in Bold at 108px shouts,`
-> `   and slides 8 and 9 are the two slides that must not. */`
-
-The comment distinguishes "display 600" from "Bold". In the shipped build they are the same file.
-The distinction the comment is built on does not exist, which is the signature of a spec written
-without being rendered.
-
-**Fix:** Either ship the Instrument Sans variable font and declare `font-weight: 400 700` on a single
-`@font-face`, which makes 500 and 600 real; or change the CSS to the weights that exist (labels 400,
-figures 700) and correct `system.md:92-93` to say `body 400 · label 400 · display 700`. Do not leave
-a spec asserting a ladder the deck cannot climb.
-
----
-
-### 5. Two canonical spoken scripts exist, and they have already drifted
-
-**Where:** `slides/narrative/script.md` vs. the 11 `<script type="text/plain" class="notes">` blocks
-in `slides/deck/index.html`.
-
-**Problem:** The same 57 spoken lines are maintained in two files with no stated source of truth.
-They are already out of sync. Three presenters rehearsing from different files is how a live pitch
-stumbles, and this is the only defect in the review that gets worse with every future edit.
-
-**Evidence:** Diffing the 57 `[P#]` lines from each file, the spoken copy has already diverged:
-
-`script.md:80`:
-
-> `[P2] An interpreter is three hundred pounds a day, booked ahead.`
-
-`index.html:151`:
-
-> `[P2] An interpreter is around three hundred pounds a day, booked ahead.`
-
-The word `around` was added on one side only — and the declared word count in the same block was not
-updated (`index.html:147` still says `48 words`; the lines now total 50).
-
-The supporting notes have drifted further. `script.md:231` still uses an internal audit task ID:
-
-> `> "Can be heard, cannot be felt" is passive on purpose — it is T5's own claim-boundary phrasing.`
-
-`index.html:443-444` has already been repaired to:
+The standing rule at `:483-486`:
 
 > `NOTE: "Can be heard, cannot be felt" is passive on purpose — it is the`
-> `claim-boundary phrasing from the bench observation.`
+> `claim-boundary phrasing from the bench observation. The active alternative ("you`
+> `can't feel them") asserts something about a specific body that was never tested.`
+> `Leave it passive.`
 
-So `index.html` is ahead in one place and behind in another. Same for the demo cue
-(`script.md:145` *"when the tones fire"* vs `index.html:301` *"the first time a tone sounds — not at
-the end"*), the cuttable notation (`← *cuttable if running long*` vs `[CUTTABLE if running long]`),
-and a slide-7 note present only in `index.html:384`.
+`You can hear them, not feel them` is the active, second-person form, and the note names
+almost exactly that string as the forbidden alternative. The other two instances are both
+correct — `:315` `Heard, not felt.` and `:474` `The buzzers we were given can be heard. They
+cannot be felt.` — so slide 4 is the only one out of register, and it is the one that now
+carries the claim eighty seconds before slide 9 arrives.
 
-**Fix:** Declare one file canonical in `system.md` and make the other generated or a pointer. If
-`index.html` wins — correct, since it is what runs in the room — reduce `script.md` to the word
-ledger and the anticipated-questions section, which are the only parts not duplicated.
+This matters beyond consistency. `AGENTS.md` is explicit that the buzzers are not validated
+against any body, and "you can hear them" tells a room of people that they, specifically, would
+hear it. That is the assertion the passive phrasing exists to avoid.
+
+**Fix:** `[P2] Those two channels are buzzers. They can be heard, not felt.` Same length, same
+position, and it matches slides 5 and 9 exactly.
+
+### N2. WARNING — four comments now contradict the code they describe
+
+Every one of these was correct before this pass and was falsified by a fix that did not update
+its own documentation.
+
+**(a)** `deck.css:5-6` — the file header still names the face that was replaced:
+
+> `Two faces, used semantically: Instrument Serif is the person (slides 1 and 10`
+> `only), Instrument Sans is the machine (everywhere else).`
+
+The serif is Gloock. `system.md` was updated thoroughly; the CSS header was not.
+
+**(b)** `index.html:431-433` — the slide-8 comment still claims an accent that was removed:
+
+> `The argument is state, not cost and not cropping. Line one carries the`
+> `slide's one accent, because "when" is the claim that answers "so why a`
+> `detector at all?".`
+
+`:437` is now plain `class="statement"`. Nothing on slide 8 carries an accent.
+
+**(c)** `main.js:12-13` — the header claims something the file no longer does:
+
+> ` * Every value a human reads eases out (cubic-bezier(0,0,.2,1)). `linear` appears nowhere:`
+> ` * the canvas scrub's easing is the scroll position itself.`
+
+`main.js:409` is `easing: function (t) { return t; }`. See N5.
+
+**(d)** `index.html:44-45` and `deck.css:219-221` still describe the signature block in terms
+that were written for Instrument Serif. Harmless, but they are the third and fourth copies of a
+rationale I flagged as over-duplicated in the first pass, and they are now stale in different
+ways from each other.
+
+**Fix:** Update (a), (b), (c). For (d), reduce to a pointer at `system.md`.
+
+### N3. WARNING — `.statement--accent` is a live rule with no user
+
+**Where:** `deck.css:206-215`. Zero occurrences in `index.html`, one in `deck.css`.
+
+**Problem:** The rule was correctly removed from the markup and then kept in the stylesheet as
+documentation:
+
+> `/* DO NOT USE ON TEXT. Kept only to document why it is unused.`
+> `   --accent (#CFD9E0, 13.75:1 on --bg) is DARKER than --ink (#F2F4F5, 17.85:1).`
+
+The reasoning is right and the contrast arithmetic checks out — `#CFD9E0` is genuinely darker
+than `#F2F4F5`, so accenting text on a dark ground demotes it. That analysis now lives properly
+in `system.md:159-169`, which is where it belongs.
+
+But a CSS rule is not a comment. It is a live selector that will apply the moment anyone types
+the class name, and a rule whose comment begins "DO NOT USE" is a loaded gun left on the table.
+The `system.md` block already carries the explanation.
+
+**Fix:** Delete the rule. Keep the prose in `system.md`.
+
+### N4. WARNING — `.diagram-label` dropped 500 → 400, undocumented, and the other three 500s changed appearance silently
+
+**Where:** `deck.css:359`, previously `500`.
+
+**Problem:** `.eyebrow` (`:152`), `.hw-label` (`:163`) and `.credit` (`:175`) are all still
+`font-weight: 500`. `.diagram-label` — the same label role, in the same deck, carrying the SVG
+node names — is now the only one at 400, with no comment explaining why. Every other change in
+this pass carries a comment; this one does not.
+
+There is a plausible and slightly worrying explanation. Before the font swap, `500` rendered as
+`400` for all four. After the swap, all four got heavier for the first time. If `.diagram-label`
+was dialled back because the new rendering looked wrong, then the fix restored the *spec* while
+one element was quietly retuned to the *broken appearance* — and the other three changed how
+they look with nobody confirming the new look was reviewed.
+
+**Fix:** Decide deliberately. If diagram labels should be lighter than eyebrows, say so in the
+comment and in `system.md`'s tracking table. If not, restore 500. Either way, eyeball
+`.eyebrow`, `.hw-label` and `.credit` at their now-real 500 before the deck is shown — they
+have never been seen at that weight.
+
+### N5. WARNING — `playBeat` is good work with three loose ends
+
+**Where:** `main.js:385-412`.
+
+The diagnosis is correct and the fix is real: LENIS_EASING is exponential, so a keypress across
+a 5:1 pinned section did burn all 90 frames in a fraction of a second and leave the presenter
+talking over a frozen frame. A clicker cannot scrub, so the beat has to play itself. Good catch,
+and it is the difference between the canvas sections being narrative and being ornamental.
+
+Three loose ends:
+
+**(a) The `linear` rationale is circular.** `:409` comments `// linear: scroll position IS the
+easing`. That justification held when a human's scroll supplied the easing. Here the machine
+animates scroll position on a linear ramp over 6 s, so the frames burn at constant rate — which
+is right for playback, a film does not ease, but it is not the reason given. `system.md` says
+*"Never `linear` for anything a human reads. Linear is reserved for the canvas scrub, where the
+scroll position is the easing."* Say plainly that a self-playing beat is film playback and
+linear is correct for it, and update `main.js:12` and the `system.md` line together.
+
+**(b) `onComplete` is a no-op.** `onComplete: function () { if (token !== navToken) return; }`
+does nothing in either branch. Either drop it or put the intended cleanup in it.
+
+**(c) The arithmetic leaves a gap.** `BEAT_DURATION = 6` against slide 4's 16 s of speech and
+slide 7's 22 s means roughly 10 s and 16 s of frozen *final* frame. Better than a frozen frame
+0, not a cure. Consider deriving the duration from the slide's spoken budget, or accept it and
+note the residual.
+
+### N6. NOTE — `canvas-sequence.js` contain fix is correct
+
+`Math.max` → `Math.min` at `:183`, with the reasoning stated: cover was cropping 24% of the
+render height on a 1400×1050 projector and dropping slide 4's callouts onto the base plate. The
+letterbox argument holds — the bars are `#0A0B0C` and the renders' own world background is
+`#0A0B0C`, so they are invisible rather than merely dark. No issue.
 
 ---
 
-## WARNING
+## First-pass warnings still open
 
-### 1. "Em dashes: one" is false as written — there are 43 in the file that says it
+### Still open, and W1 has got worse
 
-**Where:** `slides/narrative/script.md:321`.
-
-**Problem:** The self-audit claim is unscoped, so it reads as a claim about the document, and as a
-claim about the document it is wrong by a factor of 43. This is checklist theatre in a deck whose
-entire pitch is that its numbers hold up, and it takes one grep to puncture.
-
-**Evidence:**
+**W1 — the em-dash claim was not scoped.** `script.md:400` is byte-identical to what I flagged:
 
 > `Em dashes: **one**, in slide 1, marking an appositive. Rhythmic, not decorative.`
 
-Actual counts: **43** in `script.md`, **26** in `index.html`.
-
-The claim is true under exactly one reading — spoken `[P#]` lines only — and under that reading it is
-precisely right:
+And the underlying count moved the wrong way. Spoken `[P#]` lines containing an em dash went
+from **1** to **5**, because the four new `[CUTTABLE — …]` annotations all use one:
 
 ```
-script.md   spoken lines with —:  34:[P1] He's DeafBlind — no useful sight, no useful hearing.   (1 of 57)
-index.html  spoken lines with —:  56:[P1] He's DeafBlind — no useful sight, no useful hearing.   (1 of 57)
+56:[P1] He's DeafBlind — no useful sight, no useful hearing.
+60:[P1] I'll come back to that.   [CUTTABLE — slide 9 pays this off regardless]
+295:[P2] Which matters in a moment.   [CUTTABLE — pure transition into the demo]
+445:[P3] So why a detector?   [CUTTABLE — setup line; the next line stands alone]
+475:[P3] We drove them down to seventy hertz. Still nothing.   [CUTTABLE — detail, not the claim]
 ```
 
-The em dash itself is fine: one appositive, rhythmic, correctly placed, and the remaining 42 are
-headings (`## 3 — Why the existing tools…`) and note prose, none decorative. The defect is the
-unqualified claim, not the punctuation.
+Strip the stage directions and it is still exactly one em dash in spoken *words*, which is the
+true and defensible claim. Totals are now 31 in `index.html` and 41 in `script.md`.
 
-**Fix:** `Em dashes in spoken lines: one — slide 1, an appositive. Note prose and headings are not
-counted.`
+**Fix:** `Em dashes in spoken words: one — slide 1, an appositive. Stage directions, headings
+and note prose are not counted.` The appendix is hand-authored below the marker, so this is a
+one-line edit that survives regeneration.
 
-### 2. "Every line is under 15 words" is false — the one mandatory line is 16
+**W3 — "nine minutes of argument ago"** is still at `index.html:516`, and it is now contradicted
+by an artefact in the same repo: the generated ledger says **5:18 full / 4:59 tight**. The deck
+computes its own runtime and then tells the presenter it is nearly twice that.
 
-**Where:** `slides/narrative/script.md:4`; the offending line at `script.md:147` and
-`slides/deck/index.html:304`.
+**W4 — "the most credible thirty seconds"** still at `index.html:492-493` against the block's own
+`P3 · 18 s` header.
 
-**Problem:** The claim fails on exactly one line, and it is the single line the deck marks as
-non-optional.
+**W8 — "Sense estimates 450,000"** still at `index.html:88`, still dropping the `over` that
+`facts.md:226` sanctions and that the very next clause uses for the 2035 figure.
 
-**Evidence:** The claim:
+**W10 — self-congratulation** is partly cleared. `index.html:456` survives untouched:
+`NOTE: This slide credits Modal by name, which the brief requires, and earns it.` So does
+`:102-103` (`That is why this line beats any statistic.`) and `:218-219`.
 
-> `Every line is under 15 words. Nothing here appears on a slide surface — these are presenter notes only.`
+### Improved or closed since the first pass
 
-Counted every one of the 57 spoken lines. Fifty-six pass. One does not:
+**W7 — slide 3** is materially better than what I asked for. Replacing `Interpreter / £275–£375
+a day` with `Communicator-guide / Booked in advance. Not at 7:42.` corrects a domain error I did
+not flag: a BSL interpreter is the wrong role for a man with no useful sight, and the note at
+`:163-169` says so. Dropping the price also removes the two-source credit problem — the credit
+is now `Guide Dogs · 2026` governing the one figure left on the slide. Correct.
 
-> `[P2] These two tones stand in for two vibration channels. The buzzers can be heard, not felt.`
+**W2 — the 16-word demo line** is now 9 words: `Those tones stand in for vibration. Heard, not
+felt.` Longest spoken line is 14. Confirmed.
 
-Sixteen words — the longest spoken line in the deck, and the one at `script.md:145` labelled
-**"The one line that must be said during the demo"**, delivered live while a buzzer is sounding and
-attention is on the hardware.
+**W11 — explaining the joke.** `Which matters in a moment.` (`:295`) and `So why a detector?`
+(`:445`) are now tagged `[CUTTABLE]`, which is a good compromise — they stay for a full run and
+go first under time pressure. `He isn't a persona we invented for a pitch.` (`:57`) and
+`That was not a nice-to-have.` (`:412`) are untagged and unchanged.
 
-Second-longest for context: `That lands in a relay. The wrist device polls it, three times a second.`
-(14, `index.html:282`) and the contingency line (14, `index.html:311`).
+**W12 — generic copy.** `Everything on it is there for one job.` is gone, replaced by the
+claim-boundary line. `So we built the thing that answers it.` (`:205`) remains.
 
-**Fix:** It is already two sentences; give the presenter permission to breathe between them, or cut
-to `These two tones stand in for two vibration channels. Heard, not felt.` (13). Then the claim is
-true and the hardest line to deliver becomes the shortest.
-
-### 3. "nine minutes of argument ago" — the deck runs 5 minutes 1 second
-
-**Where:** `slides/deck/index.html:476-477` and `slides/narrative/script.md:252-253`.
-
-**Problem:** A duration stated in the notes that is nearly double the deck's own summed budget. In a
-deck that gets £102,000, £275–£375, 450,000, 1.4 s and 3.8 s all exactly right, this is the one
-number nobody added up — and it is the deck's own runtime.
-
-**Evidence:**
-
-> `The slide is already the same image the audience saw nine minutes of`
-> `argument ago, and the only thing that changed is that they now know what the`
-> `device does.`
-
-Summing every `· N s ·` budget in `index.html`: slides total **211 s**, plus the **90 s** demo =
-**301 s = 5 min 01 s**. Measured slide 1 → slide 10 specifically: 301 − 18 (slide 0) − 10
-(slide 10) = **273 s = 4 min 33 s**.
-
-"Nine minutes" is wrong under either measure. It stays in the notes so it will not be said aloud —
-but a presenter riffing off their own note may repeat it, and a five-minute pitch described as nine
-minutes reads as a deck that has never been timed.
-
-**Fix:** `four and a half minutes of argument ago`, in both files.
-
-### 4. Slide 9's note calls it "thirty seconds"; the slide is budgeted 18 s
-
-**Where:** `slides/deck/index.html:432` vs `:452-453`; same at `script.md:218` vs `:239-240`.
-
-**Problem:** Two different durations for the same slide, 21 lines apart in one notes block.
-
-**Evidence:** The block header (`index.html:432`):
-
-> `P3 · 18 s · 48 words`
-
-and its closing note (`index.html:452-453`):
-
-> `NOTE: Deliver this without apology and without a rueful smile. It is the most`
-> `credible thirty seconds in the deck.`
-
-At the stated 130 wpm, 48 words is 22 s, so 18 s is already tight; 30 s is a different slide. If the
-presenter believes they have thirty seconds here, the deck runs long and the demo budget is what
-gives.
-
-**Fix:** Either say "the most credible moment in the deck" and drop the duration, or reconcile the
-budget upward — slide 9 is the one place worth the extra ten seconds.
-
-### 5. "It's 7:42 in the morning" — invented precision opening a deck that insists nothing is invented
-
-**Where:** `slides/deck/index.html:29`, `slides/narrative/script.md:17`.
-
-**Problem:** The deck's first spoken sentence is a fabricated-sounding specific, and its fourth
-spoken sentence is a promise that nothing here is fabricated. Fake-precise timestamps are one of the
-most recognisable tells in AI-assisted narrative copy, and this one is not in `facts.md`.
-
-**Evidence:** First line of the deck (`index.html:29`):
-
-> `[P1] It's 7:42 in the morning, at a bus stop in south London.`
-
-Grepped `research/facts.md` for `7:42`, `7.42`, `seven forty` — **no match**. Every other figure the
-deck speaks traces to `facts.md`; this one does not.
-
-Nineteen lines later (`index.html:57`):
-
-> `[P1] He isn't a persona we invented for a pitch.`
-
-If 7:42 is Hasan's grandfather's actual bus time, it is the best detail in the deck and should be in
-`facts.md` beside the rest. If it was chosen because 7:42 sounds more real than 7:40, it is the exact
-move the next slide disavows, and it is placed where a sceptical judge forms their first impression.
-
-**Fix:** Source it into `facts.md`, or drop to `It's early morning, at a bus stop in south London.`
-The line loses nothing — the specificity that earns the deck its credibility is `Hasan's
-grandfather`, not the clock.
-
-### 6. "better than YOLO ever could" — an unsourced comparative superlative in a deck that sources everything
-
-**Where:** `slides/deck/index.html:404`, `slides/narrative/script.md:202`.
-
-**Problem:** The deck refuses to say "there are 450,000" without a citation chain, then makes an
-unbounded model-comparison claim with no measurement behind it. It is also the one line where the
-deck sounds like a product pitch rather than an engineering account.
-
-**Evidence:**
-
-> `[P3] Claude reads a bus number better than YOLO ever could.`
-
-`ever could` is not a measured claim — it is a claim about all possible YOLO configurations. Nothing
-in `facts.md` or the plan benchmarks the two on route-number OCR. Compare the discipline three lines
-down, where the same slide makes its real argument and makes it precisely:
-
-> `[P3] The Claude API is stateless. Modal isn't.`
-
-That line is checkable, load-bearing and unattackable. The YOLO line is none of the three and it is
-the first thing a judge who has trained a detector will push on.
-
-**Fix:** `[P3] Claude reads the number off the front. YOLO tells us when to ask.` Same setup, no
-superlative, and it lands the `when` / `what` split the slide is actually built on.
-
-### 7. Slide 3's credit breaks the documented format and does not sit beneath its figures
-
-**Where:** `slides/deck/index.html:142`. Format spec at `slides/design/system.md:105-106`.
-
-**Problem:** The documented credit shape is `QUALIFIER · SOURCE · YEAR` and the qualifier is called
-mandatory. Slide 3 ships `SOURCE YEAR · SOURCE YEAR`, with no qualifier, placed under the whole
-block rather than under either figure.
-
-**Evidence:** The rule (`system.md:105-106`):
-
-> `Format: QUALIFIER · SOURCE · YEAR. The qualifier is mandatory when the figure is a`
-> `model rather than a count`
-
-and `system.md:97-98`: *"carries a credit line **directly beneath it**"*.
-
-As built (`index.html:142`):
-
-```
-<p class="credit" data-reveal data-reveal-delay="320">Guide Dogs 2026 · NUBSLI Apr 2026</p>
-```
-
-Two sources compressed into one line, no qualifier field, and `.ledger-block` (`deck.css:254-261`)
-places it under all four rows — so neither `£102,000` nor `£275–£375` has a credit directly beneath
-it. Slide 2 (`index.html:82`) shows the correct shape: `Estimated · Sense · 2022`.
-
-Both figures also want a qualifier that is currently missing. Per `facts.md:62`, £102,000 is a
-*lifetime* cost on a page current 2026 citing end-2024 data. Per `facts.md:65`, £275–£375 is a
-*median full-day range across regions*, not a single rate.
-
-**Fix:** Move each credit under its own row, or set the shared line as
-`LIFETIME · GUIDE DOGS · 2026   ·   MEDIAN DAY · NUBSLI · APR 2026`. The deck's own rule is right;
-this is the one slide that does not follow it.
-
-### 8. "Sense estimates 450,000" drops the "over" that `facts.md` sanctions
-
-**Where:** `slides/deck/index.html:88`, `script.md:51`, and the slide surface at `index.html:81`.
-
-**Problem:** `facts.md` writes the approved sentence out in full and the deck delivers it one word
-short — turning a floor into a point estimate.
-
-**Evidence:** `facts.md:226` gives the sanctioned phrasing:
-
-> `✅ "Sense estimates over 450,000 people in the UK are deafblind, rising to over 610,000 by 2035."`
-
-The deck says (`index.html:88`):
-
-> `[P1] Sense estimates 450,000 deafblind people in the UK. Over 610,000 by 2035.`
-
-`over` survives on the 2035 projection and is dropped on the headline figure, which is inconsistent
-within a single sentence. The source (`facts.md:33`) is explicit: *"there are over 450,000 people in
-the UK who are deafblind."*
-
-The `ESTIMATED` credit correctly handles model-vs-count, but not floor-vs-point. On screen,
-`450,000` under the eyebrow `People in the UK who are deafblind`, counting up to a precise-looking
-number, reads as a census result.
-
-**Fix:** `Sense estimates over 450,000 deafblind people in the UK.` One word, and it costs nothing.
-
-### 9. The presenter notes are written to be audited, not performed
-
-**Where:** throughout the `.notes` blocks; worst at `slides/deck/index.html:207, 294, 411-414` and
-`slides/narrative/script.md:231, 235`.
-
-**Problem:** The brief for this review asks whether three nervous people would say these words. Much
-of the notes apparatus is not addressed to a nervous presenter at all — it is addressed to a reviewer
-checking provenance. Internal document IDs are worse than useless at the moment of delivery.
-
-**Evidence:**
-
-`index.html:207` — a plan constraint number, mid-performance:
-
-> `NOTE: Last line is the outbound-only property (plan Global Constraint 9). It`
-
-`index.html:294` — a revision hash, immediately above the live 90-second demo, the single highest-stress
-moment in the deck:
-
-> `Locked order, plan Revision 2026-07-18e §5:`
-
-`script.md:231` and `:235` — an internal audit task ID, twice, with no expansion:
-
-> `> "Can be heard, cannot be felt" is passive on purpose — it is T5's own claim-boundary`
-> `> 70 Hz is from T5's labelled sweep (70/100/150/220 Hz)`
-
-Nobody on stage knows what T5 is. `index.html` has already fixed one of these two and not the other,
-which is BLOCKER 5 in miniature.
-
-The genuinely good notes are the ones written to a person: `index.html:35-37` (*"Do not invite the
-audience to close their eyes… The black screen is time, not a simulation. Let it sit."*),
-`:155-156` (*"The handoff from P1 to P2 happens mid-slide, on the interpreter line. Rehearse it"*),
-and `:306-307` (*"Say it on the first tone. If the audience hears an unexplained beep and forms their
-own theory, slide 9 arrives too late to correct it."*). Those are direction. The provenance strings
-are footnotes wearing a director's hat.
-
-**Fix:** Strip document IDs from the `.notes` blocks. Keep them in the plan and in `facts.md` where a
-reviewer looks. A note either changes what the presenter does in the next ten seconds or it belongs
-somewhere else.
-
-### 10. Four notes praise the deck to the person reading it
-
-**Where:** `slides/deck/index.html:103, 208, 313, 416, 453`.
-
-**Problem:** Self-congratulation in presenter notes does nothing for delivery, and reads as written-to-be-read.
-It is also the tell that the notes were composed as an artefact rather than as rehearsal material.
-
-**Evidence:**
-
-`:103` — > `That is why this line beats any statistic.`
-
-`:208` — > `It reads as a security answer, which is what a judge will hear, and it's true.`
-
-`:313` — > `NOTE: Fourteen words. It does not apologise, does not explain, does not troubleshoot on stage.`
-
-`:416` — > `NOTE: This slide credits Modal by name, which the brief requires, and earns it.`
-
-`:453` — > `It is the most credible thirty seconds in the deck.`
-
-`:416` is the clearest case: `and earns it` is the deck applauding itself, and the rest of the
-sentence tells the presenter about a submission brief they cannot act on mid-slide. `:313`'s
-*"Fourteen words"* is accurate — I counted — but a presenter does not need the word count of the line
-they are about to say; they need to know it is the whole response and nothing follows it, which the
-rest of the note already says well.
-
-**Fix:** Cut `:416` entirely. Reduce `:453` to `Deliver this without apology and without a rueful
-smile.` — the strongest note in the deck, weakened by the sentence after it. Cut the first sentence
-of `:313` and keep the second.
-
-### 11. Three spoken lines explain the joke
-
-**Where:** `slides/deck/index.html:57, 284, 378`.
-
-**Problem:** Each of these tells the audience how to receive the line before or after it, instead of
-letting the line do its own work. The deck is otherwise unusually disciplined about this, which makes
-the three stand out.
-
-**Evidence:**
-
-`:57` — > `[P1] He isn't a persona we invented for a pitch.`
-
-Defensive and self-aware; it also plants the words *persona* and *pitch* in the audience's head at
-the exact moment the deck wants them thinking about a person. The very next line does the job
-properly and needs no help: `[P1] I spoke to him. That conversation is why this exists.`
-
-`:284` — > `[P2] Which matters in a moment.`
-
-Announcing that something is about to matter rather than making it matter. The preceding line,
-`Safety sensing never touches the network.`, already lands and already points forward.
-
-`:378` — > `[P3] That was not a nice-to-have.`
-
-`nice-to-have` is product-management register in a deck that has otherwise held plain English for
-seven slides, and the sentence exists only to tell the audience the previous line was important.
-`If the network dies mid-street, the safety sensing doesn't.` is the strongest sentence on slide 7
-and it is followed by a line that softens it.
-
-**Fix:** Cut all three. Slide 1 loses a defensive beat, slide 5 hands into the demo a half-second
-faster, slide 7 ends on its best line. No information is lost.
-
-### 12. Two spoken lines could belong to any hardware pitch
-
-**Where:** `slides/deck/index.html:201, 204`.
-
-**Problem:** The review asked for copy that could belong to another project. These two are it. Every
-other line in the deck is unusable by anyone else — these could open any hackathon hardware demo of
-the last decade.
-
-**Evidence:**
-
-`:201` — > `[P2] So we built the thing that answers it.`
-
-`we built the thing` is the default transition into a hardware reveal, and `the thing` is vague in
-the one place the deck should be concrete.
-
-`:204` — > `[P2] Everything on it is there for one job.`
-
-Generic, and slightly untrue on its face: the board has four ports doing three different jobs (two
-outputs, ranging, listening). The line immediately before it already made the point better by
-enumerating them.
-
-By contrast, `[P2] It only ever calls out. Nothing can call in.` (`:205`) is specific, checkable,
-belongs to this project alone, and is the best line on the slide.
-
-**Fix:** Cut `:204`. Replace `:201` with something that names the answer, e.g.
-`[P2] So we built something that tells you which one.`
-
-### 13. The same design rationale is written out in four files
-
-**Where:** `slides/deck/index.html:45` and `:461-462` and `:476-478`; `slides/deck/css/deck.css:210`;
-`slides/design/system.md:48-50`; `slides/narrative/script.md:252-253`.
-
-**Problem:** The slide-1/slide-10 rationale is restated nearly verbatim in six places across four
-files. Documentation replicated to look thorough is a slop pattern in its own right, and it
-guarantees drift — as BLOCKER 5 already demonstrates elsewhere.
-
-**Evidence:** The same sentence, four times:
-
-- `index.html:461-462` — `The only thing that has changed is that the audience now knows what the device does.`
-- `index.html:477-478` — `the only thing that changed is that they now know what the device does.`
-- `system.md:49-50` — `The only thing that has changed between them is that the audience now knows what the device does.`
-- `script.md:253` — `the only thing that changed is that they now know what the device does.`
-
-And the supporting formulation three times:
-
-- `index.html:45` — `this block verbatim — same face, size, tracking, placement, words.`
-- `deck.css:210` — `Slides 1 and 10 share this block verbatim: same face, same size, same`
-- `system.md:49` — `1's composition **exactly**: same face, same size, same position.`
-
-Note that the three lists disagree: `index.html` lists five properties, `deck.css` lists four,
-`system.md` lists three. Nobody can say which is authoritative.
-
-**Fix:** `system.md:255-259` is the right home. Reduce the `index.html` comment and the `deck.css`
-comment to a pointer, and delete the restatement from the slide-10 note, which is design rationale
-the presenter cannot act on anyway.
-
-### 14. Twenty-nine prohibitions in three casing styles
-
-**Where:** throughout `slides/deck/index.html` `.notes` blocks.
-
-**Problem:** The notes are majority-negative and typographically inconsistent about it. For three
-nervous people, a wall of DO NOTs raises the cost of every sentence — the presenter is rehearsing a
-list of ways to fail rather than a thing to say.
-
-**Evidence:** Counted across `index.html`: **29** prohibitions, rendered five different ways:
-
-```
-   3  DO NOT
-   3  Do NOT
-   7  Do not
-   5  do not
-   1  Never
-   3  never
-```
-
-`DO NOT`, `Do NOT` and `Do not` all appear inside the slide-3 note alone (`:158-165`). The emphasis
-carries no consistent meaning, so it stops signalling anything.
-
-The prohibitions themselves are mostly justified — `DO NOT say £55,000` (`:160`) prevents a real,
-documented error (`facts.md:221`), and `Do NOT claim the range sensor chooses a direction` (`:380`)
-is a safety-of-claim boundary that must hold. The problem is density and inconsistency, not
-existence.
-
-**Fix:** Pick one form (`Do not`) and use it everywhere. Where a prohibition has a positive twin,
-lead with the twin: `Say £102,000 — Guide Dogs' birth-to-retirement figure. Not £55,000, which is
-stale and lower than the training cost alone.` Same information, and the presenter rehearses the
-sentence they will actually say.
+**Accent budget.** With `.statement--accent` off slide 8, `--accent` now appears on exactly one
+slide — slide 5's local-sensing path — and `system.md:159-169` documents the rule properly. The
+budget is no longer ambiguous. Closed.
 
 ---
 
-## SUGGESTION
+## The two you held
 
-### 1. Slide 5 is the only dead-centred composition and the only one without a stated reason
+### `7:42` — I withdraw the objection, with one condition
 
-**Where:** `slides/deck/css/deck.css:324-328`. Checklist item at `slides/design/system.md:280`.
+You have changed the facts of my finding in two ways. It came from the project brief rather than
+being invented, and it is no longer decorative: `:135` and `:151` both use it as the pivot of the
+communicator-guide row — `Booked in advance. Not at 7:42.` A detail that opens the deck and then
+returns forty seconds later to carry an argument is doing structural work, and cutting it now
+costs more than it saves. My first-pass reasoning was that it looked like fabricated texture; it
+isn't, and it no longer reads that way.
 
-**Problem:** `system.md:244-247` sets off-centre as the default and calls dead-centre "the template
-answer"; the checklist asks *"Any element dead-centred without a reason?"* Slide 5 spans all twelve
-columns and all three rows with `align-self: center`, and no file states why.
+**One condition.** `script.md`'s appendix asserts *"Every figure traces to
+`slides/research/facts.md`."* `7:42` does not, and it is now spoken twice and printed once on a
+visible surface. Add it to `facts.md` with its provenance — one line, sourced to the brief,
+flagged as a story detail rather than a statistic. That keeps the deck's own traceability claim
+true, which is the only reason I raised it.
 
-**Evidence:**
+### `better than YOLO ever could` — I still think it should go
 
-```
-.diagram-frame {
-  grid-column: 1 / span 12;
-  grid-row: 1 / span 3;
-  align-self: center;
-}
-```
+**Where:** `index.html:444`.
 
-Every other placement in the deck follows the rule: `.signature`, `.stat--scale`,
-`.stat--latency-first/second` and `.statement-block` all sit `grid-row: 3; align-self: end`.
-`.callouts` sits `1 / span 4; grid-row: 3`. Slide 5 is the sole exception.
+My position has hardened rather than softened, because this pass removed the deck's only other
+unsourced number. Slide 6 now says `not yet measured` on the team's own timings. Slide 3 dropped
+a price rather than cite a single undated provider. Slide 7 corrected a count that was defensible
+in the plan but wrong on the slide. Against that, `better than YOLO ever could` is the last bald
+comparative in the deck, and `ever could` is not a claim about a benchmark — it is a claim about
+every possible YOLO configuration.
 
-There is a good reason available — a 2.6:1 diagram needs the full measure, and the slide is held for
-the entire 90-second demo while the audience is watching hardware, not the screen. It is simply not
-written down, and the `index.html:217-225` comment explains the accent path instead.
+It is also unnecessary. The slide's real argument is three lines below and is unattackable:
+`The Claude API is stateless. Modal isn't.` The YOLO line exists only to set up `So why a
+detector?`, which is itself now tagged `[CUTTABLE]` — so the deck is prepared to cut the payoff
+while keeping the overclaim that sets it up.
 
-**Fix:** One line in `system.md` §Layout granting slide 5 the exception and saying why, in the same
-way `system.md:143-145` grants slide 6's.
+A judge who has trained a detector will push on this, and the honest answer ("we didn't
+benchmark it") undercuts a slide that is otherwise the most rigorous in the deck.
 
-### 2. Slide 5's three accent paths are an undocumented exemption; slide 6's identical case is documented
+**Fix:** `[P3] Claude reads the number off the front. YOLO tells us when to ask.` Same setup,
+no superlative, and it states the `when` / `what` split the slide is built on one beat earlier.
 
-**Where:** `slides/deck/css/deck.css:363-375` vs `slides/design/system.md:143-145`.
+---
 
-**Problem:** The accent budget is "one element per slide, maximum". Slide 5 accents three separate
-`<path>` elements. The argument that they are one thing is correct — but it lives only in a CSS
-comment, while the structurally identical argument for slide 6 is written into the design system.
-Budgets that are enforced in one file and waived in another are how budgets stop being budgets.
+## Gloock — my read
 
-**Evidence:** Documented exemption (`system.md:143-145`):
+**Considered, not trying-too-hard.** Three reasons, and one thing to test.
 
-> `Accent budget is **one element per slide**. Slide 6's two numbers count as one element`
-> `(they are one statement); if both were accent the slide would have no hierarchy.`
+The reasoning in `system.md:52-58` is the right reasoning. Instrument Serif's problem is not that
+it is a bad face — it is that it has become the default signal for "we have taste", which makes
+it load-bearing in the same way Inter is, just one tier up. Swapping it for a face in the same
+register that has not been worn smooth is exactly the move, and it is the *reason* given that
+makes it read as considered rather than contrarian.
 
-Undocumented exemption (`deck.css:360-375`), three rules:
+It survives the test that matters: it is doing a job. Gloock is a Didone — high stroke contrast,
+vertical stress — which is a genuinely different voice from Instrument Sans's grotesque, so the
+serif-is-the-person / grotesque-is-the-machine split reads *more* clearly than it did, not less.
+A face chosen to be unusual rather than to be different-from-the-other-face is what trying-too-hard
+looks like, and this isn't that.
 
-```
-.diagram-rule--local,
-.diagram-edge--local { stroke: var(--accent); stroke-width: 2; }
-.diagram-arrow--local { fill: var(--accent); }
-```
+It is also correctly scoped. `--font-serif` has exactly one consumer, `.signature-line`
+(`deck.css:230-237`), at `--t-display` only. Two slides, one size, five words. The boldness is
+spent in one place, which is what `system.md` says it is for.
 
-Also worth noting for balance: slide 6 ends up with **no** accent at all — `.stat--latency-first` and
-`.stat--latency-second` carry no accent class, and `.figure` is `--ink` (`deck.css:186`). So the one
-exemption `system.md` bothered to write down is for a case that does not arise. Across the whole
-deck only slides 5 and 8 use `--accent`; eight of eleven slides use none. That is legal under a
-maximum, but it means the accent token is carrying almost no work.
+**The one thing to test.** A Didone's hairlines are the first thing a projector loses. Verify it
+on the actual projector at the actual throw before the room fills. Two things work in your
+favour: it is only ever set at 108 px @1920, which is where a Didone is safest, and light-on-dark
+causes strokes to bloom rather than thin, so the hairlines will thicken slightly rather than
+drop out. Risk is low but it is not zero, and it is fifteen seconds to check.
 
-**Fix:** Add slide 5's exemption to `system.md` §Colour in the same sentence pattern. Separately,
-decide whether slide 6 should take the accent it was written an exemption for.
+If it does shimmer, the fix is a lower-contrast serif — not a retreat to Instrument Serif, which
+would reintroduce the problem you correctly identified.
 
-### 3. `system.md`'s slide-6 accent sentence argues against itself
-
-**Where:** `slides/design/system.md:143-145`.
-
-**Problem:** The sentence grants an exemption and then gives a reason not to use it, in the same
-breath, leaving no actionable rule.
-
-**Evidence:**
-
-> `Slide 6's two numbers count as one element (they are one statement); if both were accent the`
-> `slide would have no hierarchy.`
-
-Clause one says accenting both is within budget. Clause two says accenting both is a mistake. A
-reader cannot tell what to do, and the implementation resolves it by accenting neither — which is a
-third option the sentence never mentions.
-
-**Fix:** Say which. E.g. *"Slide 6 accents the first figure only; the second is `--ink`. The pair
-counts as one element against the budget."*
-
-### 4. `.hw-label` relies on authored capitals while `.eyebrow` and `.credit` are transformed
-
-**Where:** `slides/deck/css/deck.css:159-165`. Spec at `slides/design/system.md:113-116`.
-
-**Problem:** `system.md` specifies hardware labels as uppercase, but `.hw-label` is the one caps role
-without `text-transform: uppercase`. It renders correctly only because `index.html:190-193` authors
-`P1 BUZZER` in capitals. Any future label typed in sentence case silently breaks the role.
-
-**Evidence:** `.eyebrow` (`:153`) and `.credit` (`:176`) both carry `text-transform: uppercase`.
-`.hw-label` (`:159-165`) carries `letter-spacing: 0.08em` and `color: var(--muted)` but no transform.
-`.diagram-label` (`:346-352`) has the same gap and the same authored-caps dependency
-(`PHONE`, `MODAL`, `RELAY`, `WRIST DEVICE`, `LOCAL SENSING`).
-
-**Fix:** Add `text-transform: uppercase` to both. Costs one line each and makes the role
-self-enforcing.
-
-### 5. `.diagram-label` is the one type size not on the ladder
-
-**Where:** `slides/deck/css/deck.css:348`.
-
-**Problem:** Every other size in the deck derives from `--u` and the five `--t-*` tokens. This one is
-a bare number.
-
-**Evidence:**
+**Glyph coverage — checked, clean.** The signature line uses U+2019 in `Hasan’s`, and a missing
+glyph there would fall back to the generic `serif` for one character in the deck's most-repeated
+word. Both shipped faces cover everything the deck uses:
 
 ```
-.diagram-label {
-  ...
-  font-size: 20px;
+Gloock-Regular.ttf (446 chars)          InstrumentSans-Variable.ttf (343 chars)
+  U+2019 RIGHT SINGLE QUOTE   OK          U+2019 RIGHT SINGLE QUOTE   OK
+  U+00A3 POUND SIGN           OK          U+00A3 POUND SIGN           OK
+  U+00B7 MIDDLE DOT           OK          U+00B7 MIDDLE DOT           OK
+  U+2013 EN DASH              OK          U+2013 EN DASH              OK
+  U+2014 EM DASH              OK          U+2014 EM DASH              OK
+  U+007E TILDE                OK          U+007E TILDE                OK
 ```
 
-Because it sits inside `viewBox="0 0 1220 470"` on an SVG at `width: 100%`, the `20px` resolves in
-user units and scales with the frame — at 1920w across an 84vw measure that is ≈26 px rendered,
-landing near `--t-micro` (27 px). So it is right today by arithmetic rather than by construction. If
-`.diagram-frame`'s column span or the viewBox ever changes, it leaves the ladder silently.
+The tilde matters now that slide 6 uses it, and the middle dot matters for every credit line.
+Both are present in both faces.
 
-**Fix:** Comment the derivation, or express it as a viewBox-relative constant so the relationship to
-`--t-micro` is visible to the next person who touches it.
-
-### 6. Declared per-slide word counts drift from actual by one to two
-
-**Where:** the `P# · Ns · N words` headers in each `.notes` block.
-
-**Problem:** Minor, but this deck trades on its numbers being checkable, and these are the numbers a
-reviewer will spot-check first.
-
-**Evidence:** Counted every block. Six are exact (slides 1, 2, 4, 5, 8, 9, 10). Four drift:
-
-```
-slide 0   claimed 37   actual 36
-slide 3   claimed 48   actual 50   (see BLOCKER 5 — "around" was added, count not updated)
-slide 6   claimed 38   actual 39
-slide 7   claimed 47   actual 46
-```
-
-Slide 3 is the meaningful one; the rest are within counting-convention noise (`7:42`, contractions).
-
-**Fix:** Recount slide 3 after resolving BLOCKER 5. Leave the others or note the convention.
+**Licensing.** `Gloock-OFL.txt` is alongside the binary, `fsType 0`. The `system.md:60-64` note
+about commercial faces being off the table for a public repo is correct and worth having written
+down.
 
 ---
 
 ## Summary
 
-The deck passes every hard visual test in `system.md` outright. No monospace anywhere — including in
-the four places most decks would reach for it. Four colours, no fifth. No gradient, shadow, glow,
-blur, or rounded card. No bullet list, no `<ul>`, no marker glyph; the ledger leader is a drawn
-hairline. No paragraph on any visible surface — the longest rendered string is eight words. No
-default-AI sans face, and both fallback chains end generic. Frame counts and per-frame budgets match
-spec exactly. The animation all carries narrative.
+Five blockers, five closed. Two of the fixes — the slide-6 estimate disclosure and the slide-3
+communicator-guide correction — are better than what I recommended, and both fixed errors I had
+missed or accepted.
 
-The failures are not visual. They are five places where the deck asserts something it has not
-checked: a sensor count that contradicts itself out loud, two figures that skip the deck's own
-mandatory citation rule, a contingency line that would sabotage the deck's best technical claim, a
-weight ladder the shipped fonts cannot render, and two copies of the spoken script that have already
-diverged.
+What is left is smaller and of one kind: **the fixes outran their own documentation.** Four
+comments now describe code that no longer exists, a dead CSS rule was kept as a comment, a font
+weight moved without a note, and a generated ledger asserts more precision than its method has.
+Individually minor; collectively they are the same failure the first pass found, which is that
+this deck's prose about itself is written faster than it is verified.
 
-That is a good failure profile. The taste is real and the discipline holds under a hostile read. What
-is missing is the last verification pass — the one where someone sums the timings, counts the
-sensors, and renders the type before writing down what it looks like.
+One new blocker: slide 4's claim-boundary line is written in the exact voice slide 9 forbids,
+and that one is a claims-discipline problem rather than a taste problem, which is why it ranks
+where it does.

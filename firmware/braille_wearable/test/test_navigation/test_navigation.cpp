@@ -20,8 +20,11 @@ void test_all_activity_and_relay_command_combinations(void) {
         CloudCommand::LEFT, CloudCommand::RIGHT, CloudCommand::AHEAD,
         CloudCommand::INVALID,
     };
+    // Audit 23: LEFT/RIGHT/AHEAD are accepted in BOTH known phases — the user
+    // scans for the bus while standing still and needs the first direction
+    // before the first step. Only UNKNOWN refuses bearings.
     const bool stillAccepted[] = {true, true, true, true, true, true,
-                                  false, false, false, false};
+                                  true, true, true, false};
     const bool movingAccepted[] = {true, false, false, false, false, true,
                                    true, true, true, false};
 

@@ -9,8 +9,11 @@ inline constexpr uint32_t CLOUD_ACTIVITY_LEASE_MS = 120000;
 // `cloudCommandName()` are the only crossings, so members may be reordered.
 //
 // BUS/NUMBER/WAIT/UNKNOWN are the STILL payload: what the camera read at the
-// stop. LEFT/RIGHT/AHEAD are the MOVING payload: which side of the camera frame
-// the bus is on. That bearing is advisory and camera-derived; it is not a ToF
+// stop. LEFT/RIGHT/AHEAD are the advisory camera-derived bus bearing, deliverable
+// in BOTH known phases (audit 23): the user scans for the bus while standing
+// still and needs the first direction before taking a step, then keeps receiving
+// updates while walking. The phone yields the shared channel to BUS/NUMBER/
+// UNKNOWN during STILL so route-88 output still lands. A bearing is not a ToF
 // obstacle-avoidance instruction and never overrides the local safety paths.
 enum class CloudCommand : uint8_t {
     NONE = 0,
@@ -155,7 +158,10 @@ inline bool acceptsRelayCommand(UserActivity activity, CloudCommand command) {
         return true;
     }
     if (isBearingCommand(command)) {
-        return activity == UserActivity::MOVING;
+        // Both known phases (audit 23): the first direction is needed while the
+        // user is still standing at the stop scanning for the bus. UNKNOWN
+        // still refuses — no directions without a fresh activity claim.
+        return activity == UserActivity::MOVING || activity == UserActivity::STILL;
     }
     if (activity != UserActivity::STILL) {
         return false;
@@ -175,8 +181,9 @@ enum class CommandGate : uint8_t {
 // Output arbitration for one cloud command, in precedence order. The local
 // safety paths outrank the cloud unconditionally: a command the activity gate
 // accepts is still dropped while ToF proximity or a siren alert owns the
-// buzzers. Bearing commands are accepted in exactly the state where proximity
-// may render, so this ordering is what keeps them from masking an obstacle.
+// buzzers. Bearing commands are accepted in both known phases (audit 23), and
+// proximity may render in MOVING, so this ordering is what keeps a bearing
+// from masking an obstacle while the user is actually walking.
 inline CommandGate evaluateCommandGate(bool outputEnabled,
                                        UserActivity activity,
                                        CloudCommand command,

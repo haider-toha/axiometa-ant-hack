@@ -375,6 +375,54 @@ export function bearingToPattern(b: Bearing): Extract<CloudPattern, "LEFT" | "RI
 }
 
 /**
+ * The EventRequest a confirmed bearing translates to.
+ *
+ * `arrivalId` is 0, NEVER a live arrival counter. `sameEvent()` compares
+ * arrivalId, so carrying one would re-POST an unchanged LEFT every time the
+ * detector re-latched an arrival — restarting the board's 800 ms pattern and
+ * truncating it. A direction is not about an arrival. Every field here must be
+ * STABLE for a held bearing so the edge-trigger keeps comparing equal.
+ */
+export function navEvent(b: Bearing): EventRequest {
+  return { pattern: bearingToPattern(b), route: "", dest: "", conf: "", arrivalId: 0 };
+}
+
+/**
+ * Which half owns the single command channel this frame. (audit 23)
+ *
+ * The demo flow this serves: the user stands STILL at the stop scanning with
+ * the camera, gets the FIRST direction the moment a bus is confirmed, then
+ * starts walking and keeps receiving directions. So a bearing must be
+ * deliverable in both phases — `acceptsRelayCommand()` on the board agrees
+ * since audit 23.
+ *
+ * MOVING: the bearing always wins. The board drops the bus-information half in
+ * MOVING anyway, so sending it would be a seq bump the board ignores.
+ *
+ * STILL: bus information outranks the bearing, but only when it is SAYING
+ * something — BUS (arrival edge), NUMBER (route read) or UNKNOWN (unreadable
+ * verdict). WAIT and NONE render nothing the user is waiting on, so a
+ * confirmed bearing fills those gaps. The deliberate cost: the WAIT
+ * "request in flight" tone is never heard while a bearing is held — a
+ * direction is worth more than a progress noise.
+ *
+ * `force` is the capture page's demo override: the bearing wins the channel
+ * unconditionally, including over NUMBER.
+ */
+export function chooseEvent(
+  busEvent: EventRequest,
+  bearing: Bearing | null,
+  activity: UserActivity,
+  force = false,
+): EventRequest {
+  if (bearing === null) return busEvent;
+  if (force || activity === "MOVING") return navEvent(bearing);
+  return busEvent.pattern === "NONE" || busEvent.pattern === "WAIT"
+    ? navEvent(bearing)
+    : busEvent;
+}
+
+/**
  * Two commands are "the same event" when every device-visible field matches.
  *
  * This is the edge-trigger, and for navigation it is load-bearing rather than an

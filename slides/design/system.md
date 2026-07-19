@@ -40,14 +40,34 @@ Two faces, both from Instrument. They are used **semantically**, not decorativel
 
 | Face | Role | Used on |
 |---|---|---|
-| **Instrument Serif** Regular | the human voice | slides **1** and **10** only |
-| **Instrument Sans** Regular / Bold | everything else | slides 0, 2–9 |
+| **Gloock** Regular | the human voice | slides **1** and **10** only |
+| **Instrument Sans** Variable, `wght 400–700` | everything else | slides 0, 2–9 |
 
-Instrument Serif appears on exactly two slides — the two that name Hasan's grandfather —
-and nowhere else. That is the deck's single deliberate risk, and it is spent in one place
-per the frontend-design skill's "spend your boldness in one place". Slide 10 reuses slide
-1's composition **exactly**: same face, same size, same position. The only thing that has
-changed between them is that the audience now knows what the device does.
+Gloock appears on exactly two slides — the two that name Hasan's grandfather — and nowhere
+else. That is the deck's single deliberate risk, spent in one place per the frontend-design
+skill's "spend your boldness in one place". Slide 10 reuses slide 1's composition
+**exactly**: same face, size, tracking, placement, words. The only thing that changed is
+that the audience now knows what the device does.
+
+**Why not Instrument Serif** (the original choice): it is OFL and would have committed
+cleanly, but 2026 research describes it as "conquering the world" — the White House rebrand,
+AI-agent startups, whole galleries of landing pages devoted to it. It is the single most
+predictable "tasteful serif" available, which for a judge on their fortieth deck of the day
+is functionally the same problem as Inter. Gloock occupies the same high-contrast editorial
+register with a heavier vertical stress, is also SIL OFL with `fsType 0`, and is nowhere
+near as worn.
+
+**Why Instrument Sans Variable, not the static cuts.** The two static TTFs shipped first
+carried only `usWeightClass` 400 and 700. Under CSS font matching every `font-weight: 500`
+silently resolved to 400 and the display `600` snapped to **Bold** — so the weight ladder
+below was fiction, and `.figure` rendered in the exact weight the CSS argued against four
+lines later. The variable file has a real `wght` axis, so 500 and 600 are true instances.
+
+**Commercial faces are not an option here.** This repo is public. Neue Montreal, GT Sectra
+and PP Editorial New are installed on the build machine and any of them would look superb,
+but pushing the files to a public repo is redistribution, not embedding — and PP Editorial
+New's `fsType 4` is *Preview & Print only*, which forbids even editable embedding. Every
+face in `slides/deck/fonts/` must be OFL with its licence file alongside.
 
 If either face fails to load, the fallback chain ends in `serif` / `sans-serif` — never in
 a named system face, because that is how Inter and `-apple-system` sneak back in.
@@ -135,6 +155,18 @@ that failed its own contrast check would be an unforced error.
 
 **Never put `--muted` on `--accent`** — that pairing is 1.79:1. The only legal
 foreground/background combination is any of the three tones on `--bg`.
+
+> ### `--accent` is for structure, never for promoting text
+>
+> `--accent` (13.75:1) is **darker than `--ink`** (17.85:1), and they differ by only
+> **1.30:1**. So painting a line accent to emphasise it makes that line *recede* — and on a
+> projector the difference disappears entirely. Slide 8 originally set "Detection is when."
+> in accent and thereby inverted its own hierarchy: the promoted line rendered greyer than
+> the line it was supposed to lead.
+>
+> Accent is legal only on **structure** — the slide-5 local-sensing path, CAD edge
+> highlights, focus rings. Text hierarchy is `--ink` for primary and `--muted` for
+> secondary. There is no third level, and it does not need one.
 
 Banned outright: gradients · drop shadows · glows · `box-shadow` · `text-shadow` ·
 `filter: blur()` · rounded-corner bordered cards · any fifth colour, including pure

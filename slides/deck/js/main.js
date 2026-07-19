@@ -382,6 +382,37 @@
     return idx;
   }
 
+  /**
+   * Play a canvas beat after key-navigation lands on it.
+   *
+   * Without this the sequence sections are ornamental. LENIS_EASING is exponential
+   * ease-out — measured, it covers 65% of the distance in the first 120 ms — so a
+   * keypress that crosses a 5:1 pinned section burns all 90 frames in about 0.36 s
+   * and the scrub tail paints off-screen. The presenter then talks over a frozen
+   * frame 0 for sixteen seconds and the explode plays as a wipe on the way out.
+   *
+   * A clicker has no way to scrub, so the beat has to play itself. Land at the top
+   * of the section, then traverse its runway on a LINEAR ease over BEAT_DURATION,
+   * which is what makes the hold-then-burn curve in the harness actually visible.
+   * Stopping at 98% keeps the section pinned, so the next → still goes to the next
+   * slide rather than skipping one.
+   */
+  var BEAT_DURATION = 6;
+  function playBeat(section, immediate) {
+    if (!lenis || immediate || REDUCED) return;
+    if (!section.classList.contains("slide--seq")) return;
+    const runway = section.offsetHeight - window.innerHeight;
+    if (runway <= 0) return;
+    const token = navToken;
+    lenis.scrollTo(documentTop(section) + runway * 0.98, {
+      duration: BEAT_DURATION,
+      easing: function (t) { return t; },   // linear: scroll position IS the easing
+      force: true,
+      // Any later navigation bumps navToken; abandon this playthrough silently.
+      onComplete: function () { if (token !== navToken) return; },
+    });
+  }
+
   function scrollToIndex(i, immediate) {
     if (!slides.length) return;
     const index = clamp(i, 0, slides.length - 1);
@@ -404,7 +435,10 @@
         easing: LENIS_EASING,
         immediate: !!immediate,
         force: true,
-        onComplete: release,
+        onComplete: function () {
+          release();
+          playBeat(target, immediate);
+        },
       });
       // onComplete does not fire if this tween is interrupted; never leave the lock set.
       window.setTimeout(release, immediate ? 0 : NAV_DURATION * 1000 + 250);

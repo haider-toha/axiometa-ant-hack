@@ -24,7 +24,6 @@
   <section id="slide-0" class="slide" data-slide="0" aria-label="Black screen">
     <script type="text/plain" class="notes" data-for="0">
 SCREEN: nothing. #0A0B0C, edge to edge. No logo, no title, no cursor.
-P1 · 18 s · 37 words
 
 [P1] It's 7:42 in the morning, at a bus stop in south London.
 [P1] A bus pulls in.
@@ -50,14 +49,13 @@ screen is time, not a simulation. Let it sit.
     </div>
     <script type="text/plain" class="notes" data-for="1">
 SCREEN: Hasan's grandfather.
-P1 · 24 s · 50 words
 
 [P1] Hasan is my friend. This is his grandfather.
 [P1] He's DeafBlind — no useful sight, no useful hearing.
 [P1] He isn't a persona we invented for a pitch.
 [P1] I spoke to him. That conversation is why this exists.
 [P1] He has never tried the device. Nobody DeafBlind has.
-[P1] I'll come back to that.
+[P1] I'll come back to that.   [CUTTABLE — slide 9 pays this off regardless]
 
 NOTE: Two verbs doing separate jobs, and they must not be blurred: SPOKE TO
 (true, and the origin of the project) and TRIED (has not happened). The last two
@@ -83,7 +81,6 @@ lines set up slide 9. Say them evenly — this is disclosure, not confession.
     </div>
     <script type="text/plain" class="notes" data-for="2">
 SCREEN: 450,000, large, counting up. Credit beneath: ESTIMATED · SENSE · 2022.
-P1 · 19 s · 41 words
 
 [P1] Sense estimates 450,000 deafblind people in the UK. Over 610,000 by 2035.
 [P1] The government's own definition names three difficulties.
@@ -144,7 +141,6 @@ Deliver flat, no emphasis — the sentence does the work.
     <script type="text/plain" class="notes" data-for="3">
 SCREEN: four-row ledger — subject, hairline rule, disqualifier. Rows reveal in
 sequence. Not a bullet list: no markers, no discs, no leading dashes.
-P1 → P2 · 22 s · 48 words
 
 [P1] A cane finds the kerb. It cannot read a bus.   [CUTTABLE if running long]
 [P1] A guide dog costs a hundred and two thousand pounds.
@@ -152,17 +148,21 @@ P1 → P2 · 22 s · 48 words
 [P2] Apps predict arrivals. They don't confirm what actually pulled in.
 [P2] All good tools. None answers: which bus is this?
 
-NOTE: The handoff from P1 to P2 happens mid-slide, on the interpreter line.
-Rehearse it — it's the only mid-slide voice change in the deck.
+NOTE: The handoff from P1 to P2 happens mid-slide, on the communicator-guide
+line. Rehearse it — it's the only mid-slide voice change in the deck.
 
 NOTE: £102,000 is Guide Dogs' own current figure — £77,000 to breed, raise and
 train, plus £25,000 to support the partnership for its working life. DO NOT say
 £55,000: that number circulates widely, is undated, and is less than the training
 cost alone. DO NOT say "£25,000 a year" — it covers the entire working life.
 
-NOTE: £275–£375 is NUBSLI's Apr 2026 guidance for a registered interpreter's full
-day. DO NOT convert to an hourly rate — NUBSLI does not define how many hours a
-"day" is, so any hourly figure would be an invented divisor.
+NOTE: The row says COMMUNICATOR-GUIDE, not "interpreter", and carries no price.
+Both are deliberate. A BSL interpreter is the wrong role for a man with no useful
+sight — he cannot see BSL — and facts.md exists partly to stop that conflation:
+interpreter, communicator-guide and intervenor are three different jobs and must
+not be mixed. The role that matches acquired deafblindness has no national
+published rate (one provider, undated), so the row argues availability instead of
+cost. Availability is the real barrier at 7:42 anyway.
 
 NOTE: Tone check. These are NOT weaknesses of a cane or a dog. They are
 different tools solving different problems, and the script says so ("all good
@@ -196,13 +196,19 @@ doesn't know the domain.
     </div>
     <script type="text/plain" class="notes" data-for="4">
 SCREEN: CAD explode. 90 frames, pin 5:1. Port callouts only.
-P2 · 16 s · 39 words
 
 [P2] So we built the thing that answers it.
 [P2] A board you wear. Four ports.
 [P2] A range sensor. A microphone. Two output channels.
-[P2] Everything on it is there for one job.
+[P2] Those two channels are buzzers. They can be heard, not felt.
 [P2] It only ever calls out. Nothing can call in.
+
+NOTE: The "hear them, not feel them" line lives HERE, not only in the demo.
+It used to sit only in the demo script, which meant that if no tone ever
+sounded it was never said at all — and slides 4 to 8 run about eighty seconds
+implying a working signal to a DeafBlind user before slide 9 corrects it. The
+claim boundary cannot depend on the demo working. Say it again on the first
+tone if the demo runs; saying it twice costs nothing.
 
 NOTE: Last line is the outbound-only property (plan Global Constraint 9). It
 reads as a security answer, which is what a judge will hear, and it's true.
@@ -274,14 +280,13 @@ PDM MICROPHONE and nothing more.
     </div>
     <script type="text/plain" class="notes" data-for="5">
 SCREEN: system diagram. Five nodes, four edges, drawn on.
-P2 · 22 s · 49 words
 
 [P2] Your phone watches the road and sends frames to Modal.
 [P2] Modal decides when a bus has arrived.
 [P2] Claude reads the number off the front.
 [P2] That lands in a relay. The wrist device polls it, three times a second.
 [P2] Safety sensing never touches the network.
-[P2] Which matters in a moment.
+[P2] Which matters in a moment.   [CUTTABLE — pure transition into the demo]
 
 NOTE: "Three times a second" = the 300 ms poll. Accurate.
 NOTE: Last line hands into the demo. Don't pause after it.
@@ -301,25 +306,35 @@ Locked order, plan Revision 2026-07-18e §5:
 The one line that must be said during the demo, the first time a tone sounds —
 not at the end:
 
-[P2] These two tones stand in for two vibration channels. The buzzers can be heard, not felt.
+[P2] Those tones stand in for vibration. Heard, not felt.
 
 NOTE: Say it on the first tone. If the audience hears an unexplained beep and
 forms their own theory, slide 9 arrives too late to correct it.
 
-DEMO CONTINGENCY — if the pipeline fails at any point, say this and press 6:
+DEMO CONTINGENCY — press 6 and use the line that matches WHAT failed. Do not
+blame the network by reflex: demo steps 1 and 2 are the range sensor and the
+on-board FFT, and neither touches the network. Slide 7 tells this same room
+"Both of those are local. No wifi in either path." Blaming wifi for a local
+failure hands them the counter-example.
 
+If the CAMERA / MODAL / RELAY leg failed (steps 3-4):
 [P2] That's a live network at a hackathon. The numbers are the same either way.
 
-NOTE: Fourteen words. It does not apologise, does not explain, does not
-troubleshoot on stage. Slides 6 to 10 are written to stand without the demo
-having worked.
+If the LOCAL sensing failed (steps 1-2):
+[P2-ALT] That one's on us, not the network. It's local. Let me show you the rest.
+
+If you are not sure which failed:
+[P2-ALT] Live hardware. The rest of the deck stands without it.
+
+NOTE: Short, and none of them apologise, explain, or troubleshoot on stage.
+Slides 6 to 10 are written to stand without the demo having worked.
     </script>
   </section>
 
 
   <!-- =====================================================================
        6 · What you just saw
-       Both figures are the mean of the plan's measured latency budget:
+       Both figures are the mean of the plan's estimated latency budget:
        0.76-2.09 s, mean 1.38 -> 1.4 s; and 2.4-6.2 s, mean 3.8 -> 3.8 s.
        Do not quote the ranges on stage.
        ================================================================== -->
@@ -335,7 +350,6 @@ having worked.
     </div>
     <script type="text/plain" class="notes" data-for="6">
 SCREEN: ~1.4 s and ~3.8 s, counting up, with the estimate credit beneath.
-P2 · 18 s · 40 words
 
 [P2] About a second and a half from bus to first signal.
 [P2] About four to the first digit of the number.
@@ -381,7 +395,6 @@ phrased as what the system does, not as what just happened. Add nothing.
     </div>
     <script type="text/plain" class="notes" data-for="7">
 SCREEN: CAD orbit of the range sensor. 80 frames, pin 4:1.
-P3 · 22 s · 47 words
 
 [P3] Two sensors on the board, one reason each.   [CUTTABLE if running long]
 [P3] Range sensor: forward clearance while you're walking.
@@ -413,16 +426,15 @@ NOTE: The cane remains the primary mobility aid. This is supplementary.
        ================================================================== -->
   <section id="slide-8" class="slide" data-slide="8" aria-label="Why Modal">
     <div class="statement-block">
-      <p class="statement statement--accent" data-reveal data-reveal-delay="0">Detection is when.</p>
+      <p class="statement" data-reveal data-reveal-delay="0">Detection is when.</p>
       <p class="statement" data-reveal data-reveal-delay="160">Claude is what.</p>
     </div>
     <script type="text/plain" class="notes" data-for="8">
 SCREEN: Detection is when. / Claude is what.
-P3 · 22 s · 50 words
 
 [P3] Claude reads a bus number better than YOLO ever could.
-[P3] So why a detector?
-[P3] Because a bus arriving isn't one frame. It's two seconds of frames.
+[P3] So why a detector?   [CUTTABLE — setup line; the next line stands alone]
+[P3] A bus arriving isn't one frame. It's two seconds of frames.
 [P3] That needs history, debounce, and a latch that fires exactly once.
 [P3] The Claude API is stateless. Modal isn't.
 [P3] Detection is when. Claude is what.
@@ -448,10 +460,9 @@ NOTE: This slide credits Modal by name, which the brief requires, and earns it.
     </div>
     <script type="text/plain" class="notes" data-for="9">
 SCREEN: We have not validated this with DeafBlind users. Held, static, alone.
-P3 · 18 s · 48 words
 
 [P3] The buzzers we were given can be heard. They cannot be felt.
-[P3] We drove them down to seventy hertz. Still nothing.
+[P3] We drove them down to seventy hertz. Still nothing.   [CUTTABLE — detail, not the claim]
 [P3] So those two tones stand in for two vibration channels.
 [P3] We have not validated this with DeafBlind users.
 [P3] Real motors next. Then the people who'd use it.
@@ -486,7 +497,6 @@ credible thirty seconds in the deck.
     </div>
     <script type="text/plain" class="notes" data-for="10">
 SCREEN: Hasan's grandfather. — identical composition to slide 1.
-P3 · 10 s · 17 words
 
 [P3] Hasan's grandfather still asks a stranger which bus just arrived.
 [P3] We'd like him to stop having to.

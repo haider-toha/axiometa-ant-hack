@@ -30,9 +30,11 @@ import {
   ACTIVITY_SEQ_MAX,
   CLOUD_PATTERNS,
   bearingToPattern,
+  chooseEvent,
   detectorToEvent,
   isCloudPattern,
   isUserActivity,
+  navEvent,
   normActivity,
   normActivitySeq,
   sameEvent,
@@ -718,5 +720,106 @@ describe("detectorToEvent", () => {
     detectorToEvent(m);
 
     expect(m).toEqual(before);
+  });
+});
+
+// --- chooseEvent: who owns the single command channel (audit 23) -------------
+//
+// The demo flow this arbitration exists for: the user stands STILL at the stop
+// scanning with the camera, must get the FIRST direction before taking a step,
+// then walks and keeps receiving directions. The board accepts bearings in both
+// known phases since audit 23, so the phone's only judgement call is precedence
+// against the bus-information half on the shared seq channel.
+
+describe("chooseEvent", () => {
+  const ev = (pattern: CloudPattern, arrivalId = 0): EventRequest => ({
+    pattern,
+    route: pattern === "NUMBER" ? "88" : "",
+    dest: "",
+    conf: pattern === "NUMBER" ? "high" : "",
+    arrivalId,
+  });
+
+  it("returns the bus event untouched when there is no bearing", () => {
+    const bus = ev("NUMBER", 3);
+    expect(chooseEvent(bus, null, "STILL")).toBe(bus);
+    expect(chooseEvent(bus, null, "MOVING")).toBe(bus);
+  });
+
+  // THE requirement this function exists for: standing still, scanning, bus
+  // confirmed, nothing else to say — the direction must go out.
+  it.each(["NONE", "WAIT"] as const)(
+    "sends the bearing while STILL when the bus half only offers %s",
+    (idle) => {
+      expect(chooseEvent(ev(idle, 2), "left", "STILL")).toEqual(navEvent("left"));
+    },
+  );
+
+  // Arrival and route information still land while standing at the stop —
+  // otherwise widening the bearing to STILL would have silenced route 88.
+  it.each(["BUS", "NUMBER", "UNKNOWN"] as const)(
+    "yields the channel to %s while STILL",
+    (busy) => {
+      const bus = ev(busy, 2);
+      expect(chooseEvent(bus, "left", "STILL")).toBe(bus);
+    },
+  );
+
+  it("always sends the bearing while MOVING — the board drops the bus half there anyway", () => {
+    expect(chooseEvent(ev("NUMBER", 2), "right", "MOVING")).toEqual(navEvent("right"));
+    expect(chooseEvent(ev("BUS", 2), "center", "MOVING")).toEqual(navEvent("center"));
+  });
+
+  it("force makes the bearing win unconditionally, including over NUMBER while STILL", () => {
+    expect(chooseEvent(ev("NUMBER", 2), "left", "STILL", true)).toEqual(navEvent("left"));
+  });
+
+  // The edge-trigger contract: a HELD bearing must keep comparing sameEvent-
+  // equal across ticks even as the detector's arrival counter moves, or every
+  // re-latch restarts the board's 800 ms pattern and truncates it.
+  it("emits a stable event for a held bearing across arrival re-latches", () => {
+    const a = chooseEvent(ev("NONE", 1), "left", "STILL");
+    const b = chooseEvent(ev("NONE", 2), "left", "STILL");
+    expect(sameEvent(a, b)).toBe(true);
+  });
+
+  // The transition the user physically performs: scanning STILL with a held
+  // direction, then starting to walk. The event is identical on both sides of
+  // the flip, so the edge-trigger does NOT re-fire and the board's pattern is
+  // not restarted mid-play by the activity change itself.
+  it("does not re-fire the same bearing when the user starts walking", () => {
+    const still = chooseEvent(ev("NONE", 1), "left", "STILL");
+    const moving = chooseEvent(ev("NONE", 1), "left", "MOVING");
+    expect(sameEvent(still, moving)).toBe(true);
+  });
+
+  it("does not mutate the bus event it was handed", () => {
+    const bus = ev("NUMBER", 4);
+    const before = structuredClone(bus);
+    chooseEvent(bus, "left", "STILL");
+    chooseEvent(bus, "left", "MOVING");
+    expect(bus).toEqual(before);
+  });
+});
+
+describe("navEvent", () => {
+  it.each([
+    ["left", "LEFT"],
+    ["center", "AHEAD"],
+    ["right", "RIGHT"],
+  ] as const)("maps %s to a %s event with empty info fields", (bearing, pattern) => {
+    expect(navEvent(bearing)).toEqual({
+      pattern,
+      route: "",
+      dest: "",
+      conf: "",
+      arrivalId: 0,
+    });
+  });
+
+  // arrivalId is pinned at 0 — a live arrival counter here would make every
+  // detector re-latch a "new" event and truncate the running nav pattern.
+  it("never carries an arrival id", () => {
+    expect(navEvent("left").arrivalId).toBe(0);
   });
 });

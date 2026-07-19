@@ -180,7 +180,12 @@
       ctx.fillRect(0, 0, w, h);
       const img = images[index];
       if (!isPaintable(img)) return;
-      const scale = Math.max(w / img.naturalWidth, h / img.naturalHeight);
+      // CONTAIN (min), not cover (max). Cover crops to fill: on a 1400x1050 projector
+      // that removed 24% of the render's height and dropped slide 4's port callouts on
+      // top of the base plate. Contain can letterbox — but the bars are #0A0B0C and the
+      // renders' own world background is #0A0B0C, so they are literally invisible. The
+      // whole frame is always shown and the callouts can never collide with geometry.
+      const scale = Math.min(w / img.naturalWidth, h / img.naturalHeight);
       const dw = img.naturalWidth * scale;
       const dh = img.naturalHeight * scale;
       ctx.drawImage(img, (w - dw) / 2, (h - dh) / 2, dw, dh);

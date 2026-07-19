@@ -169,7 +169,7 @@ void test_activity_gate_truth_table_is_exhaustive(void) {
         CloudCommand::INVALID,
     };
     //                    NONE   BUS    NUM    WAIT   UNKN   ERR    LEFT   RIGHT  AHEAD  INVAL
-    const bool still[] = {true,  true,  true,  true,  true,  true,  false, false, false, false};
+    const bool still[] = {true,  true,  true,  true,  true,  true,  true,  true,  true,  false};
     const bool moving[] = {true, false, false, false, false, true,  true,  true,  true,  false};
     const bool unset[] = {true,  false, false, false, false, true,  false, false, false, false};
 
@@ -183,7 +183,7 @@ void test_activity_gate_truth_table_is_exhaustive(void) {
     }
 }
 
-void test_camera_bearing_renders_while_moving_and_is_suppressed_while_still(void) {
+void test_camera_bearing_renders_in_both_phases_and_needs_known_activity(void) {
     RelaySequenceState state{};
     consumeRelayCommand(state, command(20, CloudCommand::NONE), UserActivity::MOVING);
 
@@ -197,16 +197,19 @@ void test_camera_bearing_renders_while_moving_and_is_suppressed_while_still(void
         static_cast<uint8_t>(RelayDisposition::ACCEPT),
         disposition(state, command(23, CloudCommand::AHEAD), UserActivity::MOVING));
 
-    // Bearing is the MOVING payload; standing at the stop suppresses it.
+    // Audit 23: the user scans for the bus while STANDING STILL, so the first
+    // direction must be deliverable before the first step is taken.
     TEST_ASSERT_EQUAL_UINT8(
-        static_cast<uint8_t>(RelayDisposition::SUPPRESS),
+        static_cast<uint8_t>(RelayDisposition::ACCEPT),
         disposition(state, command(24, CloudCommand::LEFT), UserActivity::STILL));
+
+    // UNKNOWN still refuses: no directions without a fresh activity claim.
     TEST_ASSERT_EQUAL_UINT8(
         static_cast<uint8_t>(RelayDisposition::SUPPRESS),
         disposition(state, command(25, CloudCommand::AHEAD), UserActivity::UNKNOWN));
 
     // A suppressed bearing is consumed, not queued: it must not replay when
-    // activity later returns to MOVING.
+    // activity later becomes known.
     TEST_ASSERT_EQUAL_UINT8(
         static_cast<uint8_t>(RelayDisposition::UNCHANGED),
         disposition(state, command(25, CloudCommand::AHEAD), UserActivity::MOVING));
@@ -267,11 +270,15 @@ void test_local_proximity_and_siren_outrank_accepted_cloud_commands(void) {
         static_cast<uint8_t>(CommandGate::OUTPUT_STOPPED),
         gate(false, UserActivity::MOVING, CloudCommand::LEFT, false, false));
 
-    // The activity gate is evaluated before local safety, so a STILL bearing
-    // reports the gate rather than a misleading proximity reason.
+    // Audit 23: a STILL bearing passes the activity gate now, so local safety
+    // is what arbitrates it — proximity cannot render in STILL by policy, but
+    // the pure gate must still rank it above the cloud if it ever were.
     TEST_ASSERT_EQUAL_UINT8(
-        static_cast<uint8_t>(CommandGate::ACTIVITY_GATE),
+        static_cast<uint8_t>(CommandGate::LOCAL_PROXIMITY),
         gate(true, UserActivity::STILL, CloudCommand::LEFT, true, false));
+    TEST_ASSERT_EQUAL_UINT8(
+        static_cast<uint8_t>(CommandGate::ALLOW),
+        gate(true, UserActivity::STILL, CloudCommand::LEFT, false, false));
     TEST_ASSERT_EQUAL_UINT8(
         static_cast<uint8_t>(CommandGate::ACTIVITY_GATE),
         gate(true, UserActivity::MOVING, CloudCommand::INVALID, false, false));
@@ -485,7 +492,7 @@ int main(int, char**) {
     RUN_TEST(test_moving_consumes_bus_information_without_render_or_replay);
     RUN_TEST(test_still_accepts_fresh_bus_information_and_error_is_global);
     RUN_TEST(test_activity_gate_truth_table_is_exhaustive);
-    RUN_TEST(test_camera_bearing_renders_while_moving_and_is_suppressed_while_still);
+    RUN_TEST(test_camera_bearing_renders_in_both_phases_and_needs_known_activity);
     RUN_TEST(test_bearing_is_not_route_or_confidence_gated_like_number);
     RUN_TEST(test_local_proximity_and_siren_outrank_accepted_cloud_commands);
     RUN_TEST(test_wrong_route_is_consumed_without_false_route_88_output);

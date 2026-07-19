@@ -153,6 +153,13 @@ inline bool isBearingCommand(CloudCommand command) {
            command == CloudCommand::AHEAD;
 }
 
+// LEFT/RIGHT are escape directions around an obstacle. AHEAD must never mask
+// a live ToF warning: it means the path is clear, which contradicts the local
+// sensor while proximity is active.
+inline bool mayInterruptProximity(CloudCommand command) {
+    return command == CloudCommand::LEFT || command == CloudCommand::RIGHT;
+}
+
 inline bool acceptsRelayCommand(UserActivity activity, CloudCommand command) {
     if (command == CloudCommand::NONE || command == CloudCommand::ERROR) {
         return true;
@@ -178,12 +185,10 @@ enum class CommandGate : uint8_t {
     LOCAL_SIREN,
 };
 
-// Output arbitration for one cloud command, in precedence order. The local
-// safety paths outrank the cloud unconditionally: a command the activity gate
-// accepts is still dropped while ToF proximity or a siren alert owns the
-// buzzers. Bearing commands are accepted in both known phases (audit 23), and
-// proximity may render in MOVING, so this ordering is what keeps a bearing
-// from masking an obstacle while the user is actually walking.
+// Output arbitration for one cloud command, in precedence order. Siren always
+// wins. ToF wins over every cloud command except LEFT/RIGHT: those two briefly
+// interrupt its output so the board can explain how to bypass the obstacle it
+// already reported. AHEAD stays blocked while proximity is active.
 inline CommandGate evaluateCommandGate(bool outputEnabled,
                                        UserActivity activity,
                                        CloudCommand command,
@@ -191,8 +196,10 @@ inline CommandGate evaluateCommandGate(bool outputEnabled,
                                        bool sirenActive) {
     if (!outputEnabled) return CommandGate::OUTPUT_STOPPED;
     if (!acceptsRelayCommand(activity, command)) return CommandGate::ACTIVITY_GATE;
-    if (proximityRendering) return CommandGate::LOCAL_PROXIMITY;
     if (sirenActive) return CommandGate::LOCAL_SIREN;
+    if (proximityRendering && !mayInterruptProximity(command)) {
+        return CommandGate::LOCAL_PROXIMITY;
+    }
     return CommandGate::ALLOW;
 }
 

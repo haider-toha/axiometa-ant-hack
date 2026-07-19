@@ -15,12 +15,30 @@ OutputSemanticInputs idleInputs() {
         false,
         false,
         false,
+        false,
         OutputTelemetrySource::NONE,
         "NONE",
         UserActivity::MOVING,
         -1,
         OutputMode::AUDIBLE,
     };
+}
+
+void test_direction_override_is_reported_instead_of_masking_proximity(void) {
+    OutputSemanticInputs inputs = idleInputs();
+    inputs.proximityActive = true;
+    inputs.proximityCanRender = true;
+    inputs.playerActive = true;
+    inputs.playerOverridesProximity = true;
+    inputs.playerSource = OutputTelemetrySource::RELAY;
+    inputs.playerPattern = "LEFT";
+
+    const OutputSemanticSnapshot snapshot = selectOutputSemantics(inputs);
+
+    TEST_ASSERT_EQUAL(OutputTelemetryState::ACTIVE, snapshot.state);
+    TEST_ASSERT_EQUAL(OutputTelemetrySource::RELAY, snapshot.source);
+    TEST_ASSERT_EQUAL_STRING("LEFT", snapshot.pattern);
+    TEST_ASSERT_EQUAL(OutputTelemetryReason::PLAYING, snapshot.reason);
 }
 
 } // namespace
@@ -189,6 +207,7 @@ void test_heartbeat_timing_is_wrap_safe(void) {
 int main(int, char **) {
     UNITY_BEGIN();
     RUN_TEST(test_formats_protocol_v2_local_proximity_record);
+    RUN_TEST(test_direction_override_is_reported_instead_of_masking_proximity);
     RUN_TEST(test_disabled_output_latch_has_highest_precedence);
     RUN_TEST(test_siren_outranks_proximity_and_player);
     RUN_TEST(test_player_outranks_suppressed_still_proximity);

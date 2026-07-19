@@ -239,23 +239,35 @@ void test_bearing_is_not_route_or_confidence_gated_like_number(void) {
                     UserActivity::STILL));
 }
 
-void test_local_proximity_and_siren_outrank_accepted_cloud_commands(void) {
-    // Bearings are accepted in exactly the state where ToF proximity renders,
-    // so this precedence is what stops a bearing masking an obstacle.
+void test_navigation_bearings_temporarily_outrank_proximity_but_not_siren(void) {
+    // Person guidance and ToF commonly describe the same obstacle. The
+    // directional cue must get a short turn on the channel or the continuous
+    // both-channel proximity cadence masks LEFT/RIGHT completely.
     TEST_ASSERT_TRUE(shouldRenderProximity(UserActivity::MOVING, true, true));
 
     TEST_ASSERT_EQUAL_UINT8(
         static_cast<uint8_t>(CommandGate::ALLOW),
         gate(true, UserActivity::MOVING, CloudCommand::LEFT, false, false));
     TEST_ASSERT_EQUAL_UINT8(
-        static_cast<uint8_t>(CommandGate::LOCAL_PROXIMITY),
+        static_cast<uint8_t>(CommandGate::ALLOW),
         gate(true, UserActivity::MOVING, CloudCommand::LEFT, true, false));
+    TEST_ASSERT_EQUAL_UINT8(
+        static_cast<uint8_t>(CommandGate::ALLOW),
+        gate(true, UserActivity::MOVING, CloudCommand::RIGHT, true, false));
+    TEST_ASSERT_EQUAL_UINT8(
+        static_cast<uint8_t>(CommandGate::LOCAL_PROXIMITY),
+        gate(true, UserActivity::MOVING, CloudCommand::AHEAD, true, false));
     TEST_ASSERT_EQUAL_UINT8(
         static_cast<uint8_t>(CommandGate::LOCAL_SIREN),
         gate(true, UserActivity::MOVING, CloudCommand::AHEAD, false, true));
     TEST_ASSERT_EQUAL_UINT8(
-        static_cast<uint8_t>(CommandGate::LOCAL_PROXIMITY),
+        static_cast<uint8_t>(CommandGate::LOCAL_SIREN),
         gate(true, UserActivity::MOVING, CloudCommand::RIGHT, true, true));
+
+    // ToF still outranks non-navigation cloud output while moving.
+    TEST_ASSERT_EQUAL_UINT8(
+        static_cast<uint8_t>(CommandGate::LOCAL_PROXIMITY),
+        gate(true, UserActivity::MOVING, CloudCommand::ERROR, true, false));
 
     // The STILL bus payload and the global ERROR keep the same subordination.
     TEST_ASSERT_EQUAL_UINT8(
@@ -270,11 +282,11 @@ void test_local_proximity_and_siren_outrank_accepted_cloud_commands(void) {
         static_cast<uint8_t>(CommandGate::OUTPUT_STOPPED),
         gate(false, UserActivity::MOVING, CloudCommand::LEFT, false, false));
 
-    // Audit 23: a STILL bearing passes the activity gate now, so local safety
-    // is what arbitrates it — proximity cannot render in STILL by policy, but
-    // the pure gate must still rank it above the cloud if it ever were.
+    // A bearing remains deliverable in STILL. ToF cannot render there by
+    // policy, but allowing the bearing makes the gate robust to a stale local
+    // proximity flag during the activity transition.
     TEST_ASSERT_EQUAL_UINT8(
-        static_cast<uint8_t>(CommandGate::LOCAL_PROXIMITY),
+        static_cast<uint8_t>(CommandGate::ALLOW),
         gate(true, UserActivity::STILL, CloudCommand::LEFT, true, false));
     TEST_ASSERT_EQUAL_UINT8(
         static_cast<uint8_t>(CommandGate::ALLOW),
@@ -570,7 +582,7 @@ int main(int, char**) {
     RUN_TEST(test_activity_gate_truth_table_is_exhaustive);
     RUN_TEST(test_camera_bearing_renders_in_both_phases_and_needs_known_activity);
     RUN_TEST(test_bearing_is_not_route_or_confidence_gated_like_number);
-    RUN_TEST(test_local_proximity_and_siren_outrank_accepted_cloud_commands);
+    RUN_TEST(test_navigation_bearings_temporarily_outrank_proximity_but_not_siren);
     RUN_TEST(test_wrong_route_is_consumed_without_false_route_88_output);
     RUN_TEST(test_low_confidence_route_88_is_consumed_without_output);
     RUN_TEST(test_duplicate_regressed_invalid_and_none_edges_do_not_render);

@@ -22,6 +22,10 @@ RelaySequenceState relaySequence;
 UserActivity currentActivity = UserActivity::MOVING;
 PatternPlayer cloudPlayer;
 OutputTelemetrySource cloudPlayerSource = OutputTelemetrySource::NONE;
+const OutputPattern* pendingCloudPattern = nullptr;
+OutputTelemetrySource pendingCloudPlayerSource = OutputTelemetrySource::NONE;
+bool cloudClearing = false;
+uint32_t cloudClearingStartedMs = 0;
 PatternPlayer sirenPlayer;
 OutputEnableLatch outputLatch;
 SirenDecision activeSirenOutput = SirenDecision::NONE;
@@ -64,6 +68,26 @@ bool proximityCanRender() {
                                  proximityOutputAllowed);
 }
 
+bool cloudAvoidanceDirectionActive() {
+    if (cloudClearing) return true;
+    if (cloudPlayerSource != OutputTelemetrySource::RELAY ||
+        !patternOutput(cloudPlayer).active) {
+        return false;
+    }
+    return cloudPlayer.pattern == &LEFT_PATTERN ||
+           cloudPlayer.pattern == &RIGHT_PATTERN;
+}
+
+bool proximityOwnsOutput() {
+    return proximityCanRender() && !cloudAvoidanceDirectionActive();
+}
+
+void clearPendingCloudPattern() {
+    pendingCloudPattern = nullptr;
+    pendingCloudPlayerSource = OutputTelemetrySource::NONE;
+    cloudClearing = false;
+}
+
 const OutputPattern& patternForSirenDecision(SirenDecision decision) {
     switch (decision) {
         case SirenDecision::ATTENTION: return ATTENTION_PATTERN;
@@ -75,8 +99,15 @@ const OutputPattern& patternForSirenDecision(SirenDecision decision) {
 }
 
 void stopCloudPattern() {
+    const bool wasAvoidanceDirection = cloudAvoidanceDirectionActive();
+    clearPendingCloudPattern();
     stopPattern(cloudPlayer);
-    if (!proximityCanRender() && !sirenOutputActive()) {
+    if (wasAvoidanceDirection && proximityCanRender() && !sirenOutputActive()) {
+        proximityToneOn = false;
+        proximityClearing = true;
+        proximityClearingStartedMs = millis();
+        hapticStop();
+    } else if (!proximityCanRender() && !sirenOutputActive()) {
         hapticStop();
     }
 }
@@ -89,6 +120,7 @@ void refreshEffectiveActivity(uint32_t nowMs, const char* source) {
 
     const UserActivity previousActivity = currentActivity;
     currentActivity = nextActivity;
+    clearPendingCloudPattern();
     stopPattern(cloudPlayer);
     if (activityTransitionClearsProximity(previousActivity, currentActivity)) {
         proximityToneOn = false;
@@ -152,8 +184,23 @@ void submitCloudCommand(CloudCommand command, const char* name,
         Serial.printf("COMMAND unsupported=%s\n", name);
         return;
     }
-    startPattern(cloudPlayer, *pattern, millis());
-    cloudPlayerSource = source;
+    const uint32_t nowMs = millis();
+    if (proximityCanRender() && mayInterruptProximity(command)) {
+        stopPattern(cloudPlayer);
+        proximityToneOn = false;
+        proximityClearing = false;
+        hapticStop();
+        pendingCloudPattern = pattern;
+        pendingCloudPlayerSource = source;
+        cloudClearing = true;
+        cloudClearingStartedMs = nowMs;
+        Serial.printf("COMMAND transition=%s from=PROXIMITY clearing_ms=%u\n",
+                      name, HAPTIC_CLEARING_GAP_MS);
+    } else {
+        clearPendingCloudPattern();
+        startPattern(cloudPlayer, *pattern, nowMs);
+        cloudPlayerSource = source;
+    }
     Serial.printf("COMMAND accepted=%s activity=%s\n", name,
                   userActivityName(currentActivity));
 }
@@ -229,6 +276,7 @@ void handleSerial(char command) {
                                OutputTelemetrySource::SERVICE);
             break;
         case 'x':
+            clearPendingCloudPattern();
             stopPattern(cloudPlayer);
             stopPattern(sirenPlayer);
             activeSirenOutput = SirenDecision::NONE;
@@ -281,9 +329,11 @@ void startSirenOutput(SirenDecision decision, uint32_t nowMs) {
     }
 
     const bool preempting = patternOutput(cloudPlayer).active ||
+                            cloudClearing ||
                             patternOutput(sirenPlayer).active ||
                             proximityCanRender();
     stopPattern(cloudPlayer);
+    clearPendingCloudPattern();
     stopPattern(sirenPlayer);
     proximityToneOn = false;
     hapticStop();
@@ -372,7 +422,7 @@ void applyTofUpdate(const TofUpdate& update, uint32_t nowMs) {
     }
 
     if (update.proximity.entered) {
-        if (proximityCanRender()) {
+        if (proximityCanRender() && !cloudAvoidanceDirectionActive()) {
             stopPattern(cloudPlayer);
             if (activeSirenOutput == SirenDecision::SIREN_WARNING) {
                 stopPattern(sirenPlayer);
@@ -470,7 +520,11 @@ const char* currentlyPlayingName() {
         if (activeSirenOutput == SirenDecision::SIREN_WARNING) return "SIREN";
         return sirenDecisionName(activeSirenOutput);
     }
-    if (proximityCanRender()) {
+    if (cloudAvoidanceDirectionActive() &&
+        patternOutput(cloudPlayer).active) {
+        return cloudPlayer.pattern->name;
+    }
+    if (proximityOwnsOutput()) {
         return "PROXIMITY";
     }
     if (cloudPlayer.pattern == nullptr || !patternOutput(cloudPlayer).active) {
@@ -506,8 +560,9 @@ OutputSemanticSnapshot currentOutputSemantics() {
         sirenOutputActive(),
         currentSirenPatternName(),
         proximityActive,
-        proximityCanRender(),
+        proximityOwnsOutput(),
         patternOutput(cloudPlayer).active,
+        cloudAvoidanceDirectionActive(),
         cloudPlayerSource,
         currentCloudPatternName(),
         currentActivity,
@@ -581,7 +636,33 @@ void serviceOutput(uint32_t nowMs) {
         hapticWrite(output.p1Hz, output.p3Hz);
         return;
     }
-    if (proximityCanRender()) {
+    if (cloudClearing) {
+        if (!clearingGapElapsed(nowMs, cloudClearingStartedMs)) {
+            hapticStop();
+            return;
+        }
+        const OutputPattern* pattern = pendingCloudPattern;
+        const OutputTelemetrySource source = pendingCloudPlayerSource;
+        clearPendingCloudPattern();
+        if (pattern != nullptr) {
+            startPattern(cloudPlayer, *pattern, nowMs);
+            cloudPlayerSource = source;
+        }
+    }
+    if (cloudAvoidanceDirectionActive()) {
+        if (tickPattern(cloudPlayer, nowMs)) {
+            hapticStop();
+            if (proximityCanRender()) {
+                proximityClearing = true;
+                proximityClearingStartedMs = nowMs;
+            }
+            return;
+        }
+        const PatternOutput output = patternOutput(cloudPlayer);
+        hapticWrite(output.p1Hz, output.p3Hz);
+        return;
+    }
+    if (proximityOwnsOutput()) {
         if (proximityClearing) {
             if (!clearingGapElapsed(nowMs, proximityClearingStartedMs)) {
                 hapticStop();

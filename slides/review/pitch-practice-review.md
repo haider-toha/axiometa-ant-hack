@@ -5,7 +5,7 @@ Reviewed 2026-07-19 against `slides/deck/index.html` as it stood after the ~01:3
 latest state, not the state at the start. Where a finding was closed by one of those edits
 I say so rather than raising it stale.
 
-**3 BLOCKER / 9 WARNING / 3 SUGGESTION.**
+**3 BLOCKER / 10 WARNING / 3 SUGGESTION.**
 
 Independent recount agrees with the ledger exactly: **P1 147 / P2 160 / P3 166 = 473 words;
 5:08 full, 4:49 tight.** The ledger's earlier double-count of the in-demo and contingency
@@ -294,10 +294,6 @@ I have also not repeated fact-level findings already covered by
 `slides/review/narrative-review.md` and `slides/review/slop-review.md`; several remain open
 and I flag them only where they bear on pitch structure.
 
-I have also not repeated fact-level findings already covered by
-`slides/review/narrative-review.md` and `slides/review/slop-review.md`; several remain open
-and I flag them only where they bear on pitch structure.
-
 ---
 
 ## Where the deck already matches best practice
@@ -516,7 +512,30 @@ statistic. It stands on primary government sources alone, which is far safer."* 
 puts the modelled estimate on screen and the primary-source argument in the mouth. **Fix:**
 consider putting the legal line on screen and letting 450,000 be spoken.
 
-### 9. The only mid-slide handoff buys nothing
+### 9. The story brackets the technical middle instead of running through it
+
+Slides 0, 1 and 10 are narrative; slides 2–9 are argument. They touch exactly once, at slide
+4's *"So we built the thing that answers it."* Across the 196 seconds where the team explains
+what it built — 64% of the pitch — **Hasan's grandfather is never mentioned again.** He
+reappears only at 5:00, having still never used the device.
+
+This matters because of the sharpest distinction in the narrative literature: narrative as
+**format** helps recall (g ≈ .55, [Mar et al. 2021](https://pmc.ncbi.nlm.nih.gov/articles/PMC8219577/)),
+while narrative as **decoration** measurably hurts it — the seductive-details effect runs up
+to **g ≈ 1.0 against** (Davis et al. 2026), and "removing seductive details" is listed as a
+positive design principle in Noetel et al.'s meta-meta of 1,189 studies. A story that
+carries the content earns its time; a story that surrounds it competes with it.
+
+To be fair: this story is not a seductive detail in the strict sense — he is the user, not
+an ornament, and the problem section genuinely rests on him. But structurally, the deck
+currently runs two pitches on one stage: a human one at the ends and a technical one in the
+middle. **Fix:** thread him through the demo. During the 90 seconds, say what each event
+means *for him*, not just what the board is doing — "That's a bus. He knows before he could
+have asked anyone." This costs no extra time (the demo is unscripted anyway, BLOCKER 1),
+converts the story from bracket to spine, and makes the slide-10 callback land on something
+the audience watched rather than something they were told.
+
+### 10. The only mid-slide handoff buys nothing
 
 P1 → P2 lands mid-slide-3 on the communicator-guide line, and the deck flags that it needs
 rehearsal. Moving it to the 3/4 boundary is strictly better: P1 asks *"which bus is this?"*
@@ -564,10 +583,16 @@ not its length or position — it is that it is unscripted (BLOCKER 1).
 
 **3. Does the opening earn the 18 s of black?** It is actually 16.6 s, 5.4% of the pitch, and
 yes — with one caveat. A voice starting at t=0 over darkness reads as deliberate within about
-three seconds, and the note correctly refuses the "close your eyes" stunt. The risk is not
-the black screen; it is that **the device is not described until 1:20**, 26% in. Those are
-separable problems. Keep the black screen; add one sentence saying what this is (WARNING 2).
-*(I could not source presentation research on opening with silence — see G.)*
+three seconds, and the note correctly refuses the "close your eyes" stunt. Opening on a real
+person is defensible on the narrative-format evidence (g ≈ .55 for narrative over expository,
+[Mar et al. 2021](https://pmc.ncbi.nlm.nih.gov/articles/PMC8219577/)) and is not a cliché in
+itself. Two cautions: do **not** defend it in Q&A with the "stories are remembered twice as
+well" claim — that number is not citable (section G) — and note that the effect shrinks or
+vanishes for technical content, so the story is doing work for the *problem*, not for the
+build. The real risk is not the black screen; it is that **the device is not described until
+1:20**, 26% in. Those are separable problems. Keep the black screen; add one sentence early
+saying what this is (WARNING 2). *(No sourced evidence on opening with silence specifically
+— see H.)*
 
 **4. Does the honesty on slide 9 help or hurt?** Mixed, and the honest answer is less
 flattering than "it's your differentiator". **On the scorecard it buys nothing** — no rubric
@@ -601,29 +626,48 @@ into the demo narration, where the audience can see it happen.
 **8. What will a judge remember 10 minutes later?** "Hasan's grandfather", a black screen,
 some beeps, and that the team said it doesn't vibrate yet. The person will land — the serif
 appears on only two slides and the words are identical, which is a real signal. But notice
-what is missing from that list: **the device, and the fact that it worked.** The demo's
-strongest sensory artefact is a beep, and the deck tells the audience twice that the beep is
-not the real output. Meanwhile "88" — the answer to the question the deck is named after —
-is never spoken. So no: that is not quite the thing you want remembered. You want
-"the team who built the thing that told a DeafBlind man the 88 had arrived, and who were
-straight about what's left." Right now the second half is louder than the first.
+what is missing from that list: **the device, and the fact that it worked.**
+
+Three things push it that way. The demo's strongest sensory artefact is a beep, and the deck
+tells the audience *twice* that the beep is not the real output. "88" — the answer to the
+question the deck is named after — is never spoken. And the story never touches the technical
+middle (WARNING 9), so the two halves are recalled separately rather than as one thing; the
+narrative literature is clear that a story helps when it *carries* content and hurts when it
+merely surrounds it.
+
+So no: that is not quite the thing you want remembered. You want *"the team who built the
+thing that told a DeafBlind man the 88 had arrived, and who were straight about what's
+left."* Right now the second half of that sentence is louder than the first, and the two
+halves are not attached to each other.
 
 ---
 
 ## The single highest-leverage change
 
-**Script the 90-second demo to the same standard as the slides, and make sure "That's the
-eighty-eight" is said out loud.**
+**Write the 90-second demo script to the same standard as the slides — narrate it as what is
+happening to Hasan's grandfather, not to the board — and make sure "That's the eighty-eight"
+is said out loud.**
 
-It is 29% of the pitch, it is the only stretch where the criteria that actually carry weight
-(Technology, Completion) are demonstrated rather than asserted, and it currently contains
-nine scripted words against 39 for the failure branches. Everything else in this deck has
-been counted, sourced and defended to the word. The most important ninety seconds has not
-been written at all.
+It is 29% of the pitch. It is the only stretch where the criteria that actually carry weight
+(Technology, Completion — 33–60% of the score in every rubric with published numbers) are
+demonstrated rather than asserted. And it currently contains **nine scripted words, against
+39 for the failure branches**. Everything else in this deck has been counted, sourced and
+defended to the word. The most important ninety seconds has not been written at all.
 
-Doing this also absorbs two other problems: it gives slide 6's one good idea a better home
-(BLOCKER 2's fallback), and it puts the achievement into the room in the presenter's own
-voice, which is what the close is currently missing (BLOCKER 3).
+Narrating it through the person rather than the hardware is what makes it the highest-leverage
+change rather than merely a necessary one, because it fixes four things at once:
 
-Second priority: fix or cut slide 6. Third: give slide 10 one clause of achievement before
-the aspiration.
+- The demo stops being unscripted (BLOCKER 1) and stops depending on the audience decoding
+  two tones the plan itself rates "High" for confusability.
+- "88" gets said, so the question the deck is named after gets an audible answer.
+- The story stops bracketing the technical middle and starts running through it (WARNING 9),
+  which is the difference between narrative-as-format and narrative-as-decoration.
+- The achievement enters the room in a presenter's voice at 2:02–3:32, so it is no longer
+  absent from the last 38 seconds (BLOCKER 3) even before slide 10 is rewritten.
+
+Second priority: fix or cut slide 6 (BLOCKER 2) — measure it at rehearsal, or delete it and
+move its one good idea into the demo narration, which buys back 19 seconds. Third: give slide
+10 one clause of achievement before the aspiration (BLOCKER 3).
+
+And before any of that: **ask the organisers for the actual judging criteria.** Everything
+above is calibrated against comparable events, not this one.

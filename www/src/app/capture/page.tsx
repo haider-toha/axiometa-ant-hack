@@ -54,14 +54,41 @@ const VISIBLE_LABELS = 6; // how many detections the list shows under the video
  * Client-side confidence floor for the person / obstacle fallback path.
  *
  * The Modal detector emits every box above DRAW_CONF_MIN = 0.20 so the overlay
- * has something to draw before a detection is trustworthy. Without a floor
- * here, a jittery 0.22 person box triggers a full /api/person-direction round
- * trip, then disappears next frame — the wearer feels a burst of LEFT/RIGHT
- * that has no obstacle behind it. 0.35 matches the Modal hazard threshold
- * (CONF_MIN) and requires the detector to actually commit to the box before
- * Claude is asked which way to route.
+ * has something to draw before a detection is trustworthy. Setting this higher
+ * than DRAW_CONF_MIN gates the person path behind a stronger commitment from
+ * the detector — but the previous 0.35 (matching Modal's CONF_MIN hazard
+ * floor) also gated OUT most real bench captures, so the phone silently
+ * ignored a visible human. 0.25 is halfway: still filters the jitter that
+ * DRAW_CONF_MIN admits, still lets a genuine detection through.
+ *
+ * The fast centroid-inverted path (see personFastBearing below) means an
+ * accepted person is signalled to the wearer on the SAME frame it appears in,
+ * without waiting for Claude — so a false positive here becomes at most one
+ * 500 ms LEFT/RIGHT tick rather than a Claude-latency-long incorrect turn.
  */
-const PERSON_MIN_CONFIDENCE = 0.35;
+const PERSON_MIN_CONFIDENCE = 0.25;
+
+/**
+ * Invert a box bearing to a route-around instruction.
+ *
+ * A person's centroid on the LEFT third of the frame means the human is over
+ * there — the wearer should walk toward the RIGHT to pass safely. Similarly
+ * for the right side. A dead-centre person is the ambiguous case where both
+ * sides are equally viable; we bias to RIGHT (pedestrian norm in the UK, and
+ * an arbitrary consistent choice matters more than which side) and let Claude
+ * override if it thinks the other side is clearer.
+ *
+ * This exists so the wearer feels a direction on the SAME 500 ms frame the
+ * person appears in. Claude runs in the background and refines the answer if
+ * it disagrees. Opus 4.5 with a 1.5 MP JPEG takes 2–3 s round-trip; without a
+ * fast path the phone was silent for that whole window.
+ */
+function invertBoxBearing(bearing: MotionBearing | null): MotionBearing | null {
+  if (bearing === null) return null;
+  if (bearing === "left") return "right";
+  if (bearing === "right") return "left";
+  return "right"; // dead-centre person: default to right, Claude may override
+}
 
 /**
  * Activity heartbeat, well under the board's CLOUD_ACTIVITY_LEASE_MS = 120000
@@ -624,8 +651,22 @@ export default function CapturePage() {
         personDirectionRef.current = null;
         personAnalyzingRef.current = false;
       } else if (personTarget) {
-        // Person/obstacle: ask Haiku which direction is clear.
-        // Rate-limit to one call per 1500 ms; don't stack calls.
+        // Person/obstacle: TWO signals, in priority order.
+        //
+        //   1. Fast path (this tick, no round trip): the person's box centroid
+        //      inverted. Person on the left of the frame → wearer should turn
+        //      right to pass. This is deterministic and lets the device buzz
+        //      LEFT/RIGHT on the same 500 ms tick the person appears — same
+        //      responsiveness as the bus centroid path.
+        //   2. Refinement (2–3 s, background): Claude Opus 4.5 looks at the
+        //      whole frame and picks the side with the more walkable pavement.
+        //      If it disagrees with the centroid inversion — say a wall is on
+        //      the "obvious" side — it overwrites personDirectionRef, and the
+        //      next tick sends the corrected LEFT/RIGHT.
+        //
+        // The Claude call is rate-limited to one per 1500 ms and de-duped by
+        // personAnalyzingRef so 2 Hz capture cannot stack requests.
+        const fastBearing = invertBoxBearing(bearingFromBox(personTarget.box));
         const now = Date.now();
         if (now - lastPersonCallRef.current > 1500 && !personAnalyzingRef.current) {
           lastPersonCallRef.current = now;
@@ -638,20 +679,27 @@ export default function CapturePage() {
             .then((r) => r.json())
             .then((data: { direction: string }) => {
               const d = data.direction;
-              personDirectionRef.current =
-                d === "left" ? "left" : d === "right" ? "right" : "center";
+              // Claude returns "left" / "right" / "ahead"; the endpoint's
+              // prompt forbids "ahead" for a blocking obstacle, but the safe
+              // default on error is "ahead" so we still handle it. "ahead"
+              // means "no strong opinion" — keep whatever the centroid picked.
+              if (d === "left") personDirectionRef.current = "left";
+              else if (d === "right") personDirectionRef.current = "right";
+              // "ahead" and unknown: leave the fast-path answer in place.
             })
             .catch(() => {
-              // leave personDirectionRef unchanged; Haiku returns ahead on error
+              // Claude unreachable: the fast-path centroid answer stays live.
             })
             .finally(() => {
               personAnalyzingRef.current = false;
             });
         }
-        // Use the most recent Haiku result directly — no voteBearing needed.
-        observed = personDirectionRef.current;
+        // Prefer Claude's refined answer if it has landed; otherwise the fast
+        // centroid inversion. Either way `observed` is never null while a
+        // person is in view — the UI and device get a direction immediately.
+        observed = personDirectionRef.current ?? fastBearing;
         vote = {
-          emitted: personDirectionRef.current,
+          emitted: observed,
           candidate: null,
           streak: 0,
         };

@@ -208,6 +208,78 @@ void test_yelp_modulation_confirms_a_flat_siren_warning(void) {
                             static_cast<uint8_t>(decision));
 }
 
+void test_periodic_broadband_noise_does_not_confirm_a_siren(void) {
+    SirenState state{};
+    seedNoiseFloor(state);
+    const float yelpShape[] = {1.0f, 1.5f, 2.0f, 1.5f, 1.0f, 0.5f, 0.0f, 0.5f};
+
+    SirenDecision decision = SirenDecision::NONE;
+    for (uint8_t frame = 0; frame < SIREN_SUSTAINED_FRAMES; ++frame) {
+        decision = updateSiren(
+            state, {32.0f + yelpShape[frame & 7], 1.0f, 20, 0.10f});
+    }
+
+    TEST_ASSERT_TRUE(sirenModulationIndex(state) > SIREN_MODULATION_INDEX_THRESHOLD);
+    TEST_ASSERT_EQUAL_UINT8(0, state.consecutiveTonalFrames);
+    TEST_ASSERT_EQUAL_UINT8(static_cast<uint8_t>(SirenDecision::NONE),
+                            static_cast<uint8_t>(decision));
+}
+
+void test_periodic_broadband_noise_during_startup_does_not_confirm_a_siren(void) {
+    SirenState state{};
+    const float yelpShape[] = {1.0f, 1.5f, 2.0f, 1.5f, 1.0f, 0.5f, 0.0f, 0.5f};
+
+    SirenDecision decision = SirenDecision::NONE;
+    for (uint8_t frame = 0; frame < SIREN_BOOTSTRAP_FRAMES; ++frame) {
+        decision = updateSiren(
+            state, {32.0f + yelpShape[frame & 7], 1.0f, 20, 0.10f});
+    }
+
+    TEST_ASSERT_TRUE(sirenModulationIndex(state) > SIREN_MODULATION_INDEX_THRESHOLD);
+    TEST_ASSERT_EQUAL_UINT8(static_cast<uint8_t>(SirenDecision::NONE),
+                            static_cast<uint8_t>(decision));
+}
+
+void test_confirmed_siren_requires_sixteen_tonal_frames(void) {
+    SirenState accepted{};
+    SirenState rejected{};
+    seedNoiseFloor(accepted);
+    seedNoiseFloor(rejected);
+    const float yelpShape[] = {1.0f, 1.5f, 2.0f, 1.5f, 1.0f, 0.5f, 0.0f, 0.5f};
+
+    SirenDecision acceptedDecision = SirenDecision::NONE;
+    SirenDecision rejectedDecision = SirenDecision::NONE;
+    for (uint8_t frame = 0; frame < SIREN_SUSTAINED_FRAMES; ++frame) {
+        const float energy = 32.0f + yelpShape[frame & 7];
+        acceptedDecision = updateSiren(
+            accepted, {energy, 1.0f, 20, frame < 16 ? 0.70f : 0.10f});
+        rejectedDecision = updateSiren(
+            rejected, {energy, 1.0f, 20, frame < 15 ? 0.70f : 0.10f});
+    }
+
+    TEST_ASSERT_TRUE(hasSustainedTonalEvidence(accepted));
+    TEST_ASSERT_FALSE(hasSustainedTonalEvidence(rejected));
+    TEST_ASSERT_EQUAL_UINT8(static_cast<uint8_t>(SirenDecision::SIREN_WARNING),
+                            static_cast<uint8_t>(acceptedDecision));
+    TEST_ASSERT_EQUAL_UINT8(static_cast<uint8_t>(SirenDecision::NONE),
+                            static_cast<uint8_t>(rejectedDecision));
+}
+
+void test_tonal_evidence_window_remains_chronological_after_ring_wrap(void) {
+    SirenState state{};
+    for (uint8_t frame = 0; frame < SIREN_HISTORY_FRAMES; ++frame) {
+        appendSirenHistory(state, {1.0f, 1.0f, 20, 0.10f});
+    }
+    for (uint8_t frame = 0; frame < SIREN_SUSTAINED_FRAMES; ++frame) {
+        appendSirenHistory(
+            state, {1.0f, 1.0f, 20, frame < 16 ? 0.70f : 0.10f});
+    }
+
+    TEST_ASSERT_TRUE(hasSustainedTonalEvidence(state));
+    appendSirenHistory(state, {1.0f, 1.0f, 20, 0.10f});
+    TEST_ASSERT_FALSE(hasSustainedTonalEvidence(state));
+}
+
 void test_monotonic_peak_sweep_confirms_a_flat_siren_warning(void) {
     SirenState state{};
     seedNoiseFloor(state);
@@ -435,6 +507,10 @@ int main(int, char**) {
     RUN_TEST(test_adaptive_floor_tracks_reference_energy_not_in_band_sound);
     RUN_TEST(test_sustained_duration_requires_thirty_two_elevated_frames);
     RUN_TEST(test_yelp_modulation_confirms_a_flat_siren_warning);
+    RUN_TEST(test_periodic_broadband_noise_does_not_confirm_a_siren);
+    RUN_TEST(test_periodic_broadband_noise_during_startup_does_not_confirm_a_siren);
+    RUN_TEST(test_confirmed_siren_requires_sixteen_tonal_frames);
+    RUN_TEST(test_tonal_evidence_window_remains_chronological_after_ring_wrap);
     RUN_TEST(test_monotonic_peak_sweep_confirms_a_flat_siren_warning);
     RUN_TEST(test_confirmed_sweep_tolerates_one_frame_of_spectral_leakage);
     RUN_TEST(test_rising_siren_amplitude_yields_danger_while_flat_yields_warning);

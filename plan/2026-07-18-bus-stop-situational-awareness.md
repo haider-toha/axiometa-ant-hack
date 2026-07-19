@@ -2,9 +2,9 @@
 
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
-**Goal:** Build a two-phase sensing, classification, relay, and output-pattern prototype for a wrist-worn DeafBlind situational-awareness product. The demo covers local obstacle/siren awareness while moving and bus arrival/route identification while still. It does not claim route guidance or camera-guided navigation. The intended product uses purpose-built vibration motors; the hack hardware uses two passive buzzers only as audible proxies for those future vibration channels.
+**Goal:** Build a two-phase sensing, classification, relay, and output-pattern prototype for a wrist-worn DeafBlind navigation and situational-awareness product. The demo covers local obstacle/siren awareness and camera-guided person avoidance while moving, plus bus arrival, route identification, and guidance toward the bus while still. The intended product uses purpose-built vibration motors; the hack hardware uses two passive buzzers only as audible proxies for those future vibration channels.
 
-**Architecture:** Three sensor inputs and two simulated output channels. A PDM microphone feeds an on-device FFT that fires a shape-aware coarse local alert after about 0.5 s and a confirmed-siren classification after at least 1.02 s. A VL53L0CX ToF gives a purely local proximity reflex with no network in the path. A phone browser POSTs frames at 2 Hz to a Modal endpoint that runs YOLO26n, holds two seconds of detection history, latches exactly one `BUS_ARRIVED` event, crops the destination blind and asks Claude to read it under a strict JSON schema. Camera submission remains active independently of activity state. The relay exposes `STILL`/`MOVING`; the ESP32 receives camera-derived commands in both states but renders bus-arrival and route-reading output only while `STILL`. P1 at 2350 Hz and P3 at 3050 Hz audibly simulate two future vibration channels. See the latest Revision note below.
+**Architecture:** Three sensor inputs and two simulated output channels. A PDM microphone feeds an on-device FFT that fires a shape-aware coarse local alert after about 0.5 s and a confirmed-siren classification after at least 1.02 s. A VL53L0CX ToF gives a purely local proximity reflex with no network in the path. A phone browser POSTs frames at 2 Hz to a Modal endpoint that runs YOLO26n, holds two seconds of detection history, latches exactly one `BUS_ARRIVED` event, and identifies person boxes. Claude reads the bus blind and, only while `MOVING`, judges the clear side around the selected person under strict JSON schemas. Camera submission remains active independently of activity state. The relay exposes `STILL`/`MOVING`; the ESP32 receives directional commands in both known states but renders bus-arrival and route-reading output only while `STILL`. P1 at 2350 Hz and P3 at 3050 Hz audibly simulate two future vibration channels. See the latest Revision note below.
 
 **Tech Stack:** ESP32-S3-MINI-1 (Arduino-ESP32 3.x / ESP-IDF v5.x, FreeRTOS, LEDC in **tone** mode, I2S0 PDM→PCM, `arduinoFFT<float>`, `Adafruit_VL53L0X`, `ArduinoJson` v7) · 2× AX22-0018 passive buzzer (MLT-8530) as audio proxies, not haptic actuators · Modal 1.5.2 + Ultralytics YOLO26n on T4 · `anthropic` 0.117.0 with `output_config.format` structured outputs · Next.js 16.2.10 on Vercel + Upstash Redis · in-browser `getUserMedia` capture on the phone (Python/OpenCV survives only inside Modal, not on a laptop) · build123d via `cad/tests/fake_adsk` for CAD.
 
@@ -22,7 +22,25 @@
 
 ---
 
+## Revision 2026-07-19f — Learnable cue grammar and fail-closed person avoidance
+
+This revision supersedes Revision 2026-07-18e wherever that revision cuts camera-guided navigation, and supersedes older one-channel PROXIMITY, WAIT, ERROR, and AHEAD waveforms. The detailed approved contract is `docs/superpowers/specs/2026-07-19-accessible-cue-and-person-guidance-design.md`; implementation evidence is in `audit/bus-stop-situational-awareness/26-accessible-cue-and-person-guidance.md`.
+
+**1. One channel always means a movement direction.** P1-only means move LEFT. P3-only means move RIGHT. No status, hazard, waiting, or error cue may use exactly one channel. AHEAD is one sustained 600 ms pulse on both channels.
+
+**2. Person avoidance is MOVING-only and fail-closed.** With no bus target, the phone selects the highest-confidence person box and sends that normalized box with the frame to `/api/person-direction`. Claude may return only a high-confidence LEFT/RIGHT recommendation, a clear result, or unavailable. Invalid input, malformed output, low confidence, timeout, and model failure produce no direction; none may become AHEAD.
+
+**3. Async results cannot outlive their scene.** The phone aborts and invalidates person guidance on STILL, bus priority, person disappearance, camera stop, or a newer request. The first side applies immediately; reversing LEFT to RIGHT or RIGHT to LEFT requires two consecutive matching Claude results.
+
+**4. Bus direction remains available in both known activity states.** The user may scan for and approach the bus while STILL or MOVING. Existing bus-information precedence and the relay wire contract remain unchanged.
+
+**5. Non-directional cues use both channels.** PROXIMITY is a 120 ms both-channel pulse with the existing distance-mapped cadence. WAIT is `200 on / 600 off / 200 on` on both channels. ERROR is both-channel long-short-long. These changes improve semantic consistency; they do not establish tactile efficacy or DeafBlind-user validation.
+
+---
+
 ## Revision 2026-07-18e — Two-phase demo and ESP-side camera-command gate
+
+> **Historical revision. Revision 2026-07-19f supersedes its navigation cut and cue-channel rules.** Its ESP-side bus-information gate and local-sensing phase rules remain current.
 
 This revision supersedes Revision 2026-07-18d's camera-guided LEFT/RIGHT/AHEAD scope and Revision 2026-07-18b's navigation experiment. The implemented experimental direction patterns may remain as dormant provenance, but they are not relay inputs, demo steps, or validated navigation.
 
@@ -458,7 +476,7 @@ static const size_t PULL_BODY_MAX = 512;   // reject anything larger BEFORE pars
 
 ---
 
-## The Haptic Vocabulary — 11 patterns, all time-coded
+## The Output Vocabulary — all patterns time-coded
 
 Two AX22-0018 passive buzzers now render the vocabulary as an **audible simulation** [T5]. P1 uses 2350 Hz and P3 uses 3050 Hz so the two conceptual future vibration channels remain explicit. Pattern semantics still use channel, simultaneity, count, rhythm, and duration, but no result from this hardware validates tactile perception.
 
@@ -466,8 +484,8 @@ Two AX22-0018 passive buzzers now render the vocabulary as an **audible simulati
 
 ### Design rules
 
-1. **All demo patterns are direction-agnostic.** The two channels demonstrate output routing and rhythm only. Dormant P11–P13 experiments are not relay inputs or demo steps and provide no evidence that future body-worn actuators will be spatially distinguishable.
-2. **BOTH channels = the world. ONE channel = the device.** External events fire both proxy tones; internal state fires one. This demonstrates software routing only. The future motor implementation must validate whether simultaneity or amplitude provides a usable tactile distinction.
+1. **ONE channel is reserved for direction.** P1-only means LEFT and P3-only means RIGHT. Every non-direction cue uses both channels. P11–P13 are live relay inputs, but provide no evidence that future body-worn actuators will be spatially distinguishable.
+2. **BOTH channels mean a non-directional event or AHEAD.** Rhythm separates local hazard, information, waiting, error, and continue-forward meanings. This demonstrates software routing only. The future motor implementation must validate the entire vocabulary with representative users.
 3. **Frequency is the primary channel; loudness is not.** Usable design: a **buzz band ≈ 60–120 Hz** and an **alert band ≈ 180–250 Hz**, both felt as coarse "low" vs "high" texture, plus plain on/off gating. Do not design meaning onto fine amplitude steps — the buzzer cannot deliver them.
 4. **Proven timing primitives reused, not reinvented** (`firmware/braille_wearable/src/braille.cpp:12-16`): buzz 400 ms · beat gap 300 ms · letter gap 800 ms (reused as the inter-digit gap). The both-fire stagger is retained at 30 ms only for onset legibility, not electrical reasons (see rule 5).
 5. **No electrical stagger is needed for the audio proxy.** The buzzers have no ERM inrush, so both tones may start simultaneously. Future vibration hardware must make its own onset and power decision.
@@ -490,21 +508,21 @@ Notation: `A` = Port 1 buzzer, `B` = Port 3 buzzer, `BOTH` = both (optional 30 m
 | **P1** | **DANGER** | BOTH | 100 % | `(200 on / 150 off) ×5`, then `500` sustained tail | ×4, gap **750** | **2250/cycle · 11 250 total** | **SAFETY** | no | Tier-2b confirmed siren **AND** amplitude trend rising |
 | **P2** | **SIREN WARNING** | BOTH | 65 % | `(400 on / 300 off) ×2` | ×1 | **1400** | ALERT | no | Tier-2b confirmed siren, flat or falling trend. Rate-limited 1 per 10 s |
 | **P3** | **ATTENTION** | BOTH | 100 % | single `250` pulse | ×1 | **250** | **SAFETY** | no | Tier-2a: 16 consecutive tonal, +12 dB frames with a directional peak sweep of at least 2 bins (~0.5 s) |
-| **P4** | **PROXIMITY** | **A only** | 2350 Hz audio proxy | `120 on / gap`, `gap = map(mm, 300→1200, 120→900)` — closer = faster | state refreshed on every valid range sample | continuous | HAZARD | no | ToF < 1200 mm on 3 consecutive samples (~150 ms in the isolated runner) |
+| **P4** | **PROXIMITY** | **BOTH** | 2350/3050 Hz audio proxy | `120 on / gap`, `gap = map(mm, 300→1200, 120→900)` — closer = faster | state refreshed on every valid range sample | continuous | HAZARD | no | ToF < 1200 mm on 3 consecutive samples (~150 ms in the isolated runner) |
 | **P5** | **BUS ARRIVING** | BOTH | 65 → 82 → 100 % | `(250 on / 250 off) ×3`, ascending | ×1 | **1500** | INFORMATION | no | `BUS_ARRIVED` edge from the relay |
 | **P6** | **ROUTE NUMBER** | BOTH | digits **buzz band ~100 Hz**, brackets **alert band ~200 Hz** | preamble `500 @ ~200 Hz` + `600` silence · digits: `LONG=500`, `SHORT=150`, intra-gap `250`, inter-digit gap **800** · terminator `600` silence + `500 @ ~200 Hz` | ×1 | **6400 for "88"** | INFORMATION | **yes** | Claude returned `confidence == "high"` and the 3-vote gate reached consensus |
-| **P7** | **WAIT** | A, B alternating | 100 % | `A 300 on / 200 off / B 300 on / 200 off` ×2 | ×4, gap **500** | **2000/cycle · 9500 total** | FEEDBACK | no | Vision request in flight, no result yet |
+| **P7** | **WAIT** | BOTH | 2350/3050 Hz audio proxy | `200 on / 600 off / 200 on` | ×1 | **1000** | FEEDBACK | no | Vision request in flight, no result yet |
 | **P8** | **UNKNOWN** | BOTH | 100→0 % | single `900` pulse, linear fade-out across its full duration | ×1 | **900** | INFORMATION | **yes** | `confidence == "low"`, **or** the vote failed consensus, **or** the request timed out (>8 s), **or** the route contains a non-digit |
 | **P9** | **ACK** | **A only** | 100 % | single `150` pulse, within 20 ms of the press | ×1 | **150** | FEEDBACK | no | Onboard button press, debounced |
-| **P10** | **ERROR / OFFLINE** | **A only** | 65 % | `600 on / 300 off / 150 on / 300 off / 600 on` (long-short-long) | ×1, re-fires every 60 s while degraded | **1950** | STATUS | no | Wi-Fi down >5 s, **or** 5 consecutive ToF I²C failures, **or** 3 consecutive relay failures |
+| **P10** | **ERROR / OFFLINE** | **BOTH** | 2350/3050 Hz audio proxy | `600 on / 300 off / 150 on / 300 off / 600 on` (long-short-long) | ×1, re-fires every 60 s while degraded | **1950** | STATUS | no | Wi-Fi down >5 s, **or** 5 consecutive ToF I²C failures, **or** 3 consecutive relay failures |
 
 **Reading the table for buzzers:** the **Motors** column (A / B / BOTH) is unchanged in *routing* — A = Port 1 buzzer, B = Port 3 buzzer. The **Intensity** column is now a **drive-frequency** column: read "100 %" as *buzz band (~60–120 Hz)*, "65 %" as a quieter/shorter gate of the same band, and any ramp as a short frequency glide within the buzz band. No pattern depends on a precise amplitude level.
 
-**Directionality is partly restored — camera-derived bus bearing only.** Superseded 2026-07-19 for LEFT, RIGHT, and AHEAD. **STOP, MOVE OVER, and TURN remain cut** and have no relay trigger or demo step.
+**Directionality is active for camera-derived bus bearing and MOVING-only person avoidance.** **STOP, MOVE OVER, and TURN remain cut** and have no relay trigger or demo step.
 
-The original cut bundled two different claims together. The one that still holds is about **ToF**: a single forward ToF zone cannot choose a safe left/right bypass, so it must never emit a direction. That reasoning does not extend to the **camera**, which resolves the target's horizontal position directly — `vision/service.py` already returns `bearing: "left" | "center" | "right"` per detection with `target` marking the bus box, and has since the detector was written.
+The original cut bundled two different claims together. The one that still holds is about **ToF**: a single forward ToF zone cannot choose a safe left/right bypass, so it must never emit a direction. That reasoning does not extend to the **camera**. A bus uses the detector target box's horizontal bearing. While `MOVING`, a selected person box may be sent to the fail-closed Claude endpoint to choose LEFT or RIGHT around the person; uncertainty emits no direction.
 
-P11–P13 are therefore live, not dormant: the phone maps the confirmed target bearing to LEFT/RIGHT/AHEAD and posts it to `/api/event`; the board accepts them **in both known phases** (`MOVING` and `STILL`; `UNKNOWN` refuses — audit 23, amended 2026-07-19 from the original MOVING-only rule). The demo flow demands it: the user scans for the bus while STANDING STILL and needs the first direction before taking a step, then keeps receiving updates while walking. Precedence on the shared channel is owned by `chooseEvent` in `www/src/lib/contract.ts`: while `STILL`, BUS/NUMBER/UNKNOWN outrank the bearing so arrival and route-88 output still land, and the bearing fills the WAIT/NONE gaps; while `MOVING`, the bearing always wins because the board drops the bus-information half there anyway.
+P11–P13 are therefore live, not dormant: the phone maps a confirmed bus target bearing to LEFT/RIGHT/AHEAD and a high-confidence person-avoidance decision to LEFT/RIGHT, then posts it to `/api/event`; the board accepts all three direction commands **in both known phases** (`UNKNOWN` refuses). Person production is separately gated to `MOVING`. The user can scan for the bus while STILL, take the first direction before the first step, then keep receiving bus updates while walking. Precedence on the shared channel is owned by `chooseEvent` in `www/src/lib/contract.ts`: while STILL, BUS/NUMBER/UNKNOWN outrank the bearing so arrival and route-88 output still land; while MOVING, a direction wins because the board suppresses the bus-information half there.
 
 What this still does **not** claim: that the wearer can localise the two buzzers spatially (33.941 mm is far below the two-point threshold — the cue is the 2350/3050 Hz frequency contrast, not position), that this is verified navigation, or that the device can confirm the user moved correctly. It is an advisory nudge toward a *dwelling* bus, not turn-by-turn guidance, and low detector confidence must still fire P8 UNKNOWN rather than a guessed direction. The MOVING phase demonstrates obstacle awareness, siren awareness, **and** coarse camera-derived bus bearing.
 

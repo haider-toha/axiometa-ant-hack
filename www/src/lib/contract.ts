@@ -21,7 +21,7 @@ export type PatternId =
   // are the board's `playing` telemetry values while a nav pattern runs.
   | "LEFT" // P11 bear left    — P1 only, 2350 Hz ·  800 ms
   | "RIGHT" // P12 bear right   — P3 only, 3050 Hz ·  800 ms
-  | "AHEAD"; // P13 keep going   — both channels    · 1000 ms
+  | "AHEAD"; // P13 keep going   — both channels    · 600 ms
 
 /**
  * Cloud-originated commands only. The five local patterns never cross the wire.

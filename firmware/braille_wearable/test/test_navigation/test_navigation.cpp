@@ -65,11 +65,9 @@ void test_right_audio_pattern_is_exact(void) {
 void test_ahead_audio_pattern_is_exact(void) {
     const OutputPattern* pattern = serviceDirectionPattern(ServiceDirection::AHEAD);
     TEST_ASSERT_NOT_NULL(pattern);
-    TEST_ASSERT_EQUAL_UINT8(3, pattern->stepCount);
-    assertStep(pattern->steps[0], 2350, 3050, 400);
-    assertStep(pattern->steps[1], 0, 0, 200);
-    assertStep(pattern->steps[2], 2350, 3050, 400);
-    TEST_ASSERT_EQUAL_UINT16(1000, outputPatternDurationMs(*pattern));
+    TEST_ASSERT_EQUAL_UINT8(1, pattern->stepCount);
+    assertStep(pattern->steps[0], 2350, 3050, 600);
+    TEST_ASSERT_EQUAL_UINT16(600, outputPatternDurationMs(*pattern));
 }
 
 void test_non_navigation_commands_have_no_audio_pattern(void) {
@@ -104,14 +102,14 @@ void test_camera_bearing_reuses_the_service_direction_patterns(void) {
 
     TEST_ASSERT_EQUAL_UINT16(800, outputPatternDurationMs(LEFT_PATTERN));
     TEST_ASSERT_EQUAL_UINT16(800, outputPatternDurationMs(RIGHT_PATTERN));
-    TEST_ASSERT_EQUAL_UINT16(1000, outputPatternDurationMs(AHEAD_PATTERN));
+    TEST_ASSERT_EQUAL_UINT16(600, outputPatternDurationMs(AHEAD_PATTERN));
 }
 
 void test_wait_and_waiting_mode_payload_durations_match_plan(void) {
     TEST_ASSERT_EQUAL_UINT16(400, outputPatternDurationMs(READY_PATTERN));
     TEST_ASSERT_EQUAL_UINT16(1500, outputPatternDurationMs(BUS_PATTERN));
     TEST_ASSERT_EQUAL_UINT16(6400, outputPatternDurationMs(NUMBER_PATTERN));
-    TEST_ASSERT_EQUAL_UINT16(9500, outputPatternDurationMs(WAIT_PATTERN));
+    TEST_ASSERT_EQUAL_UINT16(1000, outputPatternDurationMs(WAIT_PATTERN));
     TEST_ASSERT_EQUAL_UINT16(900, outputPatternDurationMs(UNKNOWN_PATTERN));
     TEST_ASSERT_EQUAL_UINT16(1950, outputPatternDurationMs(ERROR_PATTERN));
 }
@@ -140,9 +138,9 @@ void test_waiting_mode_waveforms_keep_the_locked_audio_contrasts(void) {
     assertStep(UNKNOWN_PATTERN.steps[2], 1750, 3650, 300);
 
     TEST_ASSERT_EQUAL_UINT8(5, ERROR_PATTERN.stepCount);
-    assertStep(ERROR_PATTERN.steps[0], 2350, 0, 600);
-    assertStep(ERROR_PATTERN.steps[2], 2350, 0, 150);
-    assertStep(ERROR_PATTERN.steps[4], 2350, 0, 600);
+    assertStep(ERROR_PATTERN.steps[0], 2350, 3050, 600);
+    assertStep(ERROR_PATTERN.steps[2], 2350, 3050, 150);
+    assertStep(ERROR_PATTERN.steps[4], 2350, 3050, 600);
 }
 
 int main(int, char**) {

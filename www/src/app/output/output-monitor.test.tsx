@@ -167,4 +167,69 @@ describe("OutputMonitor serial lifecycle", () => {
     expect(screen.queryByText("RECENT")).not.toBeInTheDocument();
     expect(screen.getByText("Waiting for a pulse")).toBeInTheDocument();
   });
+
+  it("decodes output telemetry and relay receipts from one serial session", async () => {
+    vi.stubGlobal(
+      "fetch",
+      vi.fn().mockResolvedValue(
+        new Response(
+          JSON.stringify({
+            seq: 24,
+            device: {
+              pattern: "NUMBER",
+              route: "88",
+              dest: "Clapham Common",
+              conf: "high",
+              arrivalId: 7,
+              ts: Date.now(),
+              activity: "STILL",
+              activitySeq: 5,
+              activityTs: Date.now(),
+            },
+            detector: { event: "", present: false, confidence: 0, arrivalId: 0, route: "", destination: "", readingConf: "", votes: [], labels: [], hazards: [], targetBearing: "" },
+            telemetry: { bandRms: 0, peakHz: 0, modIdx: 0, trend: "flat", playing: "NONE", tofMm: 0, upMs: 0, rssi: -55 },
+          }),
+          { status: 200 },
+        ),
+      ),
+    );
+    serialMocks.getGrantedOutputPort.mockResolvedValue({} as SerialPort);
+    render(<OutputMonitor />);
+    await screen.findByText("USB connected");
+
+    act(() => {
+      handlers[0].onText(
+        outputRecord(2_350, 0, 2_000) +
+          "RELAY activity=STILL seq=5 override=0\n" +
+          "RELAY command=accepted pattern=NUMBER seq=24 activity=STILL route=88\n",
+      );
+    });
+    expect(screen.getByLabelText("Left output frequency")).toHaveTextContent("2,350 Hz");
+
+    fireEvent.click(screen.getByRole("tab", { name: "Relay trace" }));
+    expect(await screen.findByRole("status")).toHaveTextContent("ACCEPTED");
+    fireEvent.click(screen.getByRole("tab", { name: "Output channels" }));
+    fireEvent.click(screen.getByRole("tab", { name: "Relay trace" }));
+    expect(serialMocks.openOutputSerialSession).toHaveBeenCalledTimes(1);
+    vi.unstubAllGlobals();
+  });
+
+  it("clears board relay receipts on disconnect", async () => {
+    vi.stubGlobal("fetch", vi.fn().mockRejectedValue(new Error("offline")));
+    serialMocks.getGrantedOutputPort.mockResolvedValue({} as SerialPort);
+    render(<OutputMonitor />);
+    await screen.findByText("USB connected");
+    act(() => {
+      handlers[0].onText(
+        "RELAY command=accepted pattern=NUMBER seq=24 activity=STILL route=88\n",
+      );
+    });
+    fireEvent.click(screen.getByRole("tab", { name: "Relay trace" }));
+    expect(screen.getByText(/Command 24:/)).toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole("button", { name: "Disconnect" }));
+    expect(screen.queryByText(/Command 24:/)).not.toBeInTheDocument();
+    expect(screen.getByText("Waiting for RELAY lines over USB")).toBeInTheDocument();
+    vi.unstubAllGlobals();
+  });
 });

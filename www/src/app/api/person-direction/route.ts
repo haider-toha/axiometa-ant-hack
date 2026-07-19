@@ -31,7 +31,7 @@ export async function POST(request: Request): Promise<Response> {
     const client = new Anthropic();
 
     const message = await client.messages.create({
-      model: "claude-haiku-4-5",
+      model: "claude-opus-4-5",
       max_tokens: 20,
       system:
         "You are a navigation assistant for a visually impaired pedestrian. A person or obstacle is blocking the path ahead. Your job is to identify which side of the frame has MORE OPEN SPACE so the pedestrian can walk around the obstacle. Look at the left side and the right side of the image. Whichever side has more open, unobstructed floor or pavement is the correct answer. Reply with exactly one word: 'left', 'right', or 'ahead' (ahead only if the path is clearly wide enough to pass without turning). Never explain.",

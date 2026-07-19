@@ -207,7 +207,8 @@ describe("OutputMonitor serial lifecycle", () => {
     expect(screen.getByLabelText("Left output frequency")).toHaveTextContent("2,350 Hz");
 
     fireEvent.click(screen.getByRole("tab", { name: "Relay trace" }));
-    expect(await screen.findByRole("status")).toHaveTextContent("ACCEPTED");
+    await screen.findByText("ACCEPTED");
+    expect(screen.getByRole("status")).toHaveTextContent("ACCEPTED");
     fireEvent.click(screen.getByRole("tab", { name: "Output channels" }));
     fireEvent.click(screen.getByRole("tab", { name: "Relay trace" }));
     expect(serialMocks.openOutputSerialSession).toHaveBeenCalledTimes(1);

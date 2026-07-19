@@ -70,6 +70,7 @@ describe("describeOutputReason", () => {
         {
           ...IDLE,
           leftHz: 2350,
+          rightHz: 3050,
           state: "ACTIVE",
           source: "LOCAL_TOF",
           pattern: "PROXIMITY",
@@ -81,7 +82,7 @@ describe("describeOutputReason", () => {
     ).toEqual({
       title: "Local proximity",
       description:
-        "P1 is pulsing because an object is 444 mm away while moving.",
+        "Both channels are pulsing because an object is 444 mm away while moving.",
       sourceLabel: "LOCAL TOF",
       activityLabel: "MOVING",
       state: "active",
@@ -153,6 +154,52 @@ describe("describeOutputReason", () => {
       expect.objectContaining({
         description:
           "The board accepted RIGHT while still; P3 carries its pulse pattern.",
+      }),
+    );
+  });
+
+  it("explains WAIT as two simultaneous both-channel pulses", () => {
+    expect(
+      describeOutputReason(
+        {
+          ...IDLE,
+          leftHz: 2350,
+          rightHz: 3050,
+          state: "ACTIVE",
+          source: "RELAY",
+          pattern: "WAIT",
+          activity: "STILL",
+          reason: "PLAYING",
+        },
+        "live",
+      ),
+    ).toEqual(
+      expect.objectContaining({
+        description:
+          "The board is waiting for the route reading; both channels pulse together twice.",
+      }),
+    );
+  });
+
+  it("explains ERROR without assigning a directional channel", () => {
+    expect(
+      describeOutputReason(
+        {
+          ...IDLE,
+          leftHz: 2350,
+          rightHz: 3050,
+          state: "ACTIVE",
+          source: "RELAY",
+          pattern: "ERROR",
+          activity: "MOVING",
+          reason: "PLAYING",
+        },
+        "live",
+      ),
+    ).toEqual(
+      expect.objectContaining({
+        description:
+          "The relay reported an error; both channels carry the long-short-long pattern.",
       }),
     );
   });
@@ -285,6 +332,7 @@ describe("outputReasonAnnouncementKey", () => {
     const proximity: OutputTelemetryV2 = {
       ...IDLE,
       leftHz: 2350,
+      rightHz: 3050,
       state: "ACTIVE",
       source: "LOCAL_TOF",
       pattern: "PROXIMITY",
@@ -304,6 +352,7 @@ describe("outputReasonAnnouncementKey", () => {
     const proximity: OutputTelemetryV2 = {
       ...IDLE,
       leftHz: 2350,
+      rightHz: 3050,
       state: "ACTIVE",
       source: "LOCAL_TOF",
       pattern: "PROXIMITY",

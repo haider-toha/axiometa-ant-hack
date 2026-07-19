@@ -114,7 +114,8 @@ relay. Their derivation depends on the target type:
   user moves toward it.
 - **Person obstacle while MOVING:** send the current frame to the
   person-direction endpoint. Claude judges the side with more open floor or
-  pavement. The returned instruction moves around the person.
+  pavement. The returned LEFT or RIGHT instruction moves around the person;
+  person avoidance never emits AHEAD.
 - **Person while STILL:** emit no person-derived instruction.
 
 The ESP32 intentionally does not know whether a direction came from a bus or a
@@ -187,10 +188,10 @@ Use Anthropic structured output with a closed JSON schema:
 ```
 
 The schema closes `obstructing` to a boolean, `direction` to
-`left | right | ahead | none`, and `confidence` to `high | low`.
+`left | right | none`, and `confidence` to `high | low`.
 
-Only `high` confidence, `obstructing: true`, and `left`, `right`, or `ahead`
-becomes a successful endpoint response. High-confidence
+Only `high` confidence, `obstructing: true`, and `left` or `right` becomes a
+successful endpoint response. High-confidence
 `obstructing: false` becomes `status: "clear"`; this prevents a peripheral
 person from generating unnecessary movement cues. Every low-confidence or
 inconsistent combination becomes `low_confidence` or `invalid_response`. Do not
@@ -232,12 +233,12 @@ when:
 Clear the last person instruction on every invalidation, `clear` response, or
 unavailable response. Never retain it as a fallback after a request failure.
 
-The first successful high-confidence instruction may publish immediately for
+The first successful high-confidence LEFT or RIGHT may publish immediately for
 responsiveness. A direct LEFT-to-RIGHT or RIGHT-to-LEFT reversal requires the
 same new high-confidence result twice consecutively before switching. This
 prevents model jitter from telling a moving user to oscillate while preserving a
-fast initial instruction. `AHEAD` is treated as a normal instruction but is
-cleared, never assumed, on uncertainty.
+fast initial instruction. Person failure or uncertainty clears guidance instead
+of assuming `AHEAD`; AHEAD remains available only through the bus-bearing path.
 
 The existing edge-trigger remains: an unchanged accepted direction does not
 re-POST `/api/event` and therefore does not restart the firmware pattern every

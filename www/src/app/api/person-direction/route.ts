@@ -1,112 +1,126 @@
-// Claude vision endpoint that resolves the "go AROUND the obstacle" direction.
-//
-// The phone posts a rear-camera JPEG here whenever the Modal detector sees a
-// person in the frame but no bus. Claude looks at the whole frame and answers
-// which side has more walkable pavement — that is the direction the wearer
-// should turn toward. A blocked path always requires a TURN, never AHEAD:
-// walking straight into a person is the failure mode this endpoint exists to
-// prevent, so the response is constrained to LEFT or RIGHT.
 import Anthropic from "@anthropic-ai/sdk";
 import { CORS, preflight } from "@/lib/cors";
+import {
+  normalizePersonDecision,
+  parsePersonDirectionRequest,
+  type PersonBox,
+  type PersonDirectionReason,
+  type PersonDirectionResponse,
+} from "@/lib/person-direction";
 
 export const dynamic = "force-dynamic";
+
+const PERSON_DIRECTION_SCHEMA = {
+  type: "object",
+  additionalProperties: false,
+  required: ["obstructing", "direction", "confidence"],
+  properties: {
+    obstructing: { type: "boolean" },
+    direction: { type: "string", enum: ["left", "right", "none"] },
+    confidence: { type: "string", enum: ["high", "low"] },
+  },
+} as const;
+
+export type PersonDirectionDecider = (input: {
+  frameB64: string;
+  personBox: PersonBox;
+}) => Promise<unknown>;
+
+function json(body: PersonDirectionResponse, status = 200): Response {
+  return Response.json(body, { status, headers: CORS });
+}
+
+function isTimeout(error: unknown): boolean {
+  return error instanceof Anthropic.APIConnectionTimeoutError ||
+    (error instanceof Error && error.name === "APIConnectionTimeoutError");
+}
+
+async function decideWithClaude({
+  frameB64,
+  personBox,
+}: {
+  frameB64: string;
+  personBox: PersonBox;
+}): Promise<unknown> {
+  const client = new Anthropic({ maxRetries: 0, timeout: 4000 });
+  const message = await client.messages.create({
+    model: "claude-opus-4-5",
+    max_tokens: 128,
+    system:
+      "You are a mobility-routing assistant. Judge only whether the highlighted person blocks the pedestrian's forward path and, if so, which side has more clear walkable space around that person. Direction names the side to move toward, not the side containing the person. Never recommend straight ahead for an obstructing person. Use low confidence whenever the image does not clearly support a safe side.",
+    messages: [
+      {
+        role: "user",
+        content: [
+          {
+            type: "image",
+            source: {
+              type: "base64",
+              media_type: "image/jpeg",
+              data: frameB64,
+            },
+          },
+          {
+            type: "text",
+            text: `The selected person's normalized [x1,y1,x2,y2] box is ${JSON.stringify(personBox)}. Return whether this person obstructs the forward path, the clear direction (left/right, or none only when not obstructing), and confidence.`,
+          },
+        ],
+      },
+    ],
+    output_config: {
+      format: {
+        type: "json_schema",
+        schema: PERSON_DIRECTION_SCHEMA,
+      },
+    },
+  });
+
+  const first = message.content[0];
+  if (!first || first.type !== "text") return null;
+  try {
+    return JSON.parse(first.text);
+  } catch {
+    return null;
+  }
+}
+
+export function createPersonDirectionPost(decide: PersonDirectionDecider) {
+  return async function POST(request: Request): Promise<Response> {
+    const startedAt = Date.now();
+    let body: unknown;
+    try {
+      body = await request.json();
+    } catch {
+      return json(
+        { status: "unavailable", direction: null, reason: "invalid_request" },
+        400,
+      );
+    }
+
+    const parsed = parsePersonDirectionRequest(body);
+    if (!parsed.ok) return json(parsed.response, 400);
+
+    let outcome: PersonDirectionResponse;
+    try {
+      outcome = normalizePersonDecision(await decide(parsed.value));
+    } catch (error) {
+      const reason: PersonDirectionReason = isTimeout(error) ? "timeout" : "model_error";
+      console.error(
+        `[person-direction] outcome=${reason} durationMs=${Date.now() - startedAt}`,
+      );
+      return json({ status: "unavailable", direction: null, reason }, 503);
+    }
+
+    const status = outcome.status === "unavailable" && outcome.reason === "invalid_response" ? 502 : 200;
+    console.info(
+      `[person-direction] outcome=${outcome.status} durationMs=${Date.now() - startedAt}`,
+    );
+    return json(outcome, status);
+  };
+}
 
 export function OPTIONS(): Response {
   return preflight();
 }
 
-/**
- * Extract the direction Claude actually committed to.
- *
- * The model is instructed to reply with a single word, but real replies
- * occasionally include a short justification ("Go right — more open pavement
- * on the right"). Two rules make this robust:
- *
- *   1. Match on WORD BOUNDARIES — a bare `.includes("right")` matches "bright"
- *      and other substrings.
- *   2. Take the LAST match, not the first — if Claude explains ("the person is
- *      standing on the left, so go right") the recommendation is at the end.
- *
- * "ahead" is admitted as a defensive fallback: if the model refuses to commit
- * to a side we surface that instead of forcing a coin flip. The capture page
- * maps it to the AHEAD device pattern, matching the pre-obstacle state.
- */
-function parseDirection(raw: string): "left" | "right" | "ahead" {
-  const lowered = raw.toLowerCase();
-  const matches = lowered.match(/\b(left|right|ahead)\b/g);
-  if (!matches || matches.length === 0) return "ahead";
-  const last = matches[matches.length - 1];
-  if (last === "left") return "left";
-  if (last === "right") return "right";
-  return "ahead";
-}
-
-export async function POST(request: Request): Promise<Response> {
-  const safeDefault = Response.json({ direction: "ahead" }, { headers: CORS });
-
-  let body: unknown;
-  try {
-    body = await request.json();
-  } catch {
-    return safeDefault;
-  }
-
-  if (
-    typeof body !== "object" ||
-    body === null ||
-    typeof (body as Record<string, unknown>).frame_b64 !== "string"
-  ) {
-    return safeDefault;
-  }
-
-  const frame_b64 = (body as Record<string, unknown>).frame_b64 as string;
-
-  try {
-    const client = new Anthropic();
-
-    // Opus 4.5 was picked for spatial reasoning on the pavement scene — Haiku
-    // routinely picked the side the person was ON instead of the side that
-    // was clear. If cost/latency ever forces a downgrade, retest with a scene
-    // where the person is off-center.
-    const message = await client.messages.create({
-      model: "claude-opus-4-5",
-      max_tokens: 16,
-      system:
-        "You are a mobility assistant for a blind pedestrian. A person or obstacle is in the frame directly ahead, blocking the path. The pedestrian MUST walk around it — never straight through. Your job is to look at the whole frame and decide which SIDE has more clear, walkable pavement to route around the obstacle. Reply with EXACTLY one word — 'left' or 'right' — naming the side the pedestrian should turn toward (NOT the side the obstacle is on). Never reply 'ahead'. Never add punctuation. Never explain. If both sides look equally clear, pick the side with fewer people, walls, kerbs, or bollards.",
-      messages: [
-        {
-          role: "user",
-          content: [
-            {
-              type: "image",
-              source: {
-                type: "base64",
-                media_type: "image/jpeg",
-                data: frame_b64,
-              },
-            },
-            {
-              type: "text",
-              text: "Which side should the pedestrian turn toward to walk around this obstacle safely — left or right? One word only.",
-            },
-          ],
-        },
-      ],
-    });
-
-    const firstContent = message.content[0];
-    if (!firstContent || firstContent.type !== "text") {
-      console.error("[person-direction] unexpected Claude response shape");
-      return safeDefault;
-    }
-
-    const raw = firstContent.text.trim();
-    const direction = parseDirection(raw);
-    console.log(`[person-direction] raw="${raw}" resolved=${direction}`);
-
-    return Response.json({ direction }, { headers: CORS });
-  } catch (err) {
-    console.error("[person-direction] Claude error:", err);
-    return safeDefault;
-  }
-}
+export const POST = createPersonDirectionPost(decideWithClaude);

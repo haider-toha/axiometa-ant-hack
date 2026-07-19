@@ -2,8 +2,8 @@
    Bus-stop situational awareness — presentation deck
    Binding: slides/design/system.md · slides/design/dom-contract.md
 
-   Two faces, used semantically: Instrument Serif is the person (slides 1 and 10
-   only), Instrument Sans is the machine (everywhere else).
+   Two faces, used semantically: Gloock is the person (slides 1 and 10 only),
+   Instrument Sans is the machine (everywhere else).
    Four colours. Two faces and no third — see system.md for the banned list.
 
    This file owns BOTH states of every [data-reveal] element. js/ owns the
@@ -203,16 +203,12 @@ p {
   color: var(--ink);
 }
 
-/* DO NOT USE ON TEXT. Kept only to document why it is unused.
-   --accent (#CFD9E0, 13.75:1 on --bg) is DARKER than --ink (#F2F4F5, 17.85:1).
-   The two differ by just 1.30:1, so painting a line accent to *promote* it makes
-   it recede instead — slide 8 inverted its own hierarchy this way, and on a
-   projector the distinction disappeared altogether.
-   --accent is for STRUCTURE only: the slide-5 local-sensing path, edge highlights,
-   focus rings. Text hierarchy is --ink for primary, --muted for secondary. */
-.statement--accent {
-  color: var(--accent);
-}
+/* There is deliberately NO accent text rule.
+   --accent (#CFD9E0, 13.75:1 on --bg) is DARKER than --ink (#F2F4F5, 17.85:1) and
+   they differ by only 1.30:1, so painting a line accent to *promote* it makes it
+   recede — slide 8 inverted its own hierarchy this way and on a projector the
+   distinction vanished. --accent is for STRUCTURE only: the slide-5 local-sensing
+   path, edge highlights, focus rings. Text is --ink primary, --muted secondary. */
 
 
 /* --- The signature --------------------------------------------------------
@@ -356,7 +352,7 @@ p {
   fill: var(--muted);
   font-family: var(--font-sans);
   font-size: 20px;
-  font-weight: 400;
+  font-weight: 500;
   letter-spacing: 0.08em;
 }
 

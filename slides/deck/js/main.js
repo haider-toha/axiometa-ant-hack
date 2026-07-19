@@ -9,8 +9,9 @@
  * `<script type="module">` is blocked by CORS on file:// origins. Load order in index.html
  * must be lenis.min.js → canvas-sequence.js → main.js, all as plain <script> tags.
  *
- * Every value a human reads eases out (cubic-bezier(0,0,.2,1)). `linear` appears nowhere:
- * the canvas scrub's easing is the scroll position itself.
+ * Every value a human reads eases out (cubic-bezier(0,0,.2,1)). `linear` appears twice,
+ * both deliberate: the canvas scrub, where scroll position is itself the easing, and
+ * playBeat(), which traverses a pinned beat evenly so all 90 frames are actually seen.
  */
 (function () {
   "use strict";

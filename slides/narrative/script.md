@@ -38,7 +38,7 @@ SCREEN: Hasan's grandfather.
 [P1] He isn't a persona we invented for a pitch.
 [P1] I spoke to him. That conversation is why this exists.
 [P1] He has never tried the device. Nobody DeafBlind has.
-[P1] I'll come back to that.   [CUTTABLE — slide 9 pays this off regardless]
+[P1] I'll come back to that.   [CUTTABLE: slide 9 pays this off regardless]
 
 NOTE: Two verbs doing separate jobs, and they must not be blurred: SPOKE TO
 (true, and the origin of the project) and TRIED (has not happened). The last two
@@ -51,7 +51,7 @@ lines set up slide 9. Say them evenly — this is disclosure, not confession.
 ```
 SCREEN: 450,000, large, counting up. Credit beneath: ESTIMATED · SENSE · 2022.
 
-[P1] Sense estimates 450,000 deafblind people in the UK. Over 610,000 by 2035.
+[P1] Sense estimates over 450,000 deafblind people in the UK. More by 2035.
 [P1] The government's own definition names three difficulties.
 [P1] Communication. Access to information. Mobility.
 [P1] The law even requires buses to announce their route number.
@@ -136,7 +136,7 @@ PDM MICROPHONE and nothing more.
     
 ```
 
-## Slide 5 · P2 · 72 spoken words
+## Slide 5 · P2 · 49 spoken words
 
 ```
 SCREEN: system diagram. Five nodes, four edges, drawn on.
@@ -146,7 +146,7 @@ SCREEN: system diagram. Five nodes, four edges, drawn on.
 [P2] Claude reads the number off the front.
 [P2] That lands in a relay. The wrist device polls it, three times a second.
 [P2] Safety sensing never touches the network.
-[P2] Which matters in a moment.   [CUTTABLE — pure transition into the demo]
+[P2] Which matters in a moment.   [CUTTABLE: pure transition into the demo]
 
 NOTE: "Three times a second" = the 300 ms poll. Accurate.
 NOTE: Last line hands into the demo. Don't pause after it.
@@ -166,19 +166,40 @@ Locked order, plan Revision 2026-07-18e §5:
 The one line that must be said during the demo, the first time a tone sounds —
 not at the end:
 
-[P2] Those tones stand in for vibration. Heard, not felt.
+[P2-DEMO] Those tones stand in for vibration. Heard, not felt.
 
 NOTE: Say it on the first tone. If the audience hears an unexplained beep and
 forms their own theory, slide 9 arrives too late to correct it.
 
-DEMO CONTINGENCY — press 6 and use the line that matches WHAT failed. Do not
+RECORD THIS DEMO WORKING BEFORE YOU PRESENT. Non-negotiable, and it is the
+single highest-value twenty minutes of prep available.
+
+David S. Rose (chairman, New York Angels) on live demos inside a pitch: "You can
+deliver 200% of the value of a live demo in a CANNED demo... no chance that
+Murphy's Law will rear its ugly head." Geoff Ralston, who has coached over a
+thousand YC demo-day pitches: "demos seldom work in modern demo day
+presentations." Paul Graham publicly reversed his own long-standing advice to
+emphasise demos.
+
+We are keeping the demo live, because this is a hackathon and working hardware
+is the thing being judged — but that is a reason to have a recording, not a
+reason to go without one. A phone video of the locked sequence running
+end to end, on the presenting laptop, playable in two taps.
+
+If the live run fails, PLAY THE RECORDING. Do not skip to slide 6 with an
+apology, and do not troubleshoot on stage. A judge who has sat through eighty
+pitches will not remember which one you played; they will remember whether they
+saw the thing work.
+
+DEMO CONTINGENCY — if there is no recording, press 6 and use the line that
+matches WHAT failed. Do not
 blame the network by reflex: demo steps 1 and 2 are the range sensor and the
 on-board FFT, and neither touches the network. Slide 7 tells this same room
 "Both of those are local. No wifi in either path." Blaming wifi for a local
 failure hands them the counter-example.
 
 If the CAMERA / MODAL / RELAY leg failed (steps 3-4):
-[P2] That's a live network at a hackathon. The numbers are the same either way.
+[P2-ALT] That's a live network at a hackathon. The numbers are the same either way.
 
 If the LOCAL sensing failed (steps 1-2):
 [P2-ALT] That one's on us, not the network. It's local. Let me show you the rest.
@@ -249,13 +270,13 @@ NOTE: The cane remains the primary mobility aid. This is supplementary.
     
 ```
 
-## Slide 8 · P3 · 49 spoken words
+## Slide 8 · P3 · 52 spoken words
 
 ```
 SCREEN: Detection is when. / Claude is what.
 
-[P3] Claude reads a bus number better than YOLO ever could.
-[P3] So why a detector?   [CUTTABLE — setup line; the next line stands alone]
+[P3] Claude reads the number off the front. YOLO tells us when to ask.
+[P3] So why a detector?   [CUTTABLE: setup line; the next line stands alone]
 [P3] A bus arriving isn't one frame. It's two seconds of frames.
 [P3] That needs history, debounce, and a latch that fires exactly once.
 [P3] The Claude API is stateless. Modal isn't.
@@ -270,16 +291,35 @@ NOTE: This slide credits Modal by name, which the brief requires, and earns it.
     
 ```
 
-## Slide 9 · P3 · 48 spoken words
+## Slide 9 · P3 · 58 spoken words
 
 ```
 SCREEN: We have not validated this with DeafBlind users. Held, static, alone.
 
 [P3] The buzzers we were given can be heard. They cannot be felt.
-[P3] We drove them down to seventy hertz. Still nothing.   [CUTTABLE — detail, not the claim]
+[P3] We drove them down to seventy hertz. Still nothing.   [CUTTABLE: detail, not the claim]
 [P3] So those two tones stand in for two vibration channels.
 [P3] We have not validated this with DeafBlind users.
-[P3] Real motors next. Then the people who'd use it.
+[P3] What this build proves is the sensing and the routing.
+[P3] Real motors and real users are the next one.
+
+NOTE — WHY EACH LIMITATION IS ANSWERED, NOT JUST NAMED. O'Keefe's 1999
+meta-analysis (107 effect sizes, 20,111 respondents) found two-sided messages
+split sharply: REFUTATIONAL ones — name a weakness and answer it — gain
+persuasive ground (r = +.077), while NON-REFUTATIONAL ones, which name a
+weakness and leave it hanging, do WORSE than saying nothing at all (r = -.049).
+Credibility follows the same split.
+
+So neither disclosure here sits alone. "Heard, not felt" is answered by the
+proxy explanation; "not validated with DeafBlind users" is answered by scoping
+what the build does prove and naming what comes next. Delete either answer and
+this slide flips from an asset to a liability.
+
+Two things the same research rules out, so nobody re-adds them: the pratfall
+effect is not real evidence (Aronson 1966's headline result was NOT significant,
+t = 1.45, p < .18), and message ORDER did not matter — so do not restructure
+the deck on a theory that disclosing early buys goodwill. It buys nothing; the
+answer is what buys.
 
 NOTE: Line 4 is the mandatory sentence, verbatim, and it is on the screen as
 well as in the mouth. It pays off slide 1.
@@ -320,13 +360,18 @@ device does.
 | Presenter | Spoken words |
 |---|---|
 | P1 | 147 |
-| P2 | 183 |
-| P3 | 163 |
-| **Total** | **493** |
+| P2 | 160 |
+| P3 | 176 |
+| **Total** | **483** |
 
-At 130 wpm: **228 s (3:47)** full, **209 s (3:28)** with every `[CUTTABLE]` line dropped (41 words).
+At 130 wpm: **223 s (3:42)** full, **204 s (3:24)** with every `[CUTTABLE]` line dropped (41 words).
 
-With a 90 s demo: **5:17 full** / **4:58 tight**. The slot is 5:00.
+With a 90 s demo: **5:12 full** / **4:54 tight**. The slot is 5:00.
+
+Excluded from the runtime above, and why:
+
+- **9 words** of `[P#-DEMO]` — spoken *inside* the 90 s demo, so adding them would double-count that time.
+- **3 `[P#-ALT]` contingency lines** (14/15/10 words) — at most one is ever spoken, and only if the demo fails.
 
 Longest spoken line: **14 words**.
 

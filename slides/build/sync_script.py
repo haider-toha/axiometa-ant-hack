@@ -28,7 +28,14 @@ NOTE_RE = re.compile(
     r'<script type="text/plain" class="notes" data-for="(\d+)"\s*>(.*?)</script>',
     re.DOTALL,
 )
+# Three categories, deliberately distinguished. Only DECK lines count toward the
+# runtime added to the 90 s demo:
+#   [P1] [P2] [P3]  deck speech, spoken over slides
+#   [P#-DEMO]       spoken DURING the demo — already inside the 90 s, never added
+#   [P#-ALT]        contingency alternates — at most one is ever spoken, and only on failure
 SPOKEN_RE = re.compile(r"^\s*\[(P[123])\]\s*(.+?)\s*$")
+DEMO_RE = re.compile(r"^\s*\[(P[123])-DEMO\]\s*(.+?)\s*$")
+ALT_RE = re.compile(r"^\s*\[(P[123])-ALT\]\s*(.+?)\s*$")
 
 
 def word_count(line: str) -> int:
@@ -49,6 +56,8 @@ def main() -> int:
     per_presenter = {"P1": 0, "P2": 0, "P3": 0}
     total_words = 0
     cuttable_words = 0
+    demo_words = 0
+    alt_lines = []
     out = [
         "# Speaker script",
         "",
@@ -73,6 +82,14 @@ def main() -> int:
             m = SPOKEN_RE.match(ln)
             if m:
                 spoken.append((m.group(1), m.group(2)))
+                continue
+            d = DEMO_RE.match(ln)
+            if d:
+                demo_words += word_count(d.group(2))
+                continue
+            a = ALT_RE.match(ln)
+            if a:
+                alt_lines.append(word_count(a.group(2)))
 
         words = sum(word_count(t) for _, t in spoken)
         total_words += words
@@ -121,8 +138,16 @@ def main() -> int:
         f"**{tight:.0f} s ({int(tight // 60)}:{int(tight % 60):02d})** with every "
         f"`[CUTTABLE]` line dropped ({cuttable_words} words).",
         "",
-        f"With a 90 s demo: **{(runtime + 90) / 60:.0f}:{int((runtime + 90) % 60):02d} full** / "
+        f"With a 90 s demo: **{int((runtime + 90) // 60)}:{int((runtime + 90) % 60):02d} full** / "
         f"**{int((tight + 90) // 60)}:{int((tight + 90) % 60):02d} tight**. The slot is 5:00.",
+        "",
+        "Excluded from the runtime above, and why:",
+        "",
+        f"- **{demo_words} words** of `[P#-DEMO]` — spoken *inside* the 90 s demo, so adding "
+        "them would double-count that time.",
+        f"- **{len(alt_lines)} `[P#-ALT]` contingency lines** "
+        f"({'/'.join(str(n) for n in alt_lines) or '—'} words) — at most one is ever spoken, "
+        "and only if the demo fails.",
         "",
         f"Longest spoken line: **{longest} words**.",
     ]

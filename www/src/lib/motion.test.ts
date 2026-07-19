@@ -176,9 +176,11 @@ describe("stationary behaviour", () => {
     },
   );
 
-  // Case 26 — the named dominant false positive [10 §6]. 0.8 Hz is deliberately
-  // absent as a passing case; it is covered as a known limitation below.
-  it.each([0.3, 0.5])("rejects 60 s of amp-4 camera panning at %s Hz", (panHz) => {
+  // Case 26 — the named dominant false positive [10 §6]. The audit-22 demo
+  // retune widened the gait band to 350–1700 ms, so pans folding inside it
+  // (0.3–0.8 Hz) moved to the known-limitations block below; what still rejects
+  // is a pan slow enough that its one-sided peaks land beyond stepMaxMs.
+  it.each([0.1, 0.2])("rejects 60 s of amp-4 camera panning at %s Hz", (panHz) => {
     expect(flips(pan(60_000, { panHz, amp: 4 }))).toBe(0);
   });
 });
@@ -202,11 +204,12 @@ describe("amplitude gate", () => {
 });
 
 describe("cadence gate", () => {
-  // Case 7 — the positive case.
+  // Case 7 — the positive case. The 5000 ms window (audit 22) retains ~9 peaks
+  // at a 526 ms step interval where the old 2500 ms window held 4.
   it("reports MOVING for sustained 1.9 Hz walking", () => {
     const s = classify(walk(6000));
     expect(s.activity).toBe("MOVING");
-    expect(s.peaks.length).toBe(4);
+    expect(s.peaks.length).toBe(9);
   });
 
   // Case 8 — issue #5 wants measured transition times. Asserted as a band so a
@@ -226,11 +229,14 @@ describe("cadence gate", () => {
   });
 
   // Case 11 — a bare peak count would pass this; the interval test is what
-  // rejects it.
+  // rejects it. The 5000 ms window retains the few heavily-smoothed aliased
+  // peaks that scrape past prominence — exactly minPeaks of them — so this is
+  // now a live demonstration of the interval rule doing the rejecting, not the
+  // count.
   it("rejects a 6 Hz cadence", () => {
     const s = classify(walk(6000, { stepHz: 6 }));
     expect(s.activity).toBe("STILL");
-    expect(s.peaks.length).toBe(0);
+    expect(s.peaks.length).toBe(3);
   });
 
   // Case 11b — the precise upper edge: 333 ms spacing, below stepMinMs.
@@ -238,26 +244,39 @@ describe("cadence gate", () => {
     expect(classify(walk(8000, { stepHz: 3 })).activity).toBe("STILL");
   });
 
-  // Case 12 — the lower edge.
+  // Case 12 — the lower edge. 0.5 Hz peaks are 2000 ms apart: the 5000 ms
+  // window now holds three of them, but the interval sits beyond stepMaxMs, so
+  // the gate still refuses.
   it("rejects a 0.5 Hz cadence", () => {
     const s = classify(walk(9000, { stepHz: 0.5 }));
     expect(s.activity).toBe("STILL");
-    expect(s.peaks.length).toBe(2);
+    expect(s.peaks.length).toBe(3);
   });
 
-  // Case 12b — 72 steps/min, the documented design floor. A cautious walker
-  // must not be excluded.
+  // Case 12b — 72 steps/min, the old documented design floor. Under the
+  // audit-22 band its ~833 ms intervals (quantised up to 866 ms at 30 Hz) sit
+  // comfortably in-band instead of straddling the old 850 ms edge, so entry is
+  // now prompt rather than delayed by boundary jitter.
   it("admits the slowest designed-for walk at 1.2 Hz", () => {
     const s = classify(walk(9000, { stepHz: 1.2 }));
     expect(s.activity).toBe("MOVING");
-    expect(s.lastTransitionT).toBeGreaterThanOrEqual(4500);
-    expect(s.lastTransitionT).toBeLessThanOrEqual(7000);
+    expect(s.lastTransitionT).toBeGreaterThanOrEqual(2500);
+    expect(s.lastTransitionT).toBeLessThanOrEqual(4500);
+  });
+
+  // Case 12c — the demo's reason for existing (audit 22): a phone reporting
+  // peaks at 40/min (1500 ms apart, stride-rate detection of a normal walk)
+  // must classify as MOVING. This is the case the old 850 ms ceiling rejected.
+  it("admits a 40 peaks/min stride-rate walk at 0.67 Hz", () => {
+    const s = classify(walk(12000, { stepHz: 0.667 }));
+    expect(s.activity).toBe("MOVING");
   });
 
   // Case 27 — the interval-consistency rule on its own, independent of the fold.
   it.each([
     [[0, 400, 800], true],
-    [[0, 400, 2000], false],
+    [[0, 1500, 3000], true],
+    [[0, 400, 2200], false],
     [[0, 400], false],
     [[0, 300, 600], false],
   ] as const)("cadenceGate(%j) === %s", (peaks, expected) => {
@@ -266,27 +285,34 @@ describe("cadence gate", () => {
 });
 
 describe("hysteresis", () => {
-  // Case 5 — fails immediately if entry and exit debounce were equal.
+  // Case 5 — fails immediately if entry and exit debounce were equal. The rest
+  // gap is 1800 ms: each burst yields an in-band peak pair (mid-lobe max plus
+  // the cut-off boundary), but one pair is a single interval and the
+  // 2-consecutive rule refuses it, while the ~1965 ms cross-burst gap sits
+  // beyond the audit-22 stepMaxMs of 1700. (The old 600 ms gap put the burst
+  // period at 1200 ms, which the widened band now legitimately reads as a slow
+  // walk — that is the retune working, not this test's subject.)
   it("does not flap when the signal oscillates across the gate", () => {
     const samples = chain(
       30,
       ...Array.from({ length: 10 }, () => [
         (t0: number) => walk(600, { t0 }),
-        (t0: number) => rest(18, 30, t0),
+        (t0: number) => rest(54, 30, t0),
       ]).flat(),
     );
     expect(classify(samples).activity).toBe("STILL");
     expect(flips(samples)).toBe(0);
   });
 
-  // Case 9 — "placing it down returns to STILL". Exit ≈ 3.5 s = window drain
-  // plus the 2 s debounce.
+  // Case 9 — "placing it down returns to STILL". Exit ≈ 6 s under audit 22:
+  // the 5000 ms window drains until fewer than minPeaks remain (~4 s after the
+  // last step at a 526 ms step interval), then the 2 s exit debounce runs.
   it("returns to STILL after the phone is put down", () => {
     const samples = [...walk(6000), ...rest(300, 30, 6000)];
     const s = classify(samples);
     expect(s.activity).toBe("STILL");
-    expect(s.lastTransitionT).toBeGreaterThanOrEqual(8500);
-    expect(s.lastTransitionT).toBeLessThanOrEqual(10500);
+    expect(s.lastTransitionT).toBeGreaterThanOrEqual(11000);
+    expect(s.lastTransitionT).toBeLessThanOrEqual(13000);
   });
 
   // Case 10 — sub-threshold motion for less than the exit debounce must not
@@ -332,9 +358,13 @@ describe("null and malformed sensor fields", () => {
   });
 
   // Case 13b — documents the quadrature limitation rather than pretending it
-  // away.
+  // away. Pinned at amp 3, where the compression is unambiguous: the magnitude
+  // swing is sqrt(3² + 9.81²) − 9.81 ≈ 0.45 m/s², below even the fallback's
+  // 0.6 prominence. (At the old amp 6 the swing is 1.69 m/s² and the audit-22
+  // doubled window now collects enough of those marginal peaks to pass the
+  // gate — a deliberate sensitivity gain, so amp 6 stopped being a miss.)
   it("misses perpendicular gait on the gravity fallback, as the geometry demands", () => {
-    const samples = walk(8000, { axis: "x" }).map((s) => ({ ...s, acceleration: null }));
+    const samples = walk(8000, { axis: "x", amp: 3 }).map((s) => ({ ...s, acceleration: null }));
     const s = classify(samples);
     expect(s.activity).toBe("STILL");
     expect(s.usingGravityFallback).toBe(true);
@@ -477,22 +507,30 @@ describe("fold properties", () => {
     expect(seen.map((x) => x.activity)).toEqual(["MOVING", "STILL"]);
     expect(seen[0].t).toBeGreaterThanOrEqual(2000);
     expect(seen[0].t).toBeLessThanOrEqual(3500);
-    expect(seen[1].t).toBeGreaterThanOrEqual(4500);
-    expect(seen[1].t).toBeLessThanOrEqual(7000);
+    // The revert lands later under audit 22: the transient's peaks linger in
+    // the 5000 ms window for twice as long before the exit debounce can start.
+    expect(seen[1].t).toBeGreaterThanOrEqual(7000);
+    expect(seen[1].t).toBeLessThanOrEqual(9500);
   });
 });
 
 // --- the known limitation, pinned rather than hidden ------------------------
 
 describe("known limitations", () => {
-  // The counterpart to case 26. A one-sided magnitude folds a 0.8 Hz pan to
-  // 1.6 Hz peaks — 625 ms spacing, squarely inside the 350–850 ms gait band. No
-  // cadence-based classifier can separate the two. This is asserted as a FLIP,
-  // not as a pass, so that the manual control can never be argued away as
-  // redundant. [audit 15 §finding 4]
-  it("cannot distinguish a perfectly periodic 0.8 Hz camera pan from walking", () => {
-    expect(flips(pan(60_000, { panHz: 0.8, amp: 4 }))).toBeGreaterThan(0);
-  });
+  // The counterpart to case 26. A one-sided magnitude folds a pan at panHz to
+  // peaks at 2·panHz, so 0.3, 0.5 and 0.8 Hz pans land at 1667, 1000 and
+  // 625 ms spacings — all inside the audit-22 350–1700 ms band. No
+  // cadence-based classifier can separate these from a slow walk. The band was
+  // widened deliberately to admit real 40–50 peaks/min walking, and this block
+  // grew from one frequency to three as the cost: asserted as FLIPS, not
+  // passes, so the manual control can never be argued away as redundant.
+  // [audit 15 §finding 4; audit 22]
+  it.each([0.3, 0.5, 0.8])(
+    "cannot distinguish a perfectly periodic %s Hz camera pan from walking",
+    (panHz) => {
+      expect(flips(pan(60_000, { panHz, amp: 4 }))).toBeGreaterThan(0);
+    },
+  );
 });
 
 // --- 28: the deliberate type duplication ------------------------------------

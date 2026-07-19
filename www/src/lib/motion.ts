@@ -17,7 +17,7 @@
 // threshold separates panning from walking — only PERIODICITY does. That is why
 // the gate is a cadence window with an inter-peak interval consistency test
 // rather than a variance threshold, and why a bare peak COUNT is not enough:
-// random hand jitter can produce three peaks in 2.5 s.
+// random hand jitter can produce three peaks in the 5 s window.
 
 /**
  * Structurally identical to `UserActivity` in ./contract, on purpose. A sensor
@@ -87,7 +87,22 @@ export interface MotionTunables {
 }
 
 /** See the threshold table in audit 17 §"Classifier spec as built" for GROUNDED
- *  vs ASSUMED on every one of these. */
+ *  vs ASSUMED on every one of these.
+ *
+ *  DEMO RETUNE (2026-07-19, audit 22): `stepMaxMs` 850 → 1700 and
+ *  `cadenceWindowMs` 2500 → 5000 (both ×2). Real phones on the bench report
+ *  peak cadences of 40–50/min — the magnitude channel often only sees every
+ *  OTHER heel strike — which is 1200–1500 ms between peaks, entirely outside
+ *  the old 850 ms ceiling, so the classifier sat on STILL while the user
+ *  walked. 1700 ms admits 40/min (1500 ms) with ~13% jitter margin; the window
+ *  doubles with it so three peaks at the slowest admitted cadence still fit
+ *  (2 × 1700 = 3400 < 5000). Known cost: slower camera pans (0.3–0.8 Hz full
+ *  sine, folding to 0.6–1.6 Hz one-sided peaks) now land inside the band, so
+ *  the pan false positive is wider than before — the manual override on the
+ *  capture page remains the mitigation. Exit latency also grows: the window
+ *  drains for up to ~4 s after the last step before the 2 s exit debounce even
+ *  starts. Hardcoded for the demo; see audit 22 before treating these as
+ *  measured. */
 export const MOTION_TUNABLES: MotionTunables = {
   smoothTauMs: 100,
   biasTauMs: 1500,
@@ -95,8 +110,8 @@ export const MOTION_TUNABLES: MotionTunables = {
   peakProminenceGravity: 0.6,
   peakCooldownMs: 300,
   stepMinMs: 350,
-  stepMaxMs: 850,
-  cadenceWindowMs: 2500,
+  stepMaxMs: 1700,
+  cadenceWindowMs: 5000,
   minPeaks: 3,
   minInBandIntervals: 2,
   entryDebounceMs: 1200,
@@ -207,13 +222,15 @@ function readRotationMagnitude(s: MotionSample): number | null {
 /**
  * Periodicity, not amplitude.
  *
- * Three peaks alone are too weak — hand jitter while standing can produce three
- * peaks in 2.5 s — so the count is paired with an inter-peak interval
- * consistency test [10 §6]. The 350–850 ms band is the documented 1.4–2.3 Hz
- * step frequency widened by ~15%. Three peaks in 2.5 s demands 1.2 steps/s
- * (72 steps/min), which sits clearly below every documented normal-walking
- * cadence — the slowest documented normal male cadence is 81 steps/min — while
- * still requiring genuine periodicity.
+ * Three peaks alone are too weak — hand jitter can produce three peaks in a
+ * 5 s window — so the count is paired with an inter-peak interval consistency
+ * test [10 §6]. The 350–1700 ms band covers ~0.59–2.86 Hz peak rates: the
+ * documented 1.4–2.3 Hz step frequency PLUS the 40–50 peaks/min actually
+ * measured on real phones, where the magnitude channel frequently registers
+ * only every other heel strike (audit 22). Three peaks in 5 s demands
+ * 0.6 peaks/s (36/min) at minimum, so the floor is now well below normal
+ * walking cadence — the interval-consistency run is what still separates a
+ * walk from random jitter at that rate.
  */
 export function cadenceGate(peaks: readonly number[], tun: MotionTunables): boolean {
   if (peaks.length < tun.minPeaks) return false;

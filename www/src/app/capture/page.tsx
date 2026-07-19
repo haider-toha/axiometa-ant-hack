@@ -200,7 +200,22 @@ export default function CapturePage() {
   // --- bus bearing ---------------------------------------------------------
   const [nav, setNav] = useState<NavView>(NAV_IDLE);
   const [lastNav, setLastNav] = useState<NavPost | null>(null);
+  /**
+   * Demo override (audit 22): POST the confirmed bearing even while the local
+   * activity is STILL. The board's `acceptsRelayCommand` still drops bearing
+   * commands unless the RELAY says MOVING, so on its own this only exercises
+   * the phone→relay half — the UI says so and points at "Force moving" for the
+   * full end-to-end override.
+   */
+  const [forceNav, setForceNav] = useState(false);
   const bearingVoteRef = useRef<BearingVote>(initialBearingVote());
+  const forceNavRef = useRef(false);
+
+  const toggleForceNav = useCallback(() => {
+    const next = !forceNavRef.current;
+    forceNavRef.current = next;
+    setForceNav(next);
+  }, []);
 
   /**
    * Steps per minute across the peaks still inside the cadence window.
@@ -570,9 +585,14 @@ export default function CapturePage() {
       // payload. The board enforces the same split in acceptsRelayCommand, so
       // this is the phone AGREEING with it rather than a second, independent
       // gate — send the wrong half and the board simply drops it, which looks
-      // identical to a dead relay from the outside.
+      // identical to a dead relay from the outside. `forceNavRef` is the demo
+      // override (audit 22): it POSTs the bearing regardless of local activity
+      // so the camera→relay path can be shown without walking, but it does NOT
+      // touch the board's own gate — pair with "Force moving" for output.
       const navPattern: NavPattern | null =
-        vote.emitted && activityRef.current === "MOVING" ? bearingToPattern(vote.emitted) : null;
+        vote.emitted && (activityRef.current === "MOVING" || forceNavRef.current)
+          ? bearingToPattern(vote.emitted)
+          : null;
 
       const event: EventRequest = navPattern
         ? {
@@ -697,8 +717,12 @@ export default function CapturePage() {
             ? "Watching your steps. Walk a few paces."
             : `Detected from your steps — ${cadenceSpm.toFixed(0)} steps/min.`;
 
-  // Only sent while MOVING, so the card can say why it is holding.
-  const navHeld = nav.confirmed !== null && !walking;
+  // Only sent while MOVING (unless force-send is on), so the card can say why
+  // it is holding — and say it loudly: a suppressed direction and a dead
+  // detector must not look alike.
+  const navHeld = nav.confirmed !== null && !walking && !forceNav;
+  /** What the confirmed bearing translates to — shown even when suppressed. */
+  const navCommand = nav.confirmed === null ? null : bearingToPattern(nav.confirmed);
 
   return (
     <main className="flex-1 bg-background px-4 py-6 font-sans text-foreground sm:px-6 sm:py-8">
@@ -866,7 +890,7 @@ export default function CapturePage() {
               <div className="flex items-baseline justify-between gap-3">
                 <h2 className="text-sm font-medium">Direction to the bus</h2>
                 <span className="font-mono text-xs tabular-nums text-muted-foreground">
-                  {walking ? "sending" : "held · needs MOVING"}
+                  {walking ? "sending" : forceNav ? "force-send on" : "suppressed · needs MOVING"}
                 </span>
               </div>
 
@@ -895,12 +919,14 @@ export default function CapturePage() {
                         : nav.confirmed === null
                           ? `Bus in view — confirming (${nav.streak}/${BEARING_CONFIRM_FRAMES}).`
                           : navHeld
-                            ? "Directions are only sent while you are MOVING."
-                            : nav.streak > 0 && nav.pending !== null
-                              ? `Sent. Checking a change to ${bearingToPattern(nav.pending)} (${nav.streak}/${BEARING_CONFIRM_FRAMES}).`
-                              : nav.streak > 0
-                                ? `Sent. Bus may have left view (${nav.streak}/${BEARING_CONFIRM_FRAMES}).`
-                                : "Sent to the board."}
+                            ? `Suppressed — ${navCommand} was NOT sent because you are STILL. Walk, or use Force send / Force moving.`
+                            : !walking
+                              ? `${navCommand} force-sent while STILL. The board ignores directions until the relay says MOVING — use Force moving above.`
+                              : nav.streak > 0 && nav.pending !== null
+                                ? `Sent. Checking a change to ${bearingToPattern(nav.pending)} (${nav.streak}/${BEARING_CONFIRM_FRAMES}).`
+                                : nav.streak > 0
+                                  ? `Sent. Bus may have left view (${nav.streak}/${BEARING_CONFIRM_FRAMES}).`
+                                  : "Sent to the board."}
                   </p>
                 </div>
               </div>
@@ -919,6 +945,20 @@ export default function CapturePage() {
                     say "left" for a centroid at 0.32 where this page says
                     AHEAD — that divergence is the design, not a fault. */}
                 <Diag label="Detector says" value={nav.detector || "–"} />
+                {/* The one cell that answers the demo question outright: what
+                    command the confirmed bearing became, and whether it left
+                    the phone or was suppressed by the activity split. */}
+                <Diag
+                  label="Command"
+                  value={
+                    navCommand === null
+                      ? "none"
+                      : navHeld
+                        ? `${navCommand} · suppressed`
+                        : `${navCommand} · sent`
+                  }
+                  alert={navHeld}
+                />
                 <Diag
                   label="Last sent"
                   value={
@@ -929,6 +969,27 @@ export default function CapturePage() {
                   alert={lastNav !== null && !lastNav.ok}
                 />
               </dl>
+
+              {/* Demo override (audit 22). Deliberately one half of a pair:
+                  this makes the phone POST regardless of activity; the board
+                  keeps its own MOVING gate, which "Force moving" above owns. */}
+              <div className="mt-4 border-t border-border pt-3">
+                <div className="flex items-center justify-between gap-3">
+                  <span className="text-xs font-medium text-muted-foreground">Force send</span>
+                  <Button
+                    size="sm"
+                    variant={forceNav ? "default" : "outline"}
+                    onClick={toggleForceNav}
+                  >
+                    {forceNav ? "Force send: on" : "Force send: off"}
+                  </Button>
+                </div>
+                <p className="mt-2 text-xs text-muted-foreground">
+                  Sends LEFT / RIGHT / AHEAD even while STILL. The board still ignores directions
+                  until the relay says MOVING — pair with “Force moving” in the walking card for
+                  the full override.
+                </p>
+              </div>
             </section>
 
             <section className="rounded-lg border border-border bg-card p-4 text-card-foreground">

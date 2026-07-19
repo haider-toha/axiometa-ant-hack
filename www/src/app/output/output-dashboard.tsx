@@ -15,6 +15,7 @@ import {
 } from "./output-timeline";
 import type { BoardRelayState } from "./relay-serial";
 import { RelayTrace } from "./relay-trace";
+import { describeOutputReason } from "./output-reason";
 
 export const OUTPUT_AFTERGLOW_MS = 750;
 
@@ -67,6 +68,9 @@ export function OutputDashboard({
   const [view, setView] = useState<"channels" | "relay">("channels");
   const connected = connection === "connected";
   const canDisconnect = connected || connection === "connecting";
+  const reasonAvailability =
+    !connected || telemetry === null ? "unavailable" : fresh ? "live" : "stale";
+  const reason = describeOutputReason(telemetry, reasonAvailability);
   const moveTabFocus = (next: "channels" | "relay") => {
     setView(next);
     document
@@ -163,6 +167,23 @@ export function OutputDashboard({
           role="tabpanel"
           aria-labelledby="output-channels-tab"
         >
+          <section
+            className={styles.reasonPanel}
+            data-state={reason.state}
+            aria-label="Why this output?"
+          >
+            <span className={styles.reasonRail} aria-hidden="true" />
+            <div className={styles.reasonCopy}>
+              <p className={styles.reasonEyebrow}>Why this output?</p>
+              <h2>{reason.title}</h2>
+              <p className={styles.reasonDescription}>{reason.description}</p>
+            </div>
+            <div className={styles.reasonBadges} aria-label="Board context">
+              <span>{reason.activityLabel}</span>
+              <span>{reason.sourceLabel}</span>
+            </div>
+          </section>
+
           <section className={styles.channels} aria-label="Physical output channels">
             <OutputChannel
               side="left"
@@ -185,7 +206,8 @@ export function OutputDashboard({
           </section>
 
           <p className="sr-only" aria-live="polite">
-            {outputAnnouncement(connection, telemetry, fresh)}
+            {outputAnnouncement(connection, telemetry, fresh)} {reason.title}.{" "}
+            {reason.description}
           </p>
 
           <PulseTimeline

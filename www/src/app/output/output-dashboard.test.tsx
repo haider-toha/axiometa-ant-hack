@@ -13,6 +13,19 @@ import {
 } from "@/app/output/relay-serial";
 
 const IDLE = { v: 1 as const, leftHz: 0, rightHz: 0, upMs: 1000 };
+const IDLE_V2 = {
+  v: 2 as const,
+  leftHz: 0,
+  rightHz: 0,
+  upMs: 1000,
+  state: "IDLE" as const,
+  source: "NONE" as const,
+  pattern: "NONE",
+  activity: "MOVING" as const,
+  reason: "NO_OUTPUT" as const,
+  tofMm: null,
+  outputMode: "AUDIBLE" as const,
+};
 const CLOCK = 10_000;
 
 function pulseHistory(): OutputTransition[] {
@@ -48,7 +61,11 @@ describe("OutputDashboard", () => {
     const props = renderDashboard();
 
     expect(screen.getByText("Disconnected")).toBeInTheDocument();
-    expect(screen.getAllByText("UNKNOWN")).toHaveLength(2);
+    expect(
+      within(
+        screen.getByRole("region", { name: "Physical output channels" }),
+      ).getAllByText("UNKNOWN"),
+    ).toHaveLength(2);
     fireEvent.click(screen.getByRole("button", { name: "Connect device" }));
     expect(props.onConnect).toHaveBeenCalledOnce();
   });
@@ -66,6 +83,57 @@ describe("OutputDashboard", () => {
     expect(screen.getAllByText("IDLE")).toHaveLength(2);
     expect(screen.getByTestId("left-actuator")).toHaveAttribute("data-active", "false");
     expect(screen.getByTestId("right-actuator")).toHaveAttribute("data-active", "false");
+  });
+
+  it("keeps version 1 boards explicit and useful", () => {
+    renderDashboard({ connection: "connected", telemetry: IDLE, fresh: true });
+
+    const reason = screen.getByRole("region", { name: "Why this output?" });
+    expect(within(reason).getByRole("heading", { name: "Reason unavailable" })).toBeInTheDocument();
+    expect(reason).toHaveTextContent("Firmware telemetry v1");
+    expect(reason).toHaveTextContent("FIRMWARE V1");
+  });
+
+  it("explains a board-derived proximity decision with live context", () => {
+    renderDashboard({
+      connection: "connected",
+      telemetry: {
+        ...IDLE_V2,
+        leftHz: 2350,
+        state: "ACTIVE",
+        source: "LOCAL_TOF",
+        pattern: "PROXIMITY",
+        reason: "PLAYING",
+        tofMm: 444,
+      },
+      fresh: true,
+    });
+
+    const reason = screen.getByRole("region", { name: "Why this output?" });
+    expect(within(reason).getByRole("heading", { name: "Local proximity" })).toBeInTheDocument();
+    expect(reason).toHaveTextContent(
+      "P1 is pulsing because an object is 444 mm away while moving.",
+    );
+    expect(reason).toHaveTextContent("MOVING");
+    expect(reason).toHaveTextContent("LOCAL TOF");
+  });
+
+  it("does not present a stale semantic reason as live", () => {
+    renderDashboard({
+      connection: "connected",
+      telemetry: {
+        ...IDLE_V2,
+        state: "ACTIVE",
+        source: "LOCAL_SIREN",
+        pattern: "SIREN",
+        reason: "PLAYING",
+      },
+      fresh: false,
+    });
+
+    const reason = screen.getByRole("region", { name: "Why this output?" });
+    expect(within(reason).getByRole("heading", { name: "Board data is stale" })).toBeInTheDocument();
+    expect(reason).not.toHaveTextContent("Local siren");
   });
 
   it("shows a left-only output with its physical frequency", () => {

@@ -1,6 +1,10 @@
 import { describe, expect, it } from "vitest";
 
-import { describeOutputReason } from "@/app/output/output-reason";
+import {
+  describeOutputReason,
+  outputReasonAnnouncement,
+  outputReasonAnnouncementKey,
+} from "@/app/output/output-reason";
 import type {
   OutputTelemetryV1,
   OutputTelemetryV2,
@@ -272,6 +276,62 @@ describe("describeOutputReason", () => {
         description: "The board is playing its startup-ready pattern.",
         sourceLabel: "SYSTEM",
       }),
+    );
+  });
+});
+
+describe("outputReasonAnnouncementKey", () => {
+  it("ignores pulse, heartbeat, and distance-only changes", () => {
+    const proximity: OutputTelemetryV2 = {
+      ...IDLE,
+      leftHz: 2350,
+      state: "ACTIVE",
+      source: "LOCAL_TOF",
+      pattern: "PROXIMITY",
+      reason: "PLAYING",
+      tofMm: 444,
+    };
+
+    expect(
+      outputReasonAnnouncementKey(
+        { ...proximity, leftHz: 0, upMs: 1100, tofMm: 510 },
+        "live",
+      ),
+    ).toBe(outputReasonAnnouncementKey(proximity, "live"));
+  });
+
+  it("keeps announcement copy stable across pulse and distance changes", () => {
+    const proximity: OutputTelemetryV2 = {
+      ...IDLE,
+      leftHz: 2350,
+      state: "ACTIVE",
+      source: "LOCAL_TOF",
+      pattern: "PROXIMITY",
+      reason: "PLAYING",
+      tofMm: 444,
+    };
+
+    expect(
+      outputReasonAnnouncement(
+        { ...proximity, leftHz: 0, upMs: 1100, tofMm: 510 },
+        "live",
+      ),
+    ).toBe(outputReasonAnnouncement(proximity, "live"));
+  });
+
+  it("changes when the semantic decision changes", () => {
+    expect(outputReasonAnnouncementKey(IDLE, "live")).not.toBe(
+      outputReasonAnnouncementKey(
+        {
+          ...IDLE,
+          state: "ACTIVE",
+          source: "RELAY",
+          pattern: "BUS",
+          activity: "STILL",
+          reason: "PLAYING",
+        },
+        "live",
+      ),
     );
   });
 });

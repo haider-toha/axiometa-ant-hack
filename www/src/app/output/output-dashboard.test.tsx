@@ -136,6 +136,29 @@ describe("OutputDashboard", () => {
     expect(reason).not.toHaveTextContent("Local siren");
   });
 
+  it("keeps semantic and physical live announcements separate", () => {
+    renderDashboard({
+      connection: "connected",
+      telemetry: {
+        ...IDLE_V2,
+        leftHz: 2350,
+        state: "ACTIVE",
+        source: "LOCAL_TOF",
+        pattern: "PROXIMITY",
+        reason: "PLAYING",
+        tofMm: 444,
+      },
+      fresh: true,
+    });
+
+    expect(screen.getByTestId("physical-output-announcement")).toHaveTextContent(
+      "Left 2350 hertz. Right off.",
+    );
+    expect(screen.getByTestId("output-reason-announcement")).not.toHaveTextContent(
+      "2350 hertz",
+    );
+  });
+
   it("shows a left-only output with its physical frequency", () => {
     renderDashboard({
       connection: "connected",

@@ -15,7 +15,11 @@ import {
 } from "./output-timeline";
 import type { BoardRelayState } from "./relay-serial";
 import { RelayTrace } from "./relay-trace";
-import { describeOutputReason } from "./output-reason";
+import {
+  describeOutputReason,
+  outputReasonAnnouncement,
+  outputReasonAnnouncementKey,
+} from "./output-reason";
 
 export const OUTPUT_AFTERGLOW_MS = 750;
 
@@ -71,6 +75,11 @@ export function OutputDashboard({
   const reasonAvailability =
     !connected || telemetry === null ? "unavailable" : fresh ? "live" : "stale";
   const reason = describeOutputReason(telemetry, reasonAvailability);
+  const reasonKey = outputReasonAnnouncementKey(telemetry, reasonAvailability);
+  const reasonAnnouncement = outputReasonAnnouncement(
+    telemetry,
+    reasonAvailability,
+  );
   const moveTabFocus = (next: "channels" | "relay") => {
     setView(next);
     document
@@ -205,9 +214,20 @@ export function OutputDashboard({
             />
           </section>
 
-          <p className="sr-only" aria-live="polite">
-            {outputAnnouncement(connection, telemetry, fresh)} {reason.title}.{" "}
-            {reason.description}
+          <p
+            className="sr-only"
+            aria-live="polite"
+            data-testid="physical-output-announcement"
+          >
+            {outputAnnouncement(connection, telemetry, fresh)}
+          </p>
+          <p
+            className="sr-only"
+            aria-live="polite"
+            data-testid="output-reason-announcement"
+            data-semantic-key={reasonKey}
+          >
+            {reasonAnnouncement}
           </p>
 
           <PulseTimeline

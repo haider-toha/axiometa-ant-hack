@@ -164,6 +164,46 @@ export function describeOutputReason(
   };
 }
 
+export function outputReasonAnnouncementKey(
+  telemetry: OutputTelemetry | null,
+  availability: OutputReasonAvailability,
+): string {
+  if (availability !== "live" || telemetry === null) {
+    return `${availability}|${telemetry?.v ?? "none"}`;
+  }
+  if (telemetry.v === 1) {
+    return "live|v1";
+  }
+  return [
+    "live",
+    "v2",
+    telemetry.state,
+    telemetry.source,
+    telemetry.pattern,
+    telemetry.activity,
+    telemetry.reason,
+    telemetry.outputMode,
+  ].join("|");
+}
+
+export function outputReasonAnnouncement(
+  telemetry: OutputTelemetry | null,
+  availability: OutputReasonAvailability,
+): string {
+  const semanticTelemetry =
+    telemetry?.v === 2
+      ? {
+          ...telemetry,
+          leftHz: 0,
+          rightHz: 0,
+          upMs: 0,
+          tofMm: null,
+        }
+      : telemetry;
+  const presentation = describeOutputReason(semanticTelemetry, availability);
+  return `${presentation.title}. ${presentation.description}`;
+}
+
 function distancePhrase(tofMm: number | null): string | null {
   return tofMm === null ? null : `${tofMm.toLocaleString("en-GB")} mm`;
 }

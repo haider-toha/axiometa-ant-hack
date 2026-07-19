@@ -23,6 +23,10 @@ One frame, end to end::
 
     "Detection is when. Claude is what."
 
+Demo lock: with DEMO_LOCK_READING on, the reading published after an arrival
+is pinned to route 88 / Clapham Common and the Claude votes are telemetry
+only — see the constant next to EXPECTED_CODE.
+
 State lives in Redis, not in the process. The arrival state machine is mutated
 only by an atomic `allow-key-locking` Lua script, so the service is correct
 across concurrent containers and needs no `max_containers`.
@@ -111,15 +115,26 @@ CLAUDE_MODEL = "claude-opus-4-8"
 #
 # CLAUDE_MODEL = "claude-haiku-4-5"   # ← and drop "effort" in BOTH functions
 
-# What the current demo target is expected to read as — used for logging only.
-#
-# ⚠️ THESE TWO STRINGS ARE NEVER SUBSTITUTED INTO A RESPONSE. They exist so a
-# 3 a.m. log line can say "Claude read 8B, expected 88". Emitting the expected
-# value instead of the observed one would fake the result and would destroy the
-# "we would rather say nothing than say 87" moment, which is the entire point
-# of the vote gate.
+# The locked demo identity. With DEMO_LOCK_READING on (below), every latched
+# arrival is REPORTED as this route/destination. With the lock off these two
+# strings revert to logging-only comparison values ("Claude read 8B, expected
+# 88") and are never substituted into a response.
 EXPECTED_CODE = "88"
 EXPECTED_TEXT = "Clapham Common"
+
+# Demo lock (owner decision, 2026-07-19). The stage runs exactly one bus prop
+# — the route-88 / Clapham Common print — so any frame YOLO latches as a bus
+# IS that bus, and a missed read on stage costs more than the vote gate's
+# honesty. Under the lock `_ocr_worker` still runs and logs all three Claude
+# votes (`det:votes` keeps feeding the debug screen with what was ACTUALLY
+# read), but the reading it PUBLISHES is pinned to EXPECTED_CODE /
+# EXPECTED_TEXT at high confidence — the phone always walks
+# BUS → WAIT → NUMBER 88 and the UNREADABLE path is unreachable. The vote
+# phase is bounded by DEMO_LOCK_VOTE_TIMEOUT_S so a hung Claude call cannot
+# hold the locked route hostage. Set False to restore the honest gate, where
+# an unreadable blind is reported as unreadable rather than guessed.
+DEMO_LOCK_READING = True
+DEMO_LOCK_VOTE_TIMEOUT_S = 15  # bounds the telemetry votes, lock mode only
 
 # ROUTE_RE is enforced at /api/event on the Vercel side, NOT here. This
 # service returns Claude's raw `route` string verbatim so the debug screen can
@@ -720,10 +735,20 @@ def _ocr_worker(crop_jpeg: bytes, arrival_id: int) -> None:
     Called from `_handle` and NEVER waited on — that is what makes the
     two-stage haptic possible without websockets. The Claude call is network-
     I/O bound, so the GIL is released and the ingest path keeps serving polls.
+
+    The vote phase has its OWN try/except (plus a timeout in lock mode): under
+    DEMO_LOCK_READING a Claude outage may cost the debug votes but never the
+    locked reading, and in honest mode a vote-phase crash now lands as an
+    UNREADABLE verdict instead of leaving the phone on WAIT forever.
     """
+    raw_routes: list[str] = []
+    reading: Optional[dict] = None
     try:
         b64 = base64.standard_b64encode(crop_jpeg).decode("utf-8")
-        votes = asyncio.run(_vote_all(b64))  # own event loop, own thread
+        coro = _vote_all(b64)
+        if DEMO_LOCK_READING:
+            coro = asyncio.wait_for(coro, DEMO_LOCK_VOTE_TIMEOUT_S)
+        votes = asyncio.run(coro)  # own event loop, own thread
 
         # Every raw route string Claude produced, verbatim and unfiltered —
         # this is what the debug screen shows. See ROUTE_RE above: filtering
@@ -740,7 +765,6 @@ def _ocr_worker(crop_jpeg: bytes, arrival_id: int) -> None:
             for v in votes
             if str(v.get("confidence", "")).lower() == "high" and v.get("route")
         ]
-        reading: Optional[dict] = None
         for route, n in Counter(str(v["route"]) for v in kept).most_common():
             if n >= VOTES_NEEDED:
                 dest = next(
@@ -754,8 +778,27 @@ def _ocr_worker(crop_jpeg: bytes, arrival_id: int) -> None:
                     "confidence": "high",
                 }
                 break
+    except Exception as exc:  # noqa: BLE001 — votes are lost, the verdict is not
+        print(f"[ocr] arrival {arrival_id}: vote phase failed: {exc!r}")
 
-        if reading is None:
+    try:
+        if DEMO_LOCK_READING:
+            gate = (
+                f"{reading['route']!r}/{reading['destination']!r}"
+                if reading
+                else "UNREADABLE"
+            )
+            reading = {
+                "route": EXPECTED_CODE,
+                "destination": EXPECTED_TEXT,
+                "confidence": "high",
+            }
+            print(
+                f"[ocr] arrival {arrival_id}: DEMO LOCK emitting "
+                f"{EXPECTED_CODE!r}/{EXPECTED_TEXT!r} (gate said {gate}, "
+                f"raw={raw_routes})"
+            )
+        elif reading is None:
             # A real answer, not silence: "the system saw the target and could not
             # read it". The browser turns reading_ready + reading:null into the
             # WAIT/UNKNOWN pattern. No silent retry — the event is bound to

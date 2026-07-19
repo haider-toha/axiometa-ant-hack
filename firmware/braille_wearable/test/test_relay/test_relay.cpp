@@ -481,6 +481,82 @@ void test_entering_still_clears_rendered_proximity_but_moving_does_not(void) {
     TEST_ASSERT_FALSE(shouldRenderProximity(UserActivity::MOVING, true, false));
 }
 
+void test_exact_demo_sequence_suppresses_moving_bus_then_delivers_88_while_still(void) {
+    ActivityWireState wire{};
+    ActivityControlState activity{};
+    RelaySequenceState sequence{};
+
+    const ActivityWireDecision movingBaseline = observeActivitySnapshot(
+        wire, true, UserActivity::MOVING, 10, 1000);
+    TEST_ASSERT_EQUAL_UINT8(
+        static_cast<uint8_t>(ActivityWireDisposition::BASELINE),
+        static_cast<uint8_t>(movingBaseline.disposition));
+    TEST_ASSERT_EQUAL_UINT8(
+        static_cast<uint8_t>(UserActivity::MOVING),
+        static_cast<uint8_t>(effectiveActivity(activity, 10)));
+
+    TEST_ASSERT_EQUAL_UINT8(
+        static_cast<uint8_t>(RelayDisposition::BASELINE),
+        static_cast<uint8_t>(consumeRelayCommand(
+            sequence, command(100, CloudCommand::NONE),
+            effectiveActivity(activity, 10)).disposition));
+    TEST_ASSERT_EQUAL_UINT8(
+        static_cast<uint8_t>(RelayDisposition::SUPPRESS),
+        static_cast<uint8_t>(consumeRelayCommand(
+            sequence, command(101, CloudCommand::BUS),
+            effectiveActivity(activity, 11)).disposition));
+
+    const ActivityWireDecision still = observeActivitySnapshot(
+        wire, true, UserActivity::STILL, 11, 2000);
+    TEST_ASSERT_EQUAL_UINT8(
+        static_cast<uint8_t>(ActivityWireDisposition::APPLY),
+        static_cast<uint8_t>(still.disposition));
+    applyCloudActivity(activity, still.activity, 20);
+    TEST_ASSERT_EQUAL_UINT8(
+        static_cast<uint8_t>(UserActivity::STILL),
+        static_cast<uint8_t>(effectiveActivity(activity, 21)));
+
+    TEST_ASSERT_EQUAL_UINT8(
+        static_cast<uint8_t>(RelayDisposition::UNCHANGED),
+        static_cast<uint8_t>(consumeRelayCommand(
+            sequence, command(101, CloudCommand::BUS),
+            effectiveActivity(activity, 21)).disposition));
+    TEST_ASSERT_EQUAL_UINT8(
+        static_cast<uint8_t>(RelayDisposition::ACCEPT),
+        static_cast<uint8_t>(consumeRelayCommand(
+            sequence, command(102, CloudCommand::BUS),
+            effectiveActivity(activity, 22)).disposition));
+
+    const ActivityWireDecision stillHeartbeat = observeActivitySnapshot(
+        wire, true, UserActivity::STILL, 11, 2500);
+    TEST_ASSERT_EQUAL_UINT8(
+        static_cast<uint8_t>(ActivityWireDisposition::APPLY),
+        static_cast<uint8_t>(stillHeartbeat.disposition));
+    applyCloudActivity(activity, stillHeartbeat.activity, 30);
+    TEST_ASSERT_EQUAL_UINT8(
+        static_cast<uint8_t>(RelayDisposition::ACCEPT),
+        static_cast<uint8_t>(consumeRelayCommand(
+            sequence, command(103, CloudCommand::WAIT),
+            effectiveActivity(activity, 31)).disposition));
+    TEST_ASSERT_EQUAL_UINT8(
+        static_cast<uint8_t>(RelayDisposition::ACCEPT),
+        static_cast<uint8_t>(consumeRelayCommand(
+            sequence, command(104, CloudCommand::NUMBER, "88"),
+            effectiveActivity(activity, 32)).disposition));
+
+    const ActivityWireDecision moving = observeActivitySnapshot(
+        wire, true, UserActivity::MOVING, 12, 3000);
+    TEST_ASSERT_EQUAL_UINT8(
+        static_cast<uint8_t>(ActivityWireDisposition::APPLY),
+        static_cast<uint8_t>(moving.disposition));
+    applyCloudActivity(activity, moving.activity, 40);
+    TEST_ASSERT_EQUAL_UINT8(
+        static_cast<uint8_t>(RelayDisposition::SUPPRESS),
+        static_cast<uint8_t>(consumeRelayCommand(
+            sequence, command(105, CloudCommand::BUS),
+            effectiveActivity(activity, 41)).disposition));
+}
+
 int main(int, char**) {
     UNITY_BEGIN();
     RUN_TEST(test_wire_command_parser_accepts_the_nine_cloud_patterns);
@@ -506,5 +582,6 @@ int main(int, char**) {
     RUN_TEST(test_long_outage_reset_revokes_authorized_still);
     RUN_TEST(test_activity_lease_and_tof_policy_are_millis_wrap_safe);
     RUN_TEST(test_entering_still_clears_rendered_proximity_but_moving_does_not);
+    RUN_TEST(test_exact_demo_sequence_suppresses_moving_bus_then_delivers_88_while_still);
     return UNITY_END();
 }

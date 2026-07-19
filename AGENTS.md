@@ -40,6 +40,11 @@ Do not allocate a module slot to a button. P1/P3 are outputs, P2 is ToF, and P4 
 
 The active web app is `www/` — a Next.js 16 app scaffolded with George's `design-studio` taste system (Tailwind v4 + shadcn on Base UI). **George owns the web app.** All new frontend, the phone camera-capture page, API routes, and the device relay are built here going forward. The legacy `app/` (below) is not the target.
 
+Haider owns the phone motion classifier and the relay-side activity producer.
+Other workstreams may validate and consume the independent `activity`,
+`activitySeq`, and `activityTs` fields, but must not add a competing classifier
+or producer unless that ownership is explicitly reassigned.
+
 ## Legacy Traps
 
 The old speech-to-braille idea is closed. Do not build from it.

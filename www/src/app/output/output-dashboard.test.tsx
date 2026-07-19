@@ -100,6 +100,7 @@ describe("OutputDashboard", () => {
       telemetry: {
         ...IDLE_V2,
         leftHz: 2350,
+        rightHz: 3050,
         state: "ACTIVE",
         source: "LOCAL_TOF",
         pattern: "PROXIMITY",

@@ -53,20 +53,18 @@ const VISIBLE_LABELS = 6; // how many detections the list shows under the video
 /**
  * Client-side confidence floor for the person / obstacle fallback path.
  *
- * The Modal detector emits every box above DRAW_CONF_MIN = 0.20 so the overlay
- * has something to draw before a detection is trustworthy. Setting this higher
- * than DRAW_CONF_MIN gates the person path behind a stronger commitment from
- * the detector — but the previous 0.35 (matching Modal's CONF_MIN hazard
- * floor) also gated OUT most real bench captures, so the phone silently
- * ignored a visible human. 0.25 is halfway: still filters the jitter that
- * DRAW_CONF_MIN admits, still lets a genuine detection through.
+ * 0.10 means "if the detector reports a person at all, run the path". Modal's
+ * own DRAW_CONF_MIN is set to 0.10 too (vision/service.py), so this matches
+ * the server floor and no valid person box is dropped between the two.
  *
- * The fast centroid-inverted path (see personFastBearing below) means an
- * accepted person is signalled to the wearer on the SAME frame it appears in,
- * without waiting for Claude — so a false positive here becomes at most one
- * 500 ms LEFT/RIGHT tick rather than a Claude-latency-long incorrect turn.
+ * The safety argument for the very low floor: the fast centroid-inverted
+ * path (see invertBoxBearing below) resolves the direction on the SAME
+ * 500 ms tick the person appears, without waiting for Claude. A false
+ * positive at 0.10 confidence therefore costs at most one LEFT/RIGHT tick
+ * before the next frame either confirms or clears it — as opposed to a
+ * Claude-latency-long incorrect turn.
  */
-const PERSON_MIN_CONFIDENCE = 0.25;
+const PERSON_MIN_CONFIDENCE = 0.1;
 
 /**
  * Invert a box bearing to a route-around instruction.

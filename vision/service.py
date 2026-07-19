@@ -70,10 +70,16 @@ app = modal.App("bus-vision")
 CONF_MIN = 0.35  # a target box below this does not count as a detection
 
 # Display threshold, deliberately well below CONF_MIN. Open-vocabulary scores
-# spread thinner across 1203 classes than across 8, so a box worth OUTLINING is
-# not yet a box worth latching an arrival or raising a hazard on. CONF_MIN still
-# gates both of those; this only gates what gets drawn.
-DRAW_CONF_MIN = 0.20
+# spread thinner across 1203+ classes than across 8, so a box worth OUTLINING
+# is not yet a box worth latching an arrival or raising a hazard on. CONF_MIN
+# still gates both of those; this only gates what gets drawn AND what the
+# phone's person / obstacle fast-path sees. Kept at 0.10 so the phone can
+# react to a person the moment YOLO-World flickers on them — the client-side
+# floor in www/src/app/capture/page.tsx (PERSON_MIN_CONFIDENCE) is 0.10 too,
+# and the fast centroid-inverted direction absorbs the noise this admits.
+# The bus/target path is unaffected: CONF_MIN = 0.35 is still what latches
+# an arrival, and the arrival FSM's hit/miss counters filter the rest.
+DRAW_CONF_MIN = 0.10
 MAX_DETECTIONS = 12  # payload cap at 2 Hz, applied after sorting by confidence
 MAX_RAW_BOXES = 30  # per-frame cap inside the forward pass itself
 DEDUPE_IOU = 0.6  # above this two boxes are the same object seen twice

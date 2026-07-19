@@ -1,6 +1,20 @@
 import { pathToFileURL } from "node:url";
 
-const CLOUD_PATTERNS = new Set(["NONE", "BUS", "NUMBER", "WAIT", "UNKNOWN", "ERROR"]);
+// Mirrors CLOUD_PATTERNS in src/lib/contract.ts — all nine wire patterns.
+// LEFT/RIGHT/AHEAD are the camera-derived bus bearings (audit 23): they are
+// legal relay state in both activity phases, so a probe that rejects them
+// would report NOT READY exactly when the direction feature is working.
+const CLOUD_PATTERNS = new Set([
+  "NONE",
+  "BUS",
+  "NUMBER",
+  "WAIT",
+  "UNKNOWN",
+  "ERROR",
+  "LEFT",
+  "RIGHT",
+  "AHEAD",
+]);
 const ACTIVITIES = new Set(["MOVING", "STILL"]);
 const ACTIVITY_LEASE_MS = 120_000;
 const MAX_CLOCK_SKEW_MS = 30_000;

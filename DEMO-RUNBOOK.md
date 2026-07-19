@@ -74,12 +74,19 @@ same time. Close one before opening the other.
    stop. Do not claim general environmental-sound recognition.
 3. **Still:** Haider's producer changes activity to fresh `STILL`. Confirm the
    readiness probe still passes and ToF output is suppressed.
-4. **Bus:** Move the printed route-88 bus prop steadily through the phone camera.
+4. **Direction (audit 23):** While `STILL`, hold the bus prop off to one side of
+   the camera frame. After the three-frame confirmation, expect `LEFT`, `RIGHT`,
+   or `AHEAD` on `/output` — bearings deliver in **both** activity phases; the
+   user scans for the bus while standing still. While an arrival or route
+   reading is active, bus information takes the shared channel first and the
+   capture page shows the direction as `held (…)`; the "Force send" toggle on
+   `/capture` makes the direction outrank it.
+5. **Bus:** Move the printed route-88 bus prop steadily through the phone camera.
    Expect `BUS`, then `WAIT`, then high-confidence `NUMBER` with route `88`.
-5. **Output:** Confirm `/output` visualizes both logical channels and the pulse
+6. **Output:** Confirm `/output` visualizes both logical channels and the pulse
    history. In audible mode the buzzers mirror those signals; in night mode they
    remain muted.
-6. **Reset:** Remove the prop and return activity to fresh `MOVING` before the
+7. **Reset:** Remove the prop and return activity to fresh `MOVING` before the
    next run.
 
 ## Output Controls

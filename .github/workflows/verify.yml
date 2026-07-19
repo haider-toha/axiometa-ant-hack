@@ -27,11 +27,14 @@ jobs:
       - name: Install pnpm
         uses: pnpm/action-setup@v6
         with:
-          version: 9.15.9
+          # Matches the pnpm major that wrote www/pnpm-lock.yaml (its
+          # `settings:` block is a pnpm 10+ format; 9.x cannot do a frozen
+          # install against it).
+          version: 11.9.0
       - name: Set up Node.js
         uses: actions/setup-node@v7
         with:
-          node-version: 20.20.0
+          node-version: 22
           cache: pnpm
           cache-dependency-path: www/pnpm-lock.yaml
       - name: Install dependencies

@@ -98,6 +98,30 @@ describe("runReadiness", () => {
     });
   });
 
+  // Audit 23: LEFT/RIGHT/AHEAD are legal relay state in both activity phases
+  // (the user scans for the bus while standing still). A probe that only knew
+  // the six bus-information patterns reported NOT READY whenever a direction
+  // was the current command — the live relay held RIGHT/STILL the day this
+  // was merged.
+  it("accepts a camera-derived bearing as the current relay command", async () => {
+    const bearingPull = { ...COMPLETE_PULL, pattern: "RIGHT", route: "", conf: "", arrivalId: 0 };
+
+    const report = await runReadiness({
+      baseUrl: "https://demo.example",
+      fetchImpl: mockFetch(
+        deployment({
+          "/api/pull": response({ contentType: "application/json", body: bearingPull }),
+        }),
+      ),
+      nowMs: READINESS_NOW_MS,
+    });
+
+    expect(report.checks.find((check) => check.id === "pull-contract")).toMatchObject({
+      ok: true,
+    });
+    expect(report.ok).toBe(true);
+  });
+
   it("turns malformed pull JSON into a contract failure instead of throwing", async () => {
     const report = await runReadiness({
       baseUrl: "https://demo.example",

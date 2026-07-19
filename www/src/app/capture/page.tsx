@@ -49,6 +49,7 @@ import {
   acceptPersonDirection,
   clearPersonGuidance,
   initialPersonGuidanceState,
+  invertBoxBearing,
   personGuidanceEligible,
   personResultIsCurrent,
   personTargetMatches,
@@ -70,9 +71,10 @@ const VISIBLE_LABELS = 6; // how many detections the list shows under the video
  * own DRAW_CONF_MIN is set to 0.10 too (vision/service.py), so this matches
  * the server floor and no valid person box is dropped between the two.
  *
- * This low score is only an analysis trigger. It never becomes a direction by
- * itself: a current, high-confidence structured Claude result is still required
- * before LEFT or RIGHT can reach the relay.
+ * A person at this floor immediately drives LEFT/RIGHT via invertBoxBearing
+ * (centroid inversion on this same tick). Claude may refine that answer later
+ * while MOVING; it is never a gate — a fail-closed / low_confidence Claude
+ * reply falls back to the centroid direction instead of silencing the wearer.
  */
 const PERSON_MIN_CONFIDENCE = 0.1;
 
@@ -632,11 +634,16 @@ export default function CapturePage() {
       }).catch(() => {});
 
       // --- which way to the bus or person ----------------------------------
-      // Bus (target: true) is always preferred. Person avoidance is a MOVING-only
-      // fallback; while STILL, visible people do not become navigation targets.
+      // Bus (target: true) is always preferred. When no bus is in view we fall
+      // back to person avoidance. Target *selection* runs in both MOVING and
+      // STILL — the wearer needs an instant "route around this person"
+      // bearing whether they are walking or scanning at the stop, matching
+      // how buses give bearings in both phases per audit 23. The Claude
+      // refinement (personGuidanceEligible below) still fires only while
+      // MOVING; STILL people are served by the synchronous centroid path.
       const detections = m.detections ?? [];
       const busTarget = detections.find((d) => d.target);
-      const personTarget = !busTarget && activityRef.current === "MOVING"
+      const personTarget = !busTarget
         ? detections
             .filter(
               (d) =>
@@ -758,11 +765,20 @@ export default function CapturePage() {
               }
             });
         }
-        // Claude directions have their own reversal stabilizer; do not feed them
-        // through the bus centroid vote state.
-        observed = personGuidanceRef.current.direction;
+        // Fast path: on this very frame, invert the person's box centroid so
+        // the wearer feels a LEFT/RIGHT immediately — the same latency they
+        // get for a bus. Claude's refined answer (which arrives 2–4 s later
+        // via personGuidanceRef, and only while MOVING) overrides the fast
+        // path whenever it is available. Claude returning low_confidence /
+        // clear / unavailable falls back to the centroid direction instead
+        // of erasing the screen. A `low_confidence` reply clears
+        // personGuidanceRef.current.direction, so `?? fastBearing` re-fires
+        // the centroid path automatically.
+        const fastBearing = invertBoxBearing(bearingFromBox(personBox));
+        const personBearing = personGuidanceRef.current.direction ?? fastBearing;
+        observed = personBearing;
         vote = {
-          emitted: personGuidanceRef.current.direction,
+          emitted: personBearing,
           candidate: null,
           streak: 0,
         };

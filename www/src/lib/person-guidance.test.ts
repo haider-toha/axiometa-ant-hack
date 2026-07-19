@@ -3,10 +3,29 @@ import {
   acceptPersonDirection,
   clearPersonGuidance,
   initialPersonGuidanceState,
+  invertBoxBearing,
   personGuidanceEligible,
   personResultIsCurrent,
   personTargetMatches,
 } from "@/lib/person-guidance";
+
+describe("invertBoxBearing", () => {
+  it("routes around a person on the left by turning right", () => {
+    expect(invertBoxBearing("left")).toBe("right");
+  });
+
+  it("routes around a person on the right by turning left", () => {
+    expect(invertBoxBearing("right")).toBe("left");
+  });
+
+  it("defaults a dead-centre person to right", () => {
+    expect(invertBoxBearing("center")).toBe("right");
+  });
+
+  it("returns null when there is no box bearing", () => {
+    expect(invertBoxBearing(null)).toBeNull();
+  });
+});
 
 describe("person guidance eligibility", () => {
   it.each([

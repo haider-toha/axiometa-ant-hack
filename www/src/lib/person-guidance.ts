@@ -1,5 +1,29 @@
 import type { UserActivity } from "@/lib/contract";
+import type { MotionBearing } from "@/lib/motion";
 import type { PersonBox, PersonDirection } from "@/lib/person-direction";
+
+/**
+ * Instant "route around" direction from a person's box centroid.
+ *
+ * The Claude person-direction endpoint answers the same question but with a
+ * 2–4 s round trip and a fail-closed "low confidence" path that discards
+ * ambiguous cases. That is fine as a smart refinement — it is not fine as
+ * the ONLY signal, because the wearer feels nothing on the frame a person
+ * appears in. This helper is the same shape as the bus centroid path
+ * (bearingFromBox → LEFT/RIGHT/AHEAD): purely deterministic, resolves in
+ * one frame, and safe to render immediately.
+ *
+ * The rule is inversion: person on the LEFT third of the frame means the
+ * wearer should turn RIGHT to pass, and vice versa. A dead-centre person
+ * biases to right (a consistent arbitrary choice matters more than which
+ * side, and Claude may override on the next tick).
+ */
+export function invertBoxBearing(bearing: MotionBearing | null): MotionBearing | null {
+  if (bearing === null) return null;
+  if (bearing === "left") return "right";
+  if (bearing === "right") return "left";
+  return "right";
+}
 
 export interface PersonGuidanceState {
   direction: PersonDirection | null;

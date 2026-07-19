@@ -97,8 +97,8 @@ export function RelayTrace({
 
   return (
     <section className={styles.trace} aria-label="Relay receipt trace">
-      <div className={styles.verdict} data-tone={verdict.tone} role="status">
-        <div>
+      <div className={styles.verdict} data-tone={verdict.tone}>
+        <div role="status">
           <p className={styles.kicker}>Relay intent ↔ board receipt</p>
           <strong>{verdict.label}</strong>
           <span>{verdict.detail}</span>

@@ -93,6 +93,7 @@ describe("RelayTrace", () => {
 
     await screen.findByText("ACCEPTED");
     expect(screen.getByRole("status")).toHaveTextContent("ACCEPTED");
+    expect(screen.getByRole("status")).not.toHaveTextContent("500 ms ago");
     expect(screen.getByRole("heading", { name: "Relay outgoing" })).toBeInTheDocument();
     expect(screen.getByRole("heading", { name: "Board received" })).toBeInTheDocument();
     expect(screen.getAllByText("Relay only").length).toBeGreaterThan(0);

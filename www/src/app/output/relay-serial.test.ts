@@ -277,7 +277,7 @@ describe("compareRelayState", () => {
     ).toMatchObject({ kind: "missed" });
   });
 
-  it("treats an unconfirmed first relay command as pending, then missed", () => {
+  it("waits when this USB session has not observed a board command", () => {
     const board = initialBoardRelayState();
     expect(
       compareRelayState({
@@ -287,16 +287,7 @@ describe("compareRelayState", () => {
         board,
         now: 10_000,
       }),
-    ).toMatchObject({ kind: "pending" });
-    expect(
-      compareRelayState({
-        usbConnected: true,
-        relayOnline: true,
-        relay: relayState({ ts: 7_000 }),
-        board,
-        now: 10_000,
-      }),
-    ).toMatchObject({ kind: "missed" });
+    ).toMatchObject({ kind: "waiting" });
   });
 
   it("marks an observed sequence gap missed", () => {

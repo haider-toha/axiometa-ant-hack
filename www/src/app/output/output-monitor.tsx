@@ -18,18 +18,24 @@ import {
 import {
   OutputDashboard,
   type ConnectionStatus,
-  type OutputHistoryEntry,
 } from "./output-dashboard";
+import {
+  pruneOutputTransitions,
+  type OutputTransition,
+} from "./output-timeline";
 
 const TELEMETRY_STALE_MS = 1_500;
-const HISTORY_LIMIT = 24;
 const subscribeToBrowserCapability = () => () => undefined;
 
 export function OutputMonitor() {
   const [connection, setConnection] = useState<ConnectionStatus>("checking");
   const [telemetry, setTelemetry] = useState<OutputTelemetry | null>(null);
   const [lastRecordAt, setLastRecordAt] = useState<number | null>(null);
-  const [history, setHistory] = useState<OutputHistoryEntry[]>([]);
+  const [history, setHistory] = useState<OutputTransition[]>([]);
+  const [recentPulseEndedAt, setRecentPulseEndedAt] = useState<{
+    left: number | null;
+    right: number | null;
+  }>({ left: null, right: null });
   const [error, setError] = useState<string | null>(null);
   const [clock, setClock] = useState(() => Date.now());
   const decoderRef = useRef(new OutputTelemetryDecoder());
@@ -37,33 +43,63 @@ export function OutputMonitor() {
   const generationRef = useRef(0);
   const connectingGenerationRef = useRef<number | null>(null);
   const historyIdRef = useRef(0);
+  const previousRecordRef = useRef<OutputTelemetry | null>(null);
   const webSerialSupported = useSyncExternalStore(
     subscribeToBrowserCapability,
     supportsWebSerial,
     () => false,
   );
 
+  const resetTrace = useCallback(() => {
+    decoderRef.current.reset();
+    previousRecordRef.current = null;
+    setTelemetry(null);
+    setLastRecordAt(null);
+    setHistory([]);
+    setRecentPulseEndedAt({ left: null, right: null });
+  }, []);
+
   const consumeText = useCallback((chunk: string) => {
     for (const record of decoderRef.current.push(chunk)) {
       const receivedAt = Date.now();
+      const previousRecord = previousRecordRef.current;
+      const boardRestarted =
+        previousRecord !== null && record.upMs < previousRecord.upMs;
+      const frequenciesChanged =
+        previousRecord === null ||
+        record.leftHz !== previousRecord.leftHz ||
+        record.rightHz !== previousRecord.rightHz;
+
+      if (boardRestarted) {
+        setRecentPulseEndedAt({ left: null, right: null });
+      } else if (previousRecord !== null) {
+        const leftEnded = previousRecord.leftHz > 0 && record.leftHz === 0;
+        const rightEnded = previousRecord.rightHz > 0 && record.rightHz === 0;
+        if (leftEnded || rightEnded) {
+          setRecentPulseEndedAt((current) => ({
+            left: leftEnded ? receivedAt : current.left,
+            right: rightEnded ? receivedAt : current.right,
+          }));
+        }
+      }
+
       setTelemetry(record);
       setLastRecordAt(receivedAt);
       setClock(receivedAt);
       setHistory((current) => {
-        const previous = current.at(-1);
-        if (previous?.leftHz === record.leftHz && previous.rightHz === record.rightHz) {
-          return current;
-        }
-        const next = [
-          ...current,
-          {
-            id: ++historyIdRef.current,
-            leftHz: record.leftHz,
-            rightHz: record.rightHz,
-          },
-        ];
-        return next.slice(-HISTORY_LIMIT);
+        const transition: OutputTransition = {
+          id: ++historyIdRef.current,
+          leftHz: record.leftHz,
+          rightHz: record.rightHz,
+          upMs: record.upMs,
+          receivedAt,
+        };
+        if (boardRestarted) return [transition];
+
+        const next = frequenciesChanged ? [...current, transition] : current;
+        return pruneOutputTransitions(next, record.upMs);
       });
+      previousRecordRef.current = record;
     }
   }, []);
 
@@ -72,9 +108,9 @@ export function OutputMonitor() {
       if (sessionRef.current || connectingGenerationRef.current !== null) return;
       const generation = ++generationRef.current;
       connectingGenerationRef.current = generation;
+      resetTrace();
       setConnection("connecting");
       setError(null);
-      decoderRef.current.reset();
 
       try {
         const session = await openOutputSerialSession(port, {
@@ -108,7 +144,7 @@ export function OutputMonitor() {
         }
       }
     },
-    [consumeText],
+    [consumeText, resetTrace],
   );
 
   const connect = useCallback(async () => {
@@ -126,13 +162,11 @@ export function OutputMonitor() {
     connectingGenerationRef.current = null;
     const session = sessionRef.current;
     sessionRef.current = null;
-    decoderRef.current.reset();
+    resetTrace();
     setConnection("disconnected");
-    setTelemetry(null);
-    setLastRecordAt(null);
     setError(null);
     void session?.close();
-  }, []);
+  }, [resetTrace]);
 
   useEffect(() => {
     const id = window.setInterval(() => setClock(Date.now()), 250);
@@ -183,6 +217,14 @@ export function OutputMonitor() {
     connection === "connected" &&
     lastRecordAt !== null &&
     clock - lastRecordAt <= TELEMETRY_STALE_MS;
+  const elapsedSinceRecord =
+    lastRecordAt === null ? 0 : Math.max(0, clock - lastRecordAt);
+  const timelineNowUpMs = telemetry
+    ? telemetry.upMs + elapsedSinceRecord
+    : null;
+  const traceEndUpMs = telemetry
+    ? telemetry.upMs + (fresh ? elapsedSinceRecord : 0)
+    : null;
 
   return (
     <OutputDashboard
@@ -190,6 +232,10 @@ export function OutputMonitor() {
       telemetry={telemetry}
       fresh={fresh}
       history={history}
+      clock={clock}
+      timelineNowUpMs={timelineNowUpMs}
+      traceEndUpMs={traceEndUpMs}
+      recentPulseEndedAt={recentPulseEndedAt}
       error={error}
       onConnect={() => void connect()}
       onDisconnect={disconnect}

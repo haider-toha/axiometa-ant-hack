@@ -5,6 +5,13 @@ import type { OutputTelemetry } from "@/lib/output-telemetry";
 import { cn } from "@/lib/utils";
 
 import styles from "./output-monitor.module.css";
+import {
+  buildOutputTimeline,
+  type OutputTimelineSegment,
+  type OutputTransition,
+} from "./output-timeline";
+
+export const OUTPUT_AFTERGLOW_MS = 750;
 
 export type ConnectionStatus =
   | "checking"
@@ -14,17 +21,15 @@ export type ConnectionStatus =
   | "connected"
   | "error";
 
-export type OutputHistoryEntry = {
-  id: number;
-  leftHz: number;
-  rightHz: number;
-};
-
 export type OutputDashboardProps = {
   connection: ConnectionStatus;
   telemetry: OutputTelemetry | null;
   fresh: boolean;
-  history: OutputHistoryEntry[];
+  history: OutputTransition[];
+  clock: number;
+  timelineNowUpMs: number | null;
+  traceEndUpMs: number | null;
+  recentPulseEndedAt: { left: number | null; right: number | null };
   error: string | null;
   onConnect: () => void;
   onDisconnect: () => void;
@@ -44,6 +49,10 @@ export function OutputDashboard({
   telemetry,
   fresh,
   history,
+  clock,
+  timelineNowUpMs,
+  traceEndUpMs,
+  recentPulseEndedAt,
   error,
   onConnect,
   onDisconnect,
@@ -101,6 +110,8 @@ export function OutputDashboard({
           frequency={telemetry?.leftHz ?? null}
           connected={connected}
           fresh={fresh}
+          clock={clock}
+          recentPulseEndedAt={recentPulseEndedAt.left}
         />
         <OutputChannel
           side="right"
@@ -108,6 +119,8 @@ export function OutputDashboard({
           frequency={telemetry?.rightHz ?? null}
           connected={connected}
           fresh={fresh}
+          clock={clock}
+          recentPulseEndedAt={recentPulseEndedAt.right}
         />
       </section>
 
@@ -115,7 +128,11 @@ export function OutputDashboard({
         {outputAnnouncement(connection, telemetry, fresh)}
       </p>
 
-      <PulseHistory history={history} />
+      <PulseTimeline
+        history={history}
+        timelineNowUpMs={timelineNowUpMs}
+        traceEndUpMs={traceEndUpMs}
+      />
     </main>
   );
 }
@@ -126,15 +143,25 @@ function OutputChannel({
   frequency,
   connected,
   fresh,
+  clock,
+  recentPulseEndedAt,
 }: {
   side: "left" | "right";
   port: string;
   frequency: number | null;
   connected: boolean;
   fresh: boolean;
+  clock: number;
+  recentPulseEndedAt: number | null;
 }) {
   const live = connected && fresh && frequency !== null;
   const active = live && frequency > 0;
+  const recent =
+    live &&
+    frequency === 0 &&
+    recentPulseEndedAt !== null &&
+    clock >= recentPulseEndedAt &&
+    clock - recentPulseEndedAt <= OUTPUT_AFTERGLOW_MS;
   const state = !connected
     ? "UNKNOWN"
     : frequency === null
@@ -143,7 +170,9 @@ function OutputChannel({
         ? "STALE"
         : active
           ? "ACTIVE"
-          : "IDLE";
+          : recent
+            ? "RECENT"
+            : "IDLE";
   const frequencyLabel =
     frequency === null
       ? "Not available"
@@ -166,6 +195,7 @@ function OutputChannel({
         <div
           className={styles.actuator}
           data-active={String(active)}
+          data-recent={String(recent)}
           data-testid={`${side}-actuator`}
           aria-label={`${label} output ${state.toLowerCase()}`}
         >
@@ -191,29 +221,89 @@ function outputAnnouncement(
   return `Left ${telemetry.leftHz > 0 ? `${telemetry.leftHz} hertz` : "off"}. Right ${telemetry.rightHz > 0 ? `${telemetry.rightHz} hertz` : "off"}.`;
 }
 
-function PulseHistory({ history }: { history: OutputHistoryEntry[] }) {
+function PulseTimeline({
+  history,
+  timelineNowUpMs,
+  traceEndUpMs,
+}: {
+  history: OutputTransition[];
+  timelineNowUpMs: number | null;
+  traceEndUpMs: number | null;
+}) {
+  const timeline =
+    timelineNowUpMs === null || traceEndUpMs === null
+      ? { left: [], right: [] }
+      : buildOutputTimeline(history, timelineNowUpMs, traceEndUpMs);
+  const empty = timeline.left.length === 0 && timeline.right.length === 0;
+  const summary = `${summarizeLane("Left", timeline.left)} ${summarizeLane("Right", timeline.right)}`;
+
   return (
-    <section className={styles.history} aria-label="Recent output transitions">
-      <div className={styles.historyHeader}>
-        <h2>Pulse history</h2>
-        <span>{history.length === 0 ? "Waiting for output" : "Oldest to newest"}</span>
+    <section
+      className={styles.timeline}
+      aria-label="Five-second output timeline"
+      aria-describedby="output-timeline-summary"
+    >
+      <div className={styles.timelineHeader}>
+        <div>
+          <p className={styles.timelineEyebrow}>Physical output trace</p>
+          <h2>Last 5 seconds</h2>
+        </div>
+        <span>Duration proportional</span>
       </div>
-      <div className={styles.historyTrack}>
-        {history.length === 0 ? (
-          <span className={styles.emptyHistory} aria-hidden="true" />
-        ) : (
-          history.map((entry) => (
-            <span
-              className={styles.historyEvent}
-              key={entry.id}
-              aria-label={`Left ${entry.leftHz > 0 ? `${entry.leftHz} hertz` : "off"}, right ${entry.rightHz > 0 ? `${entry.rightHz} hertz` : "off"}`}
-            >
-              <span data-side="left" data-active={String(entry.leftHz > 0)} />
-              <span data-side="right" data-active={String(entry.rightHz > 0)} />
-            </span>
-          ))
-        )}
+      <div className={styles.timelineBody}>
+        <TimelineLane port="P1" label="LEFT" side="left" segments={timeline.left} />
+        <TimelineLane port="P3" label="RIGHT" side="right" segments={timeline.right} />
+        {empty && <span className={styles.timelineEmpty}>Waiting for a pulse</span>}
+        <div className={styles.timelineScale} aria-hidden="true">
+          <span>-5 s</span>
+          <span>NOW</span>
+        </div>
       </div>
+      <p className="sr-only" id="output-timeline-summary">
+        {summary}
+      </p>
     </section>
   );
+}
+
+function TimelineLane({
+  port,
+  label,
+  side,
+  segments,
+}: {
+  port: string;
+  label: string;
+  side: "left" | "right";
+  segments: OutputTimelineSegment[];
+}) {
+  return (
+    <div className={styles.timelineLane} data-side={side}>
+      <div className={styles.timelineLabel}>
+        <span>{port}</span>
+        <strong>{label}</strong>
+      </div>
+      <div className={styles.timelineTrack} aria-hidden="true">
+        {segments.map((segment) => (
+          <span
+            className={styles.timelinePulse}
+            key={segment.id}
+            style={{
+              left: `${segment.startPercent}%`,
+              width: `${segment.widthPercent}%`,
+            }}
+          />
+        ))}
+      </div>
+    </div>
+  );
+}
+
+function summarizeLane(label: string, segments: OutputTimelineSegment[]): string {
+  if (segments.length === 0) return `${label}: no pulses.`;
+
+  const durationMs = Math.round(
+    segments.reduce((total, segment) => total + segment.durationMs, 0),
+  );
+  return `${label}: ${segments.length} ${segments.length === 1 ? "pulse" : "pulses"}, ${durationMs.toLocaleString("en-GB")} milliseconds.`;
 }

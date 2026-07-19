@@ -119,6 +119,16 @@
   background: var(--card);
 }
 
+.left {
+  --channel-color: var(--left-channel);
+  --channel-soft: var(--left-channel-soft);
+}
+
+.right {
+  --channel-color: var(--right-channel);
+  --channel-soft: var(--right-channel-soft);
+}
+
 .channelHeader {
   display: flex;
   align-items: flex-start;
@@ -151,6 +161,18 @@
 .right .channelState[data-state="active"] {
   border-color: var(--right-channel);
   background: var(--right-channel-soft);
+  color: var(--right-channel);
+}
+
+.left .channelState[data-state="recent"] {
+  border-color: color-mix(in srgb, var(--left-channel) 45%, var(--border));
+  background: color-mix(in srgb, var(--left-channel-soft) 72%, var(--card));
+  color: var(--left-channel);
+}
+
+.right .channelState[data-state="recent"] {
+  border-color: color-mix(in srgb, var(--right-channel) 45%, var(--border));
+  background: color-mix(in srgb, var(--right-channel-soft) 72%, var(--card));
   color: var(--right-channel);
 }
 
@@ -228,6 +250,23 @@
   background: var(--right-channel);
 }
 
+.left .actuator[data-recent="true"],
+.right .actuator[data-recent="true"] {
+  animation: actuatorAfterglow 750ms ease-out both;
+}
+
+.left .actuator[data-recent="true"]::before,
+.left .actuator[data-recent="true"]::after,
+.right .actuator[data-recent="true"]::before,
+.right .actuator[data-recent="true"]::after {
+  animation: actuatorRingsAfterglow 750ms ease-out both;
+}
+
+.left .actuator[data-recent="true"] .actuatorCore,
+.right .actuator[data-recent="true"] .actuatorCore {
+  animation: actuatorCoreAfterglow 750ms ease-out both;
+}
+
 .frequency {
   margin: 0;
   overflow-wrap: anywhere;
@@ -238,64 +277,174 @@
   text-align: center;
 }
 
-.history {
+.timeline {
   display: grid;
-  grid-template-columns: 150px minmax(0, 1fr);
-  align-items: center;
-  gap: 16px;
+  grid-template-columns: 170px minmax(0, 1fr);
+  align-items: start;
+  gap: 24px;
   border-top: 1px solid var(--border);
-  padding-top: 16px;
+  padding-top: 18px;
 }
 
-.historyHeader h2,
-.historyHeader span {
+.timelineHeader {
+  display: flex;
+  min-height: 76px;
+  flex-direction: column;
+  justify-content: space-between;
+  padding: 3px 0 20px;
+}
+
+.timelineHeader h2,
+.timelineHeader p,
+.timelineHeader span {
   margin: 0;
 }
 
-.historyHeader h2 {
-  font-size: 13px;
-  font-weight: 500;
+.timelineHeader h2 {
+  font-size: 16px;
+  font-weight: 600;
+  letter-spacing: -0.01em;
 }
 
-.historyHeader span {
+.timelineEyebrow,
+.timelineHeader span {
+  color: var(--muted-foreground);
+  font-family: var(--font-mono);
+  font-size: 10px;
+  line-height: 1.2;
+  text-transform: uppercase;
+}
+
+.timelineEyebrow {
+  margin-bottom: 4px !important;
+  letter-spacing: 0.04em;
+}
+
+.timelineBody {
+  position: relative;
+  display: grid;
+  min-width: 0;
+  grid-template-rows: 28px 28px 14px;
+  row-gap: 6px;
+}
+
+.timelineLane {
+  display: grid;
+  min-width: 0;
+  grid-template-columns: 88px minmax(0, 1fr);
+  align-items: center;
+  gap: 12px;
+}
+
+.timelineLabel {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 8px;
+  font-family: var(--font-mono);
+  font-size: 10px;
+  line-height: 1;
+}
+
+.timelineLabel span {
+  color: var(--muted-foreground);
+}
+
+.timelineLabel strong {
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.04em;
+}
+
+.timelineLane[data-side="left"] .timelineLabel strong {
+  color: var(--left-channel);
+}
+
+.timelineLane[data-side="right"] .timelineLabel strong {
+  color: var(--right-channel);
+}
+
+.timelineTrack {
+  position: relative;
+  height: 24px;
+  overflow: hidden;
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  background-color: color-mix(in srgb, var(--muted) 34%, transparent);
+  background-image: linear-gradient(to right, var(--border) 1px, transparent 1px);
+  background-size: 20% 100%;
+}
+
+.timelineTrack::after {
+  position: absolute;
+  inset: 0 0 0 auto;
+  width: 1px;
+  background: var(--foreground);
+  content: "";
+  opacity: 0.34;
+}
+
+.timelinePulse {
+  position: absolute;
+  z-index: 1;
+  inset-block: 4px;
+  border-radius: 2px;
+}
+
+.timelineLane[data-side="left"] .timelinePulse {
+  background: var(--left-channel);
+  box-shadow: 0 0 0 1px color-mix(in srgb, var(--left-channel) 18%, transparent);
+}
+
+.timelineLane[data-side="right"] .timelinePulse {
+  background: var(--right-channel);
+  box-shadow: 0 0 0 1px color-mix(in srgb, var(--right-channel) 18%, transparent);
+}
+
+.timelineEmpty {
+  position: absolute;
+  z-index: 2;
+  inset: 0 0 20px 100px;
+  display: grid;
+  place-items: center;
   color: var(--muted-foreground);
   font-size: 11px;
+  pointer-events: none;
 }
 
-.historyTrack {
+.timelineScale {
   display: flex;
-  height: 42px;
-  min-width: 0;
-  align-items: stretch;
-  gap: 4px;
-  overflow: hidden;
+  grid-column: 1;
+  justify-content: space-between;
+  margin-left: 100px;
+  color: var(--muted-foreground);
+  font-family: var(--font-mono);
+  font-size: 9px;
+  letter-spacing: 0.04em;
+  line-height: 1;
 }
 
-.emptyHistory {
-  width: 100%;
-  border: 1px dashed var(--neutral-7);
-  border-radius: 4px;
+@keyframes actuatorAfterglow {
+  from {
+    border-color: var(--channel-color);
+    background: var(--channel-soft);
+    transform: scale(1.015);
+  }
+  to {
+    border-color: var(--neutral-7);
+    background: var(--neutral-3);
+    transform: scale(1);
+  }
 }
 
-.historyEvent {
-  display: grid;
-  min-width: 8px;
-  flex: 1;
-  grid-template-rows: 1fr 1fr;
-  gap: 2px;
+@keyframes actuatorRingsAfterglow {
+  from { border-color: var(--channel-color); }
+  to { border-color: var(--neutral-7); }
 }
 
-.historyEvent > span {
-  border-radius: 2px;
-  background: var(--neutral-4);
-}
-
-.historyEvent > span[data-side="left"][data-active="true"] {
-  background: var(--left-channel);
-}
-
-.historyEvent > span[data-side="right"][data-active="true"] {
-  background: var(--right-channel);
+@keyframes actuatorCoreAfterglow {
+  from { background: var(--channel-color); }
+  to { background: var(--neutral-9); }
 }
 
 @keyframes actuatorPulse {
@@ -339,15 +488,56 @@
     font-size: 24px;
   }
 
-  .history {
+  .timeline {
     grid-template-columns: 1fr;
+    gap: 10px;
+  }
+
+  .timelineHeader {
+    min-height: 0;
+    flex-direction: row;
+    align-items: end;
+    padding-bottom: 4px;
+  }
+
+  .timelineLane {
+    grid-template-columns: 64px minmax(0, 1fr);
     gap: 8px;
+  }
+
+  .timelineEmpty {
+    left: 72px;
+  }
+
+  .timelineScale {
+    margin-left: 72px;
   }
 }
 
 @media (prefers-reduced-motion: reduce) {
   .actuator[data-active="true"],
   .connectionStatus .statusDot {
+    animation: none;
+  }
+
+  .left .actuator[data-recent="true"],
+  .right .actuator[data-recent="true"] {
+    border-color: var(--channel-color);
+    background: var(--channel-soft);
+    animation: none;
+  }
+
+  .left .actuator[data-recent="true"]::before,
+  .left .actuator[data-recent="true"]::after,
+  .right .actuator[data-recent="true"]::before,
+  .right .actuator[data-recent="true"]::after {
+    border-color: var(--channel-color);
+    animation: none;
+  }
+
+  .left .actuator[data-recent="true"] .actuatorCore,
+  .right .actuator[data-recent="true"] .actuatorCore {
+    background: var(--channel-color);
     animation: none;
   }
 }

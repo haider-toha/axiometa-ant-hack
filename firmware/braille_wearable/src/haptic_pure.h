@@ -11,7 +11,7 @@ enum class OutputMode : uint8_t {
     AUDIBLE,
 };
 
-inline constexpr OutputMode DEFAULT_OUTPUT_MODE = OutputMode::NIGHT;
+inline constexpr OutputMode DEFAULT_OUTPUT_MODE = OutputMode::AUDIBLE;
 
 struct HapticDrive {
     uint16_t p1Hz;

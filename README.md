@@ -86,8 +86,8 @@ topology must be verified before treating the modules as a drop-in electrical
 replacement.
 
 The current combined ESP32 build is `firmware/braille_wearable` environment
-`board_firmware`. It contains the local ToF and siren paths plus an older
-experimental directionality stub. The current target supersedes that stub:
+`board_firmware`. It contains the local ToF and siren paths plus relay-driven
+camera bearing cues:
 `MOVING` keeps bus information silent while local ToF/siren output remains active;
-`STILL` suppresses ToF proximity output, keeps siren output active, and accepts fresh BUS/WAIT/NUMBER/UNKNOWN relay commands. The cane remains the primary mobility aid; the single forward ToF zone provides clearance feedback but cannot select a safe left/right bypass. Relay parsing and the Core-0 phone-hotspot client are implemented; the web-owned independent activity fields are still pending, so service Serial remains the deterministic activity test surface. See
+`STILL` suppresses ToF proximity output, keeps siren output active, and accepts fresh BUS/WAIT/NUMBER/UNKNOWN relay commands. Camera-derived LEFT/RIGHT/AHEAD cues are accepted in both known activity phases. The cane remains the primary mobility aid; the single forward ToF zone provides clearance feedback but cannot select a safe left/right bypass. Relay parsing, the Core-0 phone-hotspot client, and the independent phone activity channel are implemented; service Serial remains the deterministic board-test surface. See
 [`firmware/braille_wearable/BOARD_FIRMWARE.md`](firmware/braille_wearable/BOARD_FIRMWARE.md).

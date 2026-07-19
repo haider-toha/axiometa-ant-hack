@@ -54,6 +54,61 @@
   }
 
   /**
+   * One requestAnimationFrame loop for the whole deck.
+   *
+   * Measured before this existed: ~240 rAF callbacks/second, about four per frame — Lenis
+   * ran its own loop and each sequence section spawned another, so two canvas beats plus
+   * Lenis meant three schedulers competing for one frame budget (four while a count-up ran).
+   * It did not drop frames on a fast machine, but the contention is exactly what bites on
+   * weaker hardware, which is what a borrowed venue laptop is.
+   *
+   * Callbacks return truthy to stay registered, falsy to unregister. When the set empties
+   * the loop stops entirely, so a deck sitting parked on a slide burns no frames at all.
+   */
+  const ticker = (function makeTicker() {
+    const callbacks = new Set();
+    let running = false;
+    let onFrame = null;
+
+    function loop(time) {
+      if (onFrame) onFrame(time);
+      // Iterate a copy: a callback may unregister itself or another mid-pass.
+      for (const cb of [...callbacks]) {
+        let keep = false;
+        try {
+          keep = cb(time);
+        } catch (err) {
+          console.error("ticker callback failed; unregistering", err);
+        }
+        if (!keep) callbacks.delete(cb);
+      }
+      running = callbacks.size > 0 || !!onFrame;
+      if (running) requestAnimationFrame(loop);
+    }
+
+    function kick() {
+      if (running) return;
+      running = true;
+      requestAnimationFrame(loop);
+    }
+
+    return {
+      add(cb) {
+        callbacks.add(cb);
+        kick();
+      },
+      remove(cb) {
+        callbacks.delete(cb);
+      },
+      /** Lenis drives from the same loop rather than owning a second one. */
+      setDriver(fn) {
+        onFrame = fn;
+        kick();
+      },
+    };
+  })();
+
+  /**
    * @param {object} opts
    * @param {string} opts.rootSel - section root (gets height = pinRatio * 100vh)
    * @param {string} opts.canvasSel
@@ -87,7 +142,9 @@
     let loaded = 0;
     let targetIndex = 0;
     let drawIndex = 0;
-    let raf = 0;
+    /** Last index actually blitted. Skips redundant drawImage calls while the lerp
+        settles across sub-frame deltas that round to the same frame. */
+    let paintedIndex = -1;
 
     root.style.position = "relative";
     root.style.height = `${pinRatio * 100}vh`;
@@ -177,15 +234,22 @@
       const p = sectionProgress();
       targetIndex = progressToIndex(p);
       if (onProgress) onProgress(p);
-      if (!raf) raf = requestAnimationFrame(tick);
+      ticker.add(tick);
     }
 
+    /**
+     * One lerp step. Registered on the shared ticker rather than self-scheduling its own
+     * requestAnimationFrame: with two sequence sections plus Lenis, per-section rAF loops
+     * meant four independent schedulers competing for one frame budget. Returning false
+     * unregisters this callback once the lerp has settled, so a parked deck costs nothing.
+     */
     function tick() {
-      raf = 0;
       drawIndex += (targetIndex - drawIndex) * SPEC.scrubLerp;
-      if (Math.abs(targetIndex - drawIndex) < 0.2) drawIndex = targetIndex;
-      else raf = requestAnimationFrame(tick);
-      paint(Math.round(drawIndex));
+      const settled = Math.abs(targetIndex - drawIndex) < 0.2;
+      if (settled) drawIndex = targetIndex;
+      const next = Math.round(drawIndex);
+      if (next !== paintedIndex) paint(next);
+      return !settled;
     }
 
     async function start() {
@@ -212,7 +276,7 @@
     function destroy() {
       window.removeEventListener("resize", resize);
       window.removeEventListener("scroll", syncFromScroll);
-      if (raf) cancelAnimationFrame(raf);
+      ticker.remove(tick);
     }
 
     return { start, SPEC };
@@ -232,11 +296,8 @@
       easing: (t) => Math.min(1, 1.001 - Math.pow(2, -10 * t)),
       smoothWheel: true,
     });
-    function raf(time) {
-      lenis.raf(time);
-      requestAnimationFrame(raf);
-    }
-    requestAnimationFrame(raf);
+    // Lenis drives from the deck's single shared loop rather than owning a second one.
+    ticker.setDriver((time) => lenis.raf(time));
     return lenis;
   }
 

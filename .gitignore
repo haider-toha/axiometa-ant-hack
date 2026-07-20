@@ -46,16 +46,27 @@ pnpm-debug.log*
 *.stl.tmp
 *.step.tmp
 
-# Slide deck build directory.
-# The generic `build/` rule above (intended for Node dist output) also matches
-# slides/build/, which would drop the two pipeline scripts. Re-include the
-# directory, then re-exclude only the regenerable heavy artifacts:
-#   mesh/*.stl        46 MB — regenerate: .venv/bin/python slides/build/step_to_stl.py
-#   *.blend           19 MB — 3 min re-render, and the frames it produces are committed
-!slides/build/
-slides/build/mesh/
-slides/build/*.blend
-slides/build/*.blend[0-9]*
-
 # Modal CLI venv (local only, do not commit)
 .venv-modal/
+
+# --- Open-source: internal artifacts (kept locally, removed from the remote) ---
+# Every path below was already tracked; the cleanup ran `git rm --cached` on each
+# so it leaves the public remote while staying on local disk. The leading-slash
+# ANCHORING is deliberate: a bare `.claude/` would also match the SEPARATE
+# app/.claude/ design-studio skills tree, which we KEEP public.
+
+# Root agent-tooling skills tree (~22MB) and its lockfile.
+/.claude/
+/skills-lock.json
+
+# Hackathon deck (fonts, frames, deck HTML/CSS, build scripts, model copies).
+/slides/
+
+# Closed / internal planning + research notes.
+/plan/archive/
+/plan/transcripts/
+/audit/
+/docs/superpowers/
+
+# Internal state-of-play note.
+/WWW-STATE-OF-PLAY.md

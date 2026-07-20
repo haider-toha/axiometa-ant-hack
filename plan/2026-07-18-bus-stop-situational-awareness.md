@@ -114,7 +114,7 @@ This revision overrides earlier rulings where they conflict. Three changes, all 
 
 **1. The two ERM motors are replaced by two AX22-0018 passive buzzers.** The ERMs could not be sourced in time; the buzzer ships in the Genesis Mini Starter Kit and is in hand. It is an **MLT-8530 electromagnetic** (magnetic, not piezo) transducer on a 22×22 mm module — 2.7 kHz resonant, 80 dB — driven by a **single Signal-pin PWM** (header `G / Vin / S`); there is no second drive channel and no amplitude-by-duty knob the way an ERM has [`parts/Axiometa Genesis Mini - Starter Kit/passive-buzzer/CONTENT.md`]. This flips the drive model from *duty-cycle amplitude* to *frequency (tone)* and flips the output physics from inertial vibration to acoustic diaphragm motion. **We drive the buzzer at a low frequency to elicit a felt buzz rather than an audible tone.** This is an experiment: a sealed magnetic buzzer is not a tactile actuator, so the felt output may be weak. A first-hour wear test (Task 13-adjacent) decides whether the tactile path is viable or whether the device falls back to audible-tone signalling for a hearing companion. The overdrive-kick / start-voltage analysis written for the ERM is **moot** — buzzers have no stiction and no inrush.
 
-**2. Camera capture moves from the laptop Python client to the mobile-ready `www/` app.** [T4 §Decision 1] locked `cv2.VideoCapture(0)` on the laptop and explicitly rejected a browser app; that ruling is **reversed by request.** George owns the Next.js app in `www/`; its capture page uses `getUserMedia({ video })` + a `<canvas>` grab at 2 Hz and is served over HTTPS on the Vercel deployment. `vision/bus_client.py` is **cut**; `vision/bus_vision.py` (Modal) and `vision/read_blind.py` remain. The trade [T4 §Decision 1] warned of — iOS Safari permission UX, a possible reload-and-re-grant on stage — is now **accepted, not avoided**; rehearse the grant flow before the demo.
+**2. Camera capture moves from the laptop Python client to the mobile-ready `app/` app.** [T4 §Decision 1] locked `cv2.VideoCapture(0)` on the laptop and explicitly rejected a browser app; that ruling is **reversed by request.** George owns the Next.js app in `app/`; its capture page uses `getUserMedia({ video })` + a `<canvas>` grab at 2 Hz and is served over HTTPS on the Vercel deployment. `vision/bus_client.py` is **cut**; `vision/bus_vision.py` (Modal) and `vision/read_blind.py` remain. The trade [T4 §Decision 1] warned of — iOS Safari permission UX, a possible reload-and-re-grant on stage — is now **accepted, not avoided**; rehearse the grant flow before the demo.
 
 **3. Left/right navigation is back in scope as software and audio simulation.** [T3 D14/D20] cut LEFT/RIGHT/AHEAD and retired all spatial coding because the two ports are a fixed 33.941 mm apart — below the ~70 mm forearm two-point threshold. **That geometry is unchanged by the swap** and spatial localization stays unavailable. The current demo carries LEFT/RIGHT through a per-channel audio contrast: 2350 Hz on P1 and 3050 Hz on P3. P11–P13 validate navigation command routing only. Future motors require a new tactile vocabulary and wear test; no current result predicts their discriminability.
 
@@ -238,26 +238,26 @@ The directory keeps its legacy name to avoid churning PlatformIO paths. Nothing 
 | `src/tof.cpp` · `src/tof.h` | **NET-NEW** | VL53L0X continuous ranging |
 | `src/main.cpp` | **NET-NEW** (from `braille_wearable.cpp`) | `setup()` + `loop()` = ToF and button only |
 
-### Web app — `www/` (George-owned; do not edit from the board workstream)
+### Web app — `app/` (George-owned; do not edit from the board workstream)
 
 | Path | Verdict | Detail |
 |---|---|---|
-| `www/src/lib/redis.ts` | **REUSE (implemented)** | Preserve the **MSET-before-INCR** ordering. It prevents readers from observing a new sequence with the previous payload |
-| `www/src/app/api/pull/route.ts` | **REUSE (implemented)** | Outbound board polling plus telemetry; preserve no-store/CORS behavior |
-| `www/src/app/api/event/route.ts` | **REUSE (implemented)** | Sanitises camera-derived bus commands and writes relay state; do not add direction commands |
-| `www/src/lib/contract.ts` | **REUSE (implemented)** | Independent `UserActivity`, `activitySeq`, and `activityTs` fields plus the nine-value cloud command vocabulary |
-| `www/src/app/page.tsx` | **REUSE (implemented)** | Device/relay monitor |
-| `www/src/app/capture/page.tsx` | **REUSE for capture/Modal submission** | Existing camera host remains active in both phases. A separate activity setter may be added, but do not gate frame submission or translate target bearing into device commands |
-| `www/package.json` · `www/pnpm-lock.yaml` | **REUSE** | Active Next.js 16 dependency surface |
+| `app/src/lib/redis.ts` | **REUSE (implemented)** | Preserve the **MSET-before-INCR** ordering. It prevents readers from observing a new sequence with the previous payload |
+| `app/src/app/api/pull/route.ts` | **REUSE (implemented)** | Outbound board polling plus telemetry; preserve no-store/CORS behavior |
+| `app/src/app/api/event/route.ts` | **REUSE (implemented)** | Sanitises camera-derived bus commands and writes relay state; do not add direction commands |
+| `app/src/lib/contract.ts` | **REUSE (implemented)** | Independent `UserActivity`, `activitySeq`, and `activityTs` fields plus the nine-value cloud command vocabulary |
+| `app/src/app/page.tsx` | **REUSE (implemented)** | Device/relay monitor |
+| `app/src/app/capture/page.tsx` | **REUSE for capture/Modal submission** | Existing camera host remains active in both phases. A separate activity setter may be added, but do not gate frame submission or translate target bearing into device commands |
+| `app/package.json` · `app/pnpm-lock.yaml` | **REUSE** | Active Next.js 16 dependency surface |
 | Vercel project link + Upstash env | **REUSE unchanged** | `haider-projects/bus-stop-awareness`, production domain `tacta.space`, `UPSTASH_*` already set at Production scope |
-| `www/src/app/api/state/route.ts` · `api/detector/route.ts` | **REUSE (implemented)** | Debug-screen state surfaces |
+| `app/src/app/api/state/route.ts` · `api/detector/route.ts` | **REUSE (implemented)** | Debug-screen state surfaces |
 
 ### Vision — `vision/` (net-new directory)
 
 | Path | Verdict |
 |---|---|
 | `vision/bus_vision.py` | **NET-NEW** — the Modal app |
-| ~~`vision/bus_client.py`~~ | **CUT (Revision §2)** — laptop capture replaced by `www/src/app/capture/page.tsx` |
+| ~~`vision/bus_client.py`~~ | **CUT (Revision §2)** — laptop capture replaced by `app/src/app/capture/page.tsx` |
 | `vision/read_blind.py` | **NET-NEW** — standalone Claude call, developed and timed before it is pasted into Modal |
 | `vision/requirements.txt` | **NET-NEW** |
 
@@ -339,7 +339,7 @@ Four contracts, all literal, all worked with route 88.
 The **browser capture page** is now the only component that understands both the detector's vocabulary and the device's (Revision §2 — it inherits this role from the cut laptop client). It translates Modal's detector response into a `CloudPattern`, and it POSTs to `/api/event` **only on change** — the relay is edge-triggered on `seq`, so re-posting an unchanged state would re-fire the haptic. (Alternatively Modal POSTs to `/api/event` directly; keep it in the browser so the one component that speaks both vocabularies also owns the edge-trigger.)
 
 ```ts
-// www/src/lib/contract.ts — shared browser/API contract
+// app/src/lib/contract.ts — shared browser/API contract
 export type PatternId =
   | "NONE"      // no active command
   | "READY"     // P0  boot complete
@@ -536,7 +536,7 @@ Notation: `A` = Port 1 buzzer, `B` = Port 3 buzzer, `BOTH` = both (optional 30 m
 
 The original cut bundled two different claims together. The one that still holds is about **ToF**: a single forward ToF zone cannot choose a safe left/right bypass, so it must never emit a direction. That reasoning does not extend to the **camera**. A bus uses the detector target box's horizontal bearing. While `MOVING`, a selected person box may be sent to the fail-closed Claude endpoint to choose LEFT or RIGHT around the person; uncertainty emits no direction.
 
-P11–P13 are therefore live, not dormant: the phone maps a confirmed bus target bearing to LEFT/RIGHT/AHEAD and a high-confidence person-avoidance decision to LEFT/RIGHT, then posts it to `/api/event`; the board accepts all three direction commands **in both known phases** (`UNKNOWN` refuses). Person production is separately gated to `MOVING`. The user can scan for the bus while STILL, take the first direction before the first step, then keep receiving bus updates while walking. Precedence on the shared channel is owned by `chooseEvent` in `www/src/lib/contract.ts`: while STILL, BUS/NUMBER/UNKNOWN outrank the bearing so arrival and route-88 output still land; while MOVING, a direction wins because the board suppresses the bus-information half there.
+P11–P13 are therefore live, not dormant: the phone maps a confirmed bus target bearing to LEFT/RIGHT/AHEAD and a high-confidence person-avoidance decision to LEFT/RIGHT, then posts it to `/api/event`; the board accepts all three direction commands **in both known phases** (`UNKNOWN` refuses). Person production is separately gated to `MOVING`. The user can scan for the bus while STILL, take the first direction before the first step, then keep receiving bus updates while walking. Precedence on the shared channel is owned by `chooseEvent` in `app/src/lib/contract.ts`: while STILL, BUS/NUMBER/UNKNOWN outrank the bearing so arrival and route-88 output still land; while MOVING, a direction wins because the board suppresses the bus-information half there.
 
 What this still does **not** claim: that the wearer can localise the two buzzers spatially (33.941 mm is far below the two-point threshold — the cue is the 2350/3050 Hz frequency contrast, not position), that this is verified navigation, or that the device can confirm the user moved correctly. It is an advisory nudge toward a *dwelling* bus, not turn-by-turn guidance, and low detector confidence must still fire P8 UNKNOWN rather than a guessed direction. The MOVING phase demonstrates obstacle awareness, siren awareness, **and** coarse camera-derived bus bearing.
 
@@ -773,7 +773,7 @@ There is also a latency floor. A warm T4 running YOLO-nano returns a box in ~10 
 
 ### Camera and transport
 
-**Camera host: the `www/` mobile web app on the phone (Revision §2 — this reverses [T4 §Decision 1]).** `www/src/app/capture/page.tsx` already implements rear-camera `getUserMedia`, canvas JPEG capture, Modal ingestion, and edge-triggered `/api/event` delivery. George owns this surface. Keep capture and Modal submission unchanged in both activity phases; expose activity independently and let the ESP32 gate bus output. Do not translate target bearing into device commands. **Rehearse the permission grant on the actual demo phone/browser** — the one failure mode that still bites is a denied or reset camera permission mid-demo. The laptop `cv2.VideoCapture` client (`vision/bus_client.py`) is cut.
+**Camera host: the `app/` mobile web app on the phone (Revision §2 — this reverses [T4 §Decision 1]).** `app/src/app/capture/page.tsx` already implements rear-camera `getUserMedia`, canvas JPEG capture, Modal ingestion, and edge-triggered `/api/event` delivery. George owns this surface. Keep capture and Modal submission unchanged in both activity phases; expose activity independently and let the ESP32 gate bus output. Do not translate target bearing into device commands. **Rehearse the permission grant on the actual demo phone/browser** — the one failure mode that still bites is a denied or reset camera permission mid-demo. The laptop `cv2.VideoCapture` client (`vision/bus_client.py`) is cut.
 
 **Transport: the existing Vercel + Upstash polling relay**, ESP32 outbound-only at 300 ms. It is already built, deployed and smoke-tested green end-to-end; `net.cpp` already implements TLS join, poll, `seq` gate and JSON POST; `/api/pull` already sets `Access-Control-Allow-Origin: *` so the debug screen reads the same state from the same place for free.
 

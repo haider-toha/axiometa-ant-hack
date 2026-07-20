@@ -6,7 +6,7 @@
 #
 #   pip install -r vision/requirements-client.txt
 #
-# vision/webapp/index.html needs nothing installed — open it over HTTPS.
+# The browser capture path (app/src/app/capture/page.tsx) needs nothing installed here.
 
 # The only non-stdlib import in client.py. HTTP goes through urllib.request,
 # so there is no `requests` dependency to pin.

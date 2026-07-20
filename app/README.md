@@ -1,72 +1,74 @@
-# Bus-Stop Relay App
+# Tacta web app
 
-This is the Next.js 16 app for the bus-stop situational-awareness prototype. It currently contains a mostly legacy speech-to-braille implementation; treat the current plan as authoritative before editing:
+This is the Next.js 16 web app for the Tacta bus-stop prototype. It does three jobs.
+
+1. It captures phone camera frames and posts them to the Modal vision service.
+2. It runs the outbound-only device relay that the ESP32 polls, backed by Upstash Redis.
+3. It runs an output monitor that reads the device output over Web Serial.
+
+The shared wire contract lives in [`src/lib/contract.ts`](src/lib/contract.ts). It is the source
+of truth for the command, activity, and telemetry types. See
+[`../MODAL-FOR-APP.md`](../MODAL-FOR-APP.md) for the Modal contract and
+[`../RELAY-FOR-FIRMWARE.md`](../RELAY-FOR-FIRMWARE.md) for the firmware contract.
+
+The stack is Next.js 16.2 (App Router), React 19, Tailwind v4 with shadcn on Base UI, Upstash
+Redis, the Anthropic SDK, and Vitest.
+
+## Pages
+
+| Route | File | Function |
+|---|---|---|
+| `/capture` | `src/app/capture/page.tsx` | The capture page. It opens the rear camera with `getUserMedia`. It grabs a `<canvas>` JPEG at 2 Hz (`CAPTURE_MS = 500`). It POSTs the base64 frame to the Modal detector (`NEXT_PUBLIC_MODAL_URL`, or `?modal=<url>`). It maps the detector response to a relay command and posts it only on change. It also owns the `STILL` and `MOVING` activity control and the person-direction path. |
+| `/output` | `src/app/output/page.tsx` | The output monitor. It reads `TACTA_OUTPUT` telemetry from the ESP32 over Web Serial. It shows the P1 and P3 buzzer channels and the pulse history. Desktop Chrome only. |
+| `/` | `src/app/page.tsx` | The debug relay monitor. It polls `/api/state`. It shows the current device command, the raw detector state, and the device telemetry. |
+
+## API routes
+
+The API routes live under [`src/app/api/`](src/app/api/). All relay state lives in Upstash
+Redis. The app writes the payload with `mset` before it increments `seq`. This ordering is the
+race fix. Preserve it.
+
+| Route | Method | Purpose |
+|---|---|---|
+| `/api/pull` | GET, POST | The ESP32's outbound poll. A POST body carries device telemetry, stored for the monitor. The response is the current `DeviceCommand`. A GET returns the command and writes no telemetry, which is handy for a `curl` smoke test. |
+| `/api/event` | POST | It ingests a camera-derived command (`BUS`, `WAIT`, `NUMBER`, `UNKNOWN`, and the advisory `LEFT`, `RIGHT`, `AHEAD` bearings). It writes relay state. |
+| `/api/activity` | POST | The `STILL` and `MOVING` activity channel and its heartbeat. It advances `activitySeq` and `activityTs` independently of the command `seq` and `ts`. |
+| `/api/person-direction` | POST | Person and obstacle handling in `MOVING`. It takes a normalized box and asks Claude which side has clear pavement. It fails closed. It uses `ANTHROPIC_API_KEY` at request time. |
+| `/api/detector` | POST | It records the raw Modal detector state for the debug screen. |
+| `/api/state` | GET | An aggregate debug snapshot of command, detector, and telemetry. The `/` page polls it. |
+
+## Local development
 
 ```bash
-sed -n '1,220p' ../plan/2026-07-18-bus-stop-situational-awareness.md
+pnpm install
+cp .env.example .env.local     # then fill in the values below
+pnpm dev                       # http://localhost:3000
 ```
 
-## What Survives
+Set the values in [`.env.example`](.env.example).
 
-The current build reuses the Vercel + Upstash relay, not the speech product.
+| Variable | Needed for |
+|---|---|
+| `UPSTASH_REDIS_REST_URL`, `UPSTASH_REDIS_REST_TOKEN` | Relay state. `Redis.fromEnv()` requires both |
+| `NEXT_PUBLIC_MODAL_URL` | The Modal detector endpoint the capture page POSTs to. Public, or pass `?modal=<url>` on `/capture` |
+| `ANTHROPIC_API_KEY` | The request-time Claude call in `/api/person-direction` |
 
-- `app/api/pull/route.ts`: ESP32 polling endpoint. Keep it dynamic, uncached, CORS-open, and curlable.
-- `app/api/push/route.ts`: starting template for the new `app/api/event/route.ts`.
-- `app/lib/redis.ts`: keep payload writes before `seq` increments. The `seq` increment is the edge trigger for the device.
-- `app/lib/contract.ts`: replace the braille-era contract with the plan's `CloudPattern`, `EventRequest`, `DeviceCommand`, telemetry, detector, and debug-state types.
-- `app/page.tsx`: keep only useful browser idioms, especially guarded polling and `getUserMedia`; the new capture path is phone video, not microphone audio.
-
-The current plan includes a first-hour buzzer wear test. The app should help expose the resulting states clearly on the debug screen once `/api/state` exists; do not hide the experimental left/right result behind generic "haptic OK" wording.
-
-## Legacy Files
-
-Do not extend these old speech/braille surfaces. The plan says to delete or replace them during implementation:
-
-- `app/api/stt/route.ts`
-- `app/api/tts/route.ts`
-- `app/api/condense/route.ts`
-- `app/api/suggest/route.ts`
-- `app/api/reply/route.ts`
-- `app/api/reply-result/route.ts`
-- `app/lib/anthropic.ts`
-- `app/lib/braille.ts`
-- `app/lib/braille.test.ts`
-- `app/components/*`
-
-The stale UI title "Speech to Braille" is not a product requirement; it is leftover code.
-
-## Local Setup
-
-```bash
-npm ci
-npm run dev
-```
-
-Open `http://localhost:3000`.
-
-Runtime relay calls require:
-
-- `UPSTASH_REDIS_REST_URL`
-- `UPSTASH_REDIS_REST_TOKEN`
-
-The production Vercel project already owns these env vars according to the current plan. Do not commit local `.env` files.
+The production relay is `https://tacta.space`. Never commit `.env.local`. The repo tracks only the
+empty `.env.example` template.
 
 ## Verification
 
-Run these after app changes:
-
 ```bash
-npm test
-npm run lint
-npm run build
+pnpm exec tsc --noEmit
+pnpm run lint
+pnpm run build          # may print Upstash missing-env warnings locally, must still succeed
+pnpm test               # Vitest unit tests
 ```
 
-`npm run build` may print Upstash missing-env warnings locally when the env vars are absent; that is acceptable only if the build completes successfully. Runtime relay smoke needs the env vars.
-
-With the dev server running and Upstash env configured:
+Run the pre-demo relay and contract readiness gate before the demo.
 
 ```bash
-curl -fsS http://localhost:3000/api/pull
+pnpm demo:readiness -- --base-url https://tacta.space
 ```
 
-After `app/api/event/route.ts` exists, smoke it with the exact `BUS`, `WAIT`, and `NUMBER` payloads from the current plan, then confirm `/api/pull` returns the incremented command.
+See [`../DEMO-RUNBOOK.md`](../DEMO-RUNBOOK.md) for the full readiness gate and the fallbacks.

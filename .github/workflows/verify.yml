@@ -20,14 +20,14 @@ jobs:
     timeout-minutes: 15
     defaults:
       run:
-        working-directory: www
+        working-directory: app
     steps:
       - name: Check out repository
         uses: actions/checkout@v7
       - name: Install pnpm
         uses: pnpm/action-setup@v6
         with:
-          # Matches the pnpm major that wrote www/pnpm-lock.yaml (its
+          # Matches the pnpm major that wrote app/pnpm-lock.yaml (its
           # `settings:` block is a pnpm 10+ format; 9.x cannot do a frozen
           # install against it).
           version: 11.9.0
@@ -36,7 +36,7 @@ jobs:
         with:
           node-version: 22
           cache: pnpm
-          cache-dependency-path: www/pnpm-lock.yaml
+          cache-dependency-path: app/pnpm-lock.yaml
       - name: Install dependencies
         run: pnpm install --frozen-lockfile
       - name: Run tests

@@ -20,7 +20,7 @@ import pytest
 
 _TESTS_DIR = pathlib.Path(__file__).resolve().parent
 _CAD_DIR = _TESTS_DIR.parent
-_SCRIPT = _CAD_DIR / "braille_wearable_enclosure.py"
+_SCRIPT = _CAD_DIR / "bus_stop_enclosure.py"
 
 # --- alias fake_adsk as adsk (must happen before importing the script) ------
 sys.path.insert(0, str(_TESTS_DIR))
@@ -35,7 +35,7 @@ sys.modules.setdefault("adsk.cam", fake_adsk.cam)
 def load_script():
     """Import the enclosure script as a FRESH module object every call."""
     spec = importlib.util.spec_from_file_location(
-        "braille_wearable_enclosure_under_test", _SCRIPT)
+        "bus_stop_enclosure_under_test", _SCRIPT)
     module = importlib.util.module_from_spec(spec)
     spec.loader.exec_module(module)
     return module

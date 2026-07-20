@@ -20,7 +20,7 @@ Build the bus-stop movement-safety and situational-awareness prototype:
 - Two AX22-0018 passive buzzers on the P1/P3 diagonal, used only as audible proxies for future vibration channels.
 - PDM microphone on I2S0 for local siren detection.
 - VL53L0CX ToF for local proximity reflex.
-- Phone browser camera capture through the Next.js app (`www/`).
+- Phone browser camera capture through the Next.js app (`app/`).
 - Modal YOLO/Claude endpoint for bus arrival and route reading.
 - Vercel + Upstash relay for outbound-only ESP32 polling.
 
@@ -30,7 +30,7 @@ The first-hour experiment is complete. The buzzers were audible but produced vir
 
 The demo has two activity phases. `MOVING` demonstrates supplementary ToF forward-clearance feedback and siren detection while travelling toward the bus stop; the cane remains the primary mobility aid. `STILL` enables camera-derived bus arrival and route-88 output. The phone camera and Modal submission may remain active in both phases; the ESP32 still receives and sequence-acknowledges relay commands while moving but suppresses BUS/WAIT/NUMBER/UNKNOWN before output arbitration. ToF continues sampling in both phases but may produce proximity output only in `MOVING`; entering `STILL` clears it. Siren detection and output remain active in both phases.
 
-The single forward ToF zone cannot choose a safe left/right bypass, so ToF must never derive `LEFT`, `RIGHT`, or `AHEAD`, and no local sensor output may be described as navigation. Camera-derived bus bearing is a separate thing: the phone can see which side of frame the bus is on, so `LEFT`, `RIGHT`, and `AHEAD` are advisory relay commands accepted in **both** `MOVING` and `STILL` (audit 23 — the user scans for the bus while standing still and needs the first direction before the first step; only `UNKNOWN` activity refuses bearings). While `STILL`, the phone yields the shared command channel to `BUS`/`NUMBER`/`UNKNOWN` so arrival and route-88 output still land; bearings fill the `WAIT`/`NONE` gaps (`chooseEvent` in `www/src/lib/contract.ts`). They are not obstacle avoidance, not automatic navigation, and never outrank the local ToF and siren paths. Existing service-Serial tones may demonstrate two conceptual future channels only when they are explicitly labelled as a simulation.
+The single forward ToF zone cannot choose a safe left/right bypass, so ToF must never derive `LEFT`, `RIGHT`, or `AHEAD`, and no local sensor output may be described as navigation. Camera-derived bus bearing is a separate thing. The phone can see which side of frame the bus is on, so `LEFT`, `RIGHT`, and `AHEAD` are advisory relay commands accepted in **both** `MOVING` and `STILL` (audit 23, the user scans for the bus while standing still and needs the first direction before the first step; only `UNKNOWN` activity refuses bearings). While `STILL`, the phone yields the shared command channel to `BUS`/`NUMBER`/`UNKNOWN` so arrival and route-88 output still land; bearings fill the `WAIT`/`NONE` gaps (`chooseEvent` in `app/src/lib/contract.ts`). They are not obstacle avoidance, not automatic navigation, and never outrank the local ToF and siren paths. Existing service-Serial tones may demonstrate two conceptual future channels only when they are explicitly labelled as a simulation.
 
 Activity freshness is independent from command delivery. An activity heartbeat must not increment command `seq` or refresh an old command timestamp. A command suppressed while moving must never replay solely because activity later changes to still.
 
@@ -38,7 +38,7 @@ Do not allocate a module slot to a button. P1/P3 are outputs, P2 is ToF, and P4 
 
 ## Web App
 
-The active web app is `www/` — a Next.js 16 app scaffolded with George's `design-studio` taste system (Tailwind v4 + shadcn on Base UI). **George owns the web app.** All new frontend, the phone camera-capture page, API routes, and the device relay are built here going forward. The legacy `app/` (below) is not the target.
+The active web app is `app/`. It is a Next.js 16 app scaffolded with George's `design-studio` taste system (Tailwind v4 + shadcn on Base UI). **George owns the web app.** All new frontend, the phone camera-capture page, API routes, and the device relay are built here going forward.
 
 Haider owns the phone motion classifier and the relay-side activity producer.
 Other workstreams may validate and consume the independent `activity`,
@@ -52,8 +52,6 @@ The old speech-to-braille idea is closed. Do not build from it.
 - `plan/archive/` is provenance only.
 - `audit/speech-to-braille-wearable/` is a closed historical record.
 - `firmware/braille_wearable/` keeps its directory name only to avoid PlatformIO churn; the braille, LCD, encoder, and experimental directionality code inside is legacy unless the current plan explicitly says to reuse a part.
-- `app/` is the stale legacy speech/braille Next.js app — do not use, edit, or reference it, and do not build new web work there. It informed the relay idioms named in the plan, but new web work lives in `www/`.
-- `cad/braille_wearable_exocage.py` is not the chosen design. Leave it alone unless the plan changes.
 
 Do not claim "opposite sides of the wrist", spatial left/right localization, or usable tactile output from the buzzers. The two audible tones simulate separate future vibration channels; they do not prove those channels will be distinguishable on the body.
 
@@ -64,24 +62,24 @@ Do not claim "opposite sides of the wrist", spatial left/right localization, or 
 - Preserve outbound-only ESP32 networking. The board polls Vercel; it does not accept inbound connections.
 - Keep local safety paths local: ToF and siren alerts must not depend on Wi-Fi.
 - Use Anthropic structured outputs for Modal Claude calls: `output_config.format` plus `json_schema`.
-- Before editing Next.js code, read the relevant local docs under `www/node_modules/next/dist/docs/`; this repo uses Next.js 16.
+- Before editing Next.js code, read the relevant local docs under `app/node_modules/next/dist/docs/`; this repo uses Next.js 16.
 - Do not rely on `parts/` absence as inventory evidence. It mirrors the vendor catalogue, not the bench.
 
 ## Verification
 
 Run the checks that match the files changed.
 
-Web app (`www/`, the active app):
+Web app (`app/`, the active app):
 
 ```bash
-cd www
+cd app
 pnpm install
 pnpm exec tsc --noEmit
 pnpm run lint
 pnpm run build
 ```
 
-`pnpm run build` can print Upstash missing-env warnings in a local shell without `UPSTASH_REDIS_REST_URL` and `UPSTASH_REDIS_REST_TOKEN`; the build still has to finish successfully. Runtime relay smoke requires those env vars. Never commit `www/.env.local` — only the empty `www/.env.example` template is tracked.
+`pnpm run build` can print Upstash missing-env warnings in a local shell without `UPSTASH_REDIS_REST_URL` and `UPSTASH_REDIS_REST_TOKEN`; the build still has to finish successfully. Runtime relay smoke requires those env vars. Never commit `app/.env.local`. Only the empty `app/.env.example` template is tracked.
 
 Firmware:
 
@@ -96,7 +94,7 @@ pio run -e board_firmware
 CAD:
 
 ```bash
-python3 -m py_compile cad/braille_wearable_enclosure.py cad/braille_wearable_exocage.py
+python3 -m py_compile cad/bus_stop_enclosure.py
 .venv/bin/python -m pytest cad/tests -q
 ```
 

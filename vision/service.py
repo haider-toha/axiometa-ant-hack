@@ -1,7 +1,7 @@
 """Modal vision service — YOLO-World detector with a baked offline vocabulary.
 
 Serves an HTTPS JSON endpoint over CORS for the phone capture page
-(`www/src/app/capture/page.tsx`) or any other HTTP client. The vocabulary — the
+(`app/src/app/capture/page.tsx`) or any other HTTP client. The vocabulary — the
 1203-class LVIS list plus two hand-tuned target prompts — is encoded into the
 weights at image-build time, so CLIP is never needed at runtime and one forward
 pass yields the drawn boxes, the arrival target and the hazards together.
@@ -46,8 +46,9 @@ Deploy::
         UPSTASH_REDIS_REST_TOKEN="$UPSTASH_REDIS_REST_TOKEN"
     modal deploy vision/service.py
 
-Paste the URL that `modal deploy` PRINTS (+ `/ingest`) into the webapp's
-CONFIG block or `MODAL_URL`. Do not construct it from the documented pattern.
+Paste the URL that `modal deploy` PRINTS (+ `/ingest`) into the capture page's
+`NEXT_PUBLIC_MODAL_URL` or the client's `MODAL_URL`. Do not construct it from the
+documented pattern.
 """
 
 import asyncio
@@ -79,7 +80,7 @@ CONF_MIN = 0.35  # a target box below this does not count as a detection
 # still gates both of those; this only gates what gets drawn AND what the
 # phone's person / obstacle fast-path sees. Kept at 0.10 so the phone can
 # react to a person the moment YOLO-World flickers on them — the client-side
-# floor in www/src/app/capture/page.tsx (PERSON_MIN_CONFIDENCE) is 0.10 too,
+# floor in app/src/app/capture/page.tsx (PERSON_MIN_CONFIDENCE) is 0.10 too,
 # and the fast centroid-inverted direction absorbs the noise this admits.
 # The bus/target path is unaffected: CONF_MIN = 0.35 is still what latches
 # an arrival, and the arrival FSM's hit/miss counters filter the rest.

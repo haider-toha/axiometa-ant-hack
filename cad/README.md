@@ -1,32 +1,68 @@
-# CAD — Speech-to-Braille Wearable enclosure
+# Bus-stop situational-awareness enclosure CAD
 
-Dimensioned 2D technical drawing of the wrist enclosure — the starting point for the 3D model
-in Fusion 360. Not a final printable part. Grounded in `audit/speech-to-braille-wearable/03`
-(parts truth) and `07` (physical arrangement); every unmeasured dimension is flagged in the drawing.
+This is the parametric enclosure for the wrist-worn Tacta device. It wraps the
+Axiometa "Genesis Mini" host board (55 x 55 mm) and its four snap-in AX22
+modules.
 
-## Files
-- **`braille_wearable_drawing.py`** — parametric drawing source (`gen_dxf()` via `ezdxf`). Edit the
-  parameters at the top (`BOARD`, `MOD`, `LCD_H`, `STANDOFF`, `LUG_GAP`, …) to update the drawing.
-- **`braille_wearable_drawing.dxf`** — generated 2D drawing. **Import into Fusion 360** (Insert → Insert
-  DXF → it becomes a sketch to build from). Also viewable in any CAD tool or `$cad-viewer`.
-- **`render_drawing.py`** — regenerates the `.dxf` and a viewable PNG (`renders/braille_technical_drawing.png`).
+| Port | Module | Aperture in the shell |
+|---|---|---|
+| P1 / P3 | passive buzzers | two buzzer grilles |
+| P2 | VL53L0CX ToF | one ToF "eye" |
+| P4 | microphone | mic port(s), this module governs the deck height |
 
-## Regenerate
-The dxf skill's own runner needs the heavy CAD kernel (`build123d`/`cadquery-ocp`), which is **not** needed
-for this pure-2D drawing — just `ezdxf` (+ `matplotlib` for the PNG):
+The shell is a **closed monolith**. A solid deck carries only functional
+openings. These are the ToF eye, the mic ports, the trimpot access, the buzzer
+grilles, and a button-access slot. The one decorative feature is the raised
+"TACTA" branding on the −X wall. It pierces nothing and is **not** an
+accessibility feature.
+
+## `bus_stop_enclosure.py`
+
+`bus_stop_enclosure.py` is a **Fusion 360 Python script**. It authors every
+dimension in millimetres. It converts to Fusion's internal centimetres through a
+single `_cm()` chokepoint. It produces two bodies. `cage` holds the shell, lugs,
+strap bars, and branding. `skin_plate` holds the base plate, corner gussets, and
+M2 standoffs. So the base carries the board, and the cage drops over it.
+
+**In Fusion.** Open a Design document. Then open *Utilities*, *Add-Ins*,
+*Scripts and Add-Ins*. Add this file and run it. The Fusion entry point is
+`run(context)`.
+
+**Headless, no Fusion.** The script falls back to
+[`tests/fake_adsk/`](tests/fake_adsk). This is a real
+[build123d](https://github.com/gumyr/build123d) geometry engine behind a fake
+`adsk` API. So it builds and **exports STEP and STL** without the Fusion GUI.
 
 ```bash
-python3 -m venv .venv
-.venv/bin/pip install ezdxf matplotlib
-.venv/bin/python cad/render_drawing.py        # run from the repo root
+python cad/bus_stop_enclosure.py
 ```
 
-## Measure before finalising (UNKNOWN — flagged magenta in the drawing)
-AX22 socket centres + 2×5 pitch · mounting-hole XY (board + each module) · USB-C edge offset ·
-board thickness · ERM coin diameter. Use calipers, or load `STP_MTX0013.step` in a CAD kernel.
+This writes `bus_stop_enclosure.step` and `bus_stop_enclosure.stl` as fit-check
+artifacts. The headless harness records chamfers but does not apply them. So the
+exported solids are sharp-edged relative to the in-Fusion build.
 
-## Next step
-Turn this into a parametric 3D model: **Claude writes a Fusion 360 Python script** (pipeline in
-`audit/speech-to-braille-wearable/08`) → Run in Fusion's *Scripts & Add-Ins* → export STL → Bambu.
-The local build123d `cad` skill (STEP) is the no-Fusion fallback. Note: the Fusion Python API works
-in **centimetres** — the script must convert from these mm values.
+## `reference/`
+
+[`reference/genesis-mini-shell.step`](reference/genesis-mini-shell.step) is a
+**known-good, physically printed** Genesis Mini shell from Printables. It serves
+as the fit reference. This shell already seats the board and modules. Check
+openings, clearances, and envelope against it before you trust our own model
+alone. See [`reference/README.md`](reference/README.md) for provenance and its
+different original module layout.
+
+## `tests/`
+
+Fusion has no headless mode. So geometry-logic bugs otherwise surface only inside
+the GUI. These bugs include boolean-miss cuts, sketch-plane orientation
+assumptions, and dimension regressions. The suite runs the enclosure script
+**offline** against `fake_adsk` and probes the result. It catches that whole
+class of bug without Fusion.
+
+```bash
+.venv/bin/python -m pytest cad/tests -q
+```
+
+The venv needs `pytest` and `build123d`. If it is absent, the geometry suite
+cannot run. The in-Fusion build remains ground truth. This suite is a fast
+regression net, not a substitute. See [`tests/README.md`](tests/README.md) for
+what the harness can and cannot catch.

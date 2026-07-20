@@ -3,8 +3,8 @@
 
 Captures from an attached camera at 2 fps, POSTs each frame to the Modal
 `/ingest` endpoint, and forwards detection events to the Vercel relay on change.
-Equivalent to `vision/webapp/index.html`, for driving the service from a
-terminal instead of a phone browser.
+Equivalent to the phone capture page (`app/src/app/capture/page.tsx`), for
+driving the service from a terminal instead of a phone browser.
 
 Run
     pip install -r vision/requirements-client.txt

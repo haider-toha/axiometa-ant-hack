@@ -17,7 +17,7 @@
 modal==1.5.2
 
 # Pinned — Global Constraint 11. Same version the container installs, so a
-# standalone read_blind test on this machine exercises the identical SDK.
+# standalone service.py OCR test on this machine exercises the identical SDK.
 anthropic==0.117.0
 
 # Imported at module level in service.py for the Contract A request/response

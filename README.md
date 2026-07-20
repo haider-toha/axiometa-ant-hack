@@ -1,93 +1,158 @@
-# Axiometa × Anthropic Hardware Hack — London, 17–19 July 2026
+# Tacta, Bus-Stop Situational Awareness for DeafBlind Users
 
-**Situational awareness for DeafBlind users.** A wrist-worn product concept that detects urgent
-sounds and answers a question the user cannot otherwise answer — *which bus just pulled in?* The
-intended product uses vibration motors. This hack prototype uses two audible buzzer tones as explicit
-proxies for those future vibration channels; it does not demonstrate viable tactile output.
+Tacta is a wrist-worn prototype for DeafBlind travellers at a bus stop. A local microphone
+detects an urgent siren. A phone camera and a cloud vision service read which bus arrived, and
+the board reports the result through two buzzers.
 
----
+The team built Tacta at the Axiometa and Anthropic hardware hack in London, from 17 to 19 July
+2026.
 
-## 🟢 START HERE — the one current plan
+> Honest scope, up front. This prototype has no working tactile output. The two on-board
+> buzzers failed the bench haptic test. They now stand in as two audible tones for two future
+> vibration channels. The team has not tested Tacta with DeafBlind users. Read the
+> [Limitations](#limitations) section below.
 
-### [`plan/2026-07-18-bus-stop-situational-awareness.md`](plan/2026-07-18-bus-stop-situational-awareness.md)
+![Tacta v2 enclosure render, a closed wrist-worn body with a distance-sensor eye and two side buzzer bosses](renders/cad-v2-iso.png)
 
-Morning setup and the exact rehearsal sequence are in
-[`DEMO-RUNBOOK.md`](DEMO-RUNBOOK.md). Run the read-only deployment gate before
-starting the demo.
+The plan is the single authoritative build target. Read
+[`plan/2026-07-18-bus-stop-situational-awareness.md`](plan/2026-07-18-bus-stop-situational-awareness.md).
+If the code or these docs disagree with the plan, the plan wins.
 
-That file is the single authoritative source for what is being built. If anything anywhere else in
-this repo contradicts it, **the plan wins** — with one exception noted below.
+## System diagram
 
-> ⚠️ `app/` is the stale legacy Next.js app from the old braille idea — do not use, edit, or reference it. The active web app lives in `www/`.
+```mermaid
+flowchart LR
+  cam["Phone camera, app capture page"] -->|"JPEG frames, 2 Hz"| modal["Modal vision service, YOLO and Claude"]
+  modal -->|"bus number and bearings"| relay["Vercel and Upstash relay"]
+  relay -->|"outbound poll"| board["ESP32-S3 board"]
+  mic["PDM microphone"] -->|"siren, local"| board
+  tof["Distance sensor"] -->|"clearance, local"| board
+  board --> buzz["Two buzzers, audio stand-ins"]
+```
 
-**Its evidence base is [`audit/bus-stop-situational-awareness/`](audit/bus-stop-situational-awareness/)** —
-four research tracks that measured the hardware, verified the APIs against live documentation, and
-reconciled the design against the meeting transcript. Where the audit records a *measurement* and the
-plan records a *number*, the audit is authoritative; the plan should be corrected to match.
+## Hardware
 
----
+An ESP32-S3 "Genesis Mini" board carries four snap-in modules. A phone browser camera supplies
+the video. All four ports are occupied.
 
-## ⛔ What is NOT current
+| Port | Module | Function |
+|---|---|---|
+| `P1` | AX22-0018 passive buzzer | Audible tone at 2350 Hz. A stand-in for a future vibration channel |
+| `P2` | VL53L0CX time-of-flight sensor | Forward distance. A clearance warning only |
+| `P3` | AX22-0018 passive buzzer | Audible tone at 3050 Hz. A stand-in for a future vibration channel |
+| `P4` | AX22-0044 PDM microphone | Local siren detection |
+| Phone camera | Phone browser camera | Bus video through the app capture page |
 
-**The project pivoted on 2026-07-18.** Everything below is prior work, kept for provenance. It is
-archived, not deleted — but **do not build from it.**
+The two AX22-0018 buzzers were audible on the bench but produced almost no felt movement. The
+team rejected them as haptic actuators. They remain only as two audible tones. See
+[`docs/lra-motor-upgrade.md`](docs/lra-motor-upgrade.md) for the vibration-motor upgrade path.
 
-| Path | What it is |
-|---|---|
-| [`plan/archive/`](plan/archive/) | The superseded plans. Each carries a header explaining what replaced it and which of its specific claims were later disproved. |
-| [`audit/speech-to-braille-wearable/`](audit/speech-to-braille-wearable/) | 48 research files for the abandoned braille idea. **Historical record — closed. Add nothing here.** Some findings remain true and were carried forward; the new audit folder cites them where it did. |
-| `firmware/braille_wearable/` | Firmware for the old idea. The Wi-Fi/network layer is reusable; the braille encoding and the LCD/encoder drivers are not. |
-| `app/` | ⛔ Stale legacy Next.js app for the old idea — **do not use, edit, or reference it.** Its Vercel + Upstash relay (`api/push`, `api/pull`) informed the design; new web work lives in `www/`. |
-| `cad/` | Parametric enclosure, dimensioned for the old component set (LCD + rotary encoder). Being adapted, not rebuilt — see the plan. |
+## Software stack
 
-### The pivot in one line
+Four parts meet at the shared contract in [`app/src/lib/contract.ts`](app/src/lib/contract.ts).
 
-The old idea encoded speech as **vibrotactile braille** on the wrist. That turned out to be
-physically impossible — a braille cell needs 6 distinguishable points in ~6mm, but vibrotactile
-two-point discrimination on the forearm is ~70mm, off by an order of magnitude. The new idea keeps
-the wrist and the haptics, and changes what they carry.
+- **`app/`** is a Next.js 16 web app on Vercel and Upstash Redis. It runs the phone camera
+  capture at 2 Hz, the device relay API, and the output monitor. See
+  [`app/README.md`](app/README.md).
+- **`vision/service.py`** is a Modal service. It runs YOLO detection. Then Claude reads the bus
+  number under a strict JSON schema. The demo locks the reading to route 88 and Clapham Common.
+  See [`MODAL-FOR-APP.md`](MODAL-FOR-APP.md).
+- **The relay** runs on Vercel and Upstash Redis. It carries commands to the board. The board
+  polls the relay outbound only and never accepts an inbound connection. See
+  [`RELAY-FOR-FIRMWARE.md`](RELAY-FOR-FIRMWARE.md).
+- **`firmware/braille_wearable/`** holds the PlatformIO firmware, environment `board_firmware`.
+  It runs the local siren and distance paths offline. The directory keeps its old name so the
+  firmware build does not break.
 
----
+### Demo phases
+
+The demo runs in two activity phases. The phone reports the phase.
+
+- In `MOVING`, the board keeps the bus output silent. It keeps the local distance and siren
+  alerts active. The cane remains the primary mobility aid.
+- In `STILL`, the board stops the distance output. It keeps the siren output. It shows the bus
+  arrival and the route-88 output.
+
+Camera bearings (`LEFT`, `RIGHT`, `AHEAD`) are advisory. They tell the wearer where the bus sits
+in frame. They work in both phases. They never outrank the local distance and siren paths.
+
+## Quick start
+
+Each area has its own doc with the full sequence. Do not copy flags from memory.
+
+Start the web app from `app/`.
+
+```bash
+cd app
+pnpm install
+pnpm run build     # production build
+pnpm dev           # local work at http://localhost:3000
+```
+
+See [`app/README.md`](app/README.md) for the env setup.
+
+Build the firmware from `firmware/braille_wearable/`.
+
+```bash
+cd firmware/braille_wearable
+pio run -e board_firmware
+```
+
+See [`firmware/braille_wearable/BOARD_FIRMWARE.md`](firmware/braille_wearable/BOARD_FIRMWARE.md)
+and [`RELAY-FOR-FIRMWARE.md`](RELAY-FOR-FIRMWARE.md).
+
+Deploy the Modal vision service.
+
+```bash
+modal deploy vision/service.py
+```
+
+Modal prints a URL. Add the `/ingest` path. Paste the result into the web app as
+`NEXT_PUBLIC_MODAL_URL`. See [`MODAL-FOR-APP.md`](MODAL-FOR-APP.md).
+
+Run the demo from [`DEMO-RUNBOOK.md`](DEMO-RUNBOOK.md). It has the stage sequence and the
+fallbacks.
 
 ## Repository map
 
 | Path | Contents |
 |---|---|
-| `plan/` | The current plan, plus `archive/` and `transcripts/` |
-| `audit/bus-stop-situational-awareness/` | 🟢 Current evidence base — 5 files |
-| `audit/speech-to-braille-wearable/` | ⛔ Closed historical record — 48 files |
-| `parts/` | Sourced hardware: Genesis Mini starter kit, VL53L0CX ToF, and AX22-0018 passive buzzers. **`parts/` mirrors the vendor catalogue, not the shelf** — a part being absent here does not mean it is absent from the room. The PDM microphone (AX22-0044) is in hand but has no folder, because it is too new to be catalogued. |
-| `firmware/` | PlatformIO project (ESP32-S3) |
-| `www/` | 🟢 Active Next.js app (design-studio taste system), deploy target Vercel |
-| `app/` | ⛔ Stale legacy Next.js app — ignore (see `AGENTS.md`) |
-| `cad/` | Parametric CAD (build123d; builds headless — Fusion 360 is not required) |
-| `renders/` | Generated images |
+| [`app/`](app/) | Next.js 16 web app. Capture page, device relay, output monitor |
+| [`vision/`](vision/) | Modal vision service (`service.py`). YOLO detection and Claude route reading |
+| [`firmware/`](firmware/) | PlatformIO ESP32-S3 firmware, environment `board_firmware` |
+| [`cad/`](cad/) | Parametric enclosure (build123d). Builds headless |
+| [`parts/`](parts/) | Vendor datasheets and STEP files. Mirrors the vendor catalogue, not the bench |
+| [`demo/`](demo/) | Demo fixtures. The synthetic siren audio |
+| [`renders/`](renders/) | Enclosure renders |
+| [`docs/`](docs/) | Forward-direction notes. The LRA upgrade path |
+| [`plan/`](plan/) | The authoritative plan |
 
----
+## Limitations
 
-## The hardware, in one table
+This is a hackathon prototype. The following limits are load-bearing, not disclaimers.
 
-All four AX22 ports are occupied. Every module snaps in — **there is no soldering and no port
-extension kit**, so component placement is fixed by the board.
+- Tactile output failed. The two AX22-0018 buzzers are audible stand-ins at 2350 Hz and
+  3050 Hz. They are not working haptics. They prove nothing about body-worn vibration.
+- The distance sensor is not navigation. The single forward zone gives a clearance warning
+  only. It never says `LEFT`, `RIGHT`, or `AHEAD`, and no local sensor output is navigation.
+- Camera bearings are advisory. `LEFT`, `RIGHT`, and `AHEAD` describe where the bus sits in
+  frame. They are not obstacle avoidance. They never outrank the local safety paths.
+- The team has not tested with DeafBlind users. This is a prototype, not an accessibility
+  product.
+- Route 88 and Clapham Common are hardcoded on purpose. This is a demo lock, not general
+  bus-reading.
 
-| Port | Module | Notes |
-|---|---|---|
-| P1 | AX22-0018 passive buzzer A | Signal on **IO1 → GPIO3**; 2350 Hz channel-A audio proxy |
-| P2 | VL53L0CX ToF distance sensor | I²C, shared bus |
-| P3 | AX22-0018 passive buzzer B | Signal on **IO1 → GPIO16**; 3050 Hz channel-B audio proxy |
-| P4 | PDM microphone (AX22-0044) | Must bind to **I2S0** — the PDM-to-PCM converter exists on I2S0 only |
+## Next iteration
 
-The first hardware experiment is complete: the buzzers were audible but produced virtually no tactile movement. They are rejected as haptic actuators. The demo retains them only to simulate two future vibration channels through distinct audible frequencies; see `audit/bus-stop-situational-awareness/05-buzzer-bench-test.md`.
+- Replace the buzzers with real vibration motors. The target part is the LRA module AX22-0039.
+  See [`docs/lra-motor-upgrade.md`](docs/lra-motor-upgrade.md).
+- Test with DeafBlind users. Nothing here is validated until the community it serves tries it.
+- Remove the route-88 and Clapham Common hardcode so the reader works for any bus.
 
-The high-level hardware, firmware, serial-protocol, and laptop-UI migration path
-for replacing P1/P3 with AX22-0039 LRA modules is documented in
-[`docs/lra-motor-upgrade.md`](docs/lra-motor-upgrade.md). The two-driver I2C
-topology must be verified before treating the modules as a drop-in electrical
-replacement.
+## Contributing
 
-The current combined ESP32 build is `firmware/braille_wearable` environment
-`board_firmware`. It contains the local ToF and siren paths plus relay-driven
-camera bearing cues:
-`MOVING` keeps bus information silent while local ToF/siren output remains active;
-`STILL` suppresses ToF proximity output, keeps siren output active, and accepts fresh BUS/WAIT/NUMBER/UNKNOWN relay commands. Camera-derived LEFT/RIGHT/AHEAD cues are accepted in both known activity phases. The cane remains the primary mobility aid; the single forward ToF zone provides clearance feedback but cannot select a safe left/right bypass. Relay parsing, the Core-0 phone-hotspot client, and the independent phone activity channel are implemented; service Serial remains the deterministic board-test surface. See
-[`firmware/braille_wearable/BOARD_FIRMWARE.md`](firmware/braille_wearable/BOARD_FIRMWARE.md).
+[`AGENTS.md`](AGENTS.md) documents the AI-assisted workflow. Claude Code and Codex both work
+from that file. Read it before you change code. CI runs on pull requests through
+[`.github/workflows/verify.yml`](.github/workflows/verify.yml). Run the verification commands
+for the area you touch. Keep the route-88 and Clapham Common hardcode unless you change the plan
+first.

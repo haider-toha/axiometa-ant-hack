@@ -1,8 +1,8 @@
-# Bus-stop situational-awareness enclosure CAD
+# Tacta wearable enclosure CAD
 
-This is the parametric enclosure for the wrist-worn Tacta device. It wraps the
-Axiometa "Genesis Mini" host board (55 x 55 mm) and its four snap-in AX22
-modules.
+Tacta is a wearable that gives situational awareness through touch. This is the
+parametric enclosure for the wrist-worn device. It wraps the Axiometa "Genesis
+Mini" host board (55 x 55 mm) and its four snap-in AX22 modules.
 
 | Port | Module | Aperture in the shell |
 |---|---|---|
@@ -16,9 +16,9 @@ grilles, and a button-access slot. The one decorative feature is the raised
 "TACTA" branding on the −X wall. It pierces nothing and is **not** an
 accessibility feature.
 
-## `bus_stop_enclosure.py`
+## `enclosure.py`
 
-`bus_stop_enclosure.py` is a **Fusion 360 Python script**. It authors every
+`enclosure.py` is a **Fusion 360 Python script**. It authors every
 dimension in millimetres. It converts to Fusion's internal centimetres through a
 single `_cm()` chokepoint. It produces two bodies. `cage` holds the shell, lugs,
 strap bars, and branding. `skin_plate` holds the base plate, corner gussets, and
@@ -34,10 +34,10 @@ M2 standoffs. So the base carries the board, and the cage drops over it.
 `adsk` API. So it builds and **exports STEP and STL** without the Fusion GUI.
 
 ```bash
-python cad/bus_stop_enclosure.py
+python cad/enclosure.py
 ```
 
-This writes `bus_stop_enclosure.step` and `bus_stop_enclosure.stl` as fit-check
+This writes `enclosure.step` and `enclosure.stl` as fit-check
 artifacts. The headless harness records chamfers but does not apply them. So the
 exported solids are sharp-edged relative to the in-Fusion build.
 

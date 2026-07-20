@@ -1,5 +1,5 @@
 // The wire contract, exercised. Implements the 14-row `contract.ts` case table
-// in audit/bus-stop-situational-awareness/15-implementation-plan.md.
+// in audit/situational-awareness/15-implementation-plan.md.
 //
 // Two rows carry most of the value and should not be "simplified" away:
 //

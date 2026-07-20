@@ -1,8 +1,20 @@
-# Bus-Stop Demo Runbook
+# Tacta Demo Runbook
 
-Use this sequence for the route `88` / `Clapham Common` demonstration. The cane
-remains the primary mobility aid. The single forward ToF sensor detects
-clearance. It cannot choose a safe left or right bypass.
+Tacta is an open project toward one wearable that gives DeafBlind people
+situational awareness through touch. It fuses cameras, microphones, and depth
+sensors and delivers the result as vibration. This runbook drives the hackathon
+demo. The demo hardcodes one concrete scene, reading a specific bus at a stop,
+route `88` / `Clapham Common`. That scene is one hardcoded example of the
+product, not the product itself.
+
+The cane remains the primary mobility aid. The single forward ToF sensor detects
+clearance only. It cannot choose a safe left or right bypass. The buzzers are
+audible stand-ins for two future vibration channels. The first-hour tactile test
+failed, so treat them as proxies only. Nothing here is validated with DeafBlind
+users.
+
+The live site tacta.space serves the pitch deck as the landing page. The demo
+tools live at `/capture`, `/output`, and `/monitor`.
 
 ## Readiness Gate
 
@@ -56,7 +68,7 @@ same time. Close one before you open the other.
 
 5. Confirm the board boots in `AUDIBLE` mode. Send `q` only for a quiet
    rehearsal. Send `v` before the audience demo.
-6. Open `/capture` on the phone, grant camera access, and frame the A4 bus prop.
+6. Open `/capture` on the phone, grant camera access, and frame the A4 route prop.
 7. Open `/output` in desktop Chrome. Select the ESP32. Confirm live idle
    telemetry. The display shows the requested logical frequencies in either
    output mode.
@@ -76,14 +88,14 @@ same time. Close one before you open the other.
    signal a stop. Do not claim general environmental-sound recognition.
 3. **Still.** Haider's producer changes activity to fresh `STILL`. Confirm the
    readiness probe still passes. Confirm the board suppresses ToF output.
-4. **Direction (audit 23).** While `STILL`, hold the bus prop to one side of the
-   camera frame. Wait for the three-frame confirmation. Then expect `LEFT`,
+4. **Direction (audit 23).** While `STILL`, hold the route prop to one side of
+   the camera frame. Wait for the three-frame confirmation. Then expect `LEFT`,
    `RIGHT`, or `AHEAD` on `/output`. Bearings deliver in **both** activity
-   phases. The user scans for the bus while standing still. While an arrival or
-   route reading is active, bus information takes the shared channel first. The
-   capture page then shows the direction as `held (…)`. The "Force send" toggle
-   on `/capture` makes the direction outrank it.
-5. **Bus.** Move the printed route-88 bus prop steadily through the phone camera.
+   phases. The user scans for the target while standing still. While an arrival
+   or route reading is active, that information takes the shared channel first.
+   The capture page then shows the direction as `held (…)`. The "Force send"
+   toggle on `/capture` makes the direction outrank it.
+5. **Arrival.** Move the printed route-88 prop steadily through the phone camera.
    Expect `BUS`, then `WAIT`, then a high-confidence `NUMBER` with route `88`.
 6. **Output.** Confirm `/output` shows both logical channels and the pulse
    history. In audible mode, the buzzers mirror those signals. In night mode,
@@ -131,5 +143,5 @@ Serial Monitor before you reconnect `/output`.
 - `/capture` sees the complete A4 prop in stable light.
 - `/output` receives fresh telemetry in desktop Chrome.
 - Fresh `MOVING` produces the ToF visualization. Fresh `STILL` suppresses it.
-- BUS, WAIT, and NUMBER 88 arrive in order while `STILL`.
+- `BUS`, `WAIT`, and `NUMBER` 88 arrive in order while `STILL`.
 - `q` and `x` stop hardware output as expected before you admit an audience.

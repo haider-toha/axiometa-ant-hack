@@ -70,3 +70,8 @@ pnpm-debug.log*
 
 # Internal state-of-play note.
 /WWW-STATE-OF-PLAY.md
+
+# Local-only, kept on disk but not committed
+/.vscode/
+/parts/
+/cad/reference/

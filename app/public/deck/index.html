@@ -1,0 +1,771 @@
+<!doctype html>
+<html lang="en-GB">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<!-- Served at "/" via a Next rewrite; base makes the relative css/js/frame paths
+     resolve to /deck/ regardless of the address-bar path. -->
+<base href="/deck/">
+<link rel="canonical" href="/">
+
+<title>Tacta — situational awareness for DeafBlind people</title>
+<!-- Empty data URI, not a file. The browser requests /favicon.ico by default and a
+     404 is the only console error the deck produces; on a borrowed venue laptop that
+     is also one pointless request before the frames start loading. -->
+<link rel="icon" href="data:,">
+<link rel="stylesheet" href="css/deck.css">
+<noscript>
+  <!-- js/ owns the .is-revealed switch. Without it every reveal would stay at
+       opacity 0 and the deck would present as eleven black slides. -->
+  <style>[data-reveal] { opacity: 1; transform: none; }</style>
+</noscript>
+<style>
+  /* Web-deployment additions: a mobile hint and an end-of-deck demo CTA.
+     Uses the deck's own design tokens. Kept outside the JS slide system. */
+  .desktop-hint {
+    position: fixed; top: 0; left: 0; width: 100%; z-index: 50;
+    padding: 10px 16px; text-align: center; box-sizing: border-box;
+    font-family: var(--font-sans); font-size: 14px;
+    color: var(--bg); background: var(--ink);
+  }
+  @media (min-width: 820px) { .desktop-hint { display: none; } }
+
+  #demo-cta {
+    min-height: 100vh; display: flex; align-items: center; justify-content: center;
+    padding: var(--margin-y) var(--margin-x);
+    background: var(--bg); color: var(--ink);
+  }
+  #demo-cta .cta-inner { max-width: 40ch; }
+  #demo-cta .cta-head {
+    font-family: var(--font-serif); font-size: var(--t-display); line-height: 1.05; margin: 0;
+  }
+  #demo-cta .cta-lead {
+    margin: calc(28 * var(--u)) 0 0;
+    font-family: var(--font-sans); font-size: var(--t-body); line-height: 1.45; color: var(--muted);
+  }
+  #demo-cta .cta-actions {
+    margin-top: calc(40 * var(--u)); display: flex; flex-wrap: wrap; gap: calc(16 * var(--u));
+  }
+  #demo-cta .cta-btn {
+    display: inline-block; padding: 0.75em 1.5em;
+    font-family: var(--font-sans); font-size: var(--t-label); letter-spacing: 0.02em;
+    text-decoration: none; color: var(--bg); background: var(--ink);
+    border: 1px solid var(--ink); border-radius: 3px;
+  }
+  #demo-cta .cta-btn:hover { opacity: 0.82; }
+  #demo-cta .cta-btn--ghost { color: var(--ink); background: transparent; }
+</style>
+</head>
+<body>
+
+<div class="desktop-hint" role="note">For the full experience, open Tacta on a desktop.</div>
+
+<main class="deck">
+
+  <!-- =====================================================================
+       0 · Black screen
+       Nothing on it. No logo, no title, no page number, no scroll hint.
+       The emptiness is the design — it is eighteen seconds of time, not a
+       simulation of anything.
+       ================================================================== -->
+  <section id="slide-0" class="slide" data-slide="0" aria-label="Opening">
+    <img class="cold-open-spinner" src="assets/braille-spinner.svg" alt="" />
+    <img class="cold-open" src="assets/image-ascii-2.png" alt="" />
+    <script type="text/plain" class="notes" data-for="0">
+SCREEN: nothing. #0A0B0C, edge to edge. No logo, no title, no cursor.
+
+[P1] It's 7:42 in the morning, at a bus stop in south London.
+[P1] A bus pulls in.
+[P1] Hasan's grandfather can't see which one.
+[P1] He can't hear the driver call it.
+[P1] So he asks a stranger. Every time.
+
+NOTE: Do not invite the audience to close their eyes. Simulating disability to
+produce sympathy is a well-criticised move and it reads as a stunt. The black
+screen is time, not a simulation. Let it sit.
+    </script>
+  </section>
+
+
+  <!-- =====================================================================
+       1 · The person
+       The serif appears here and on slide 10, nowhere else. Slide 10 reuses
+       this block verbatim — same face, size, tracking, placement, words.
+       ================================================================== -->
+  <section id="slide-1" class="slide" data-slide="1" aria-label="The person">
+    <img class="person-portrait" src="assets/image-ascii-4.png" alt="" data-reveal />
+    <div class="signature" data-reveal>
+      <p class="signature-line">Hasan’s grandfather.</p>
+    </div>
+    <script type="text/plain" class="notes" data-for="1">
+SCREEN: Hasan's grandfather.
+
+[P1] Hasan is my friend. This is his grandfather.
+[P1] He's DeafBlind — no useful sight, no useful hearing.
+[P1] He isn't a persona we invented for a pitch.
+[P1] I spoke to him. That conversation is why this exists.
+[P1] He has never tried the device. Nobody DeafBlind has.
+[P1] I'll come back to that.   [CUTTABLE: slide 9 pays this off regardless]
+
+NOTE: Two verbs doing separate jobs, and they must not be blurred: SPOKE TO
+(true, and the origin of the project) and TRIED (has not happened). The last two
+lines set up slide 9. Say them evenly — this is disclosure, not confession.
+    </script>
+  </section>
+
+
+  <!-- =====================================================================
+       2 · Scale
+       One figure, verified 2026-07-19 against slides/research/facts.md.
+
+       450,000 is an ESTIMATE, not a count — Sense / Operational Research
+       Society 2017, on Centre for Disability Research 2010 prevalence, applied
+       to 2022 ONS population. The "Estimated" qualifier in the credit line is
+       mandatory and must not be dropped for visual tidiness.
+       ================================================================== -->
+  <section id="slide-2" class="slide" data-slide="2" aria-label="Scale">
+    <div class="stat stat--scale" data-reveal>
+      <p class="eyebrow">People in the UK who are deafblind</p>
+      <p class="figure" data-count-to="450000" data-count-format="int">450,000</p>
+      <p class="credit">Estimated · Sense · 2022</p>
+    </div>
+    <img class="scale-portrait" src="assets/image-ascii-3.png" alt="" data-reveal />
+    <script type="text/plain" class="notes" data-for="2">
+SCREEN: 450,000, large, counting up. Credit beneath: ESTIMATED · SENSE · 2022.
+
+[P1] Sense estimates over 450,000 deafblind people in the UK. More by 2035.
+[P1] The government's own definition names three difficulties.
+[P1] Communication. Access to information. Mobility.
+[P1] The law even requires buses to announce their route number.
+[P1] Only to the people already on board.
+
+NOTE: Say "estimates". The 450,000 is a model, not a count — Sense / Operational
+Research Society 2017, on Centre for Disability Research 2010 prevalence, applied
+to 2022 ONS population. Best figure that exists; every UK deafblind charity uses
+it. If a judge asks where it comes from, that chain is the answer. Never say
+"there are".
+
+NOTE: The three difficulties are quoted from the Department of Health's statutory
+definition — communication, access to information, MOBILITY. The government
+already wrote down the problem this device addresses. That is why this line beats
+any statistic.
+
+NOTE: The last two lines are the deck's hardest fact and they are primary
+legislation. SI 2023/715 reg 7 requires the route number be given to passengers
+"on which they are travelling", beginning when the doors open. An on-board duty.
+Deliver flat, no emphasis — the sentence does the work.
+    </script>
+  </section>
+
+
+  <!-- =====================================================================
+       3 · Why the existing tools don't answer this
+       The one place a multi-part structure earns its place, because the
+       argument is an enumeration of four different tools. Set as a ledger:
+       subject, hairline leader, qualifier. Not a bullet list.
+
+       Figures verified 2026-07-19 against slides/research/facts.md.
+       ================================================================== -->
+  <section id="slide-3" class="slide" data-slide="3"
+           aria-label="Why the existing tools don't answer this">
+   <div class="ledger-block">
+    <dl class="ledger">
+      <div class="ledger-row" data-reveal data-reveal-delay="0">
+        <dt>Cane</dt>
+        <dd>Gets him to the stop, then leaves him there.</dd>
+      </div>
+      <div class="ledger-row" data-reveal data-reveal-delay="80">
+        <dt>Guide dog</dt>
+        <dd>£102,000 over a working life, and can’t read a bus.</dd>
+      </div>
+      <div class="ledger-row" data-reveal data-reveal-delay="160">
+        <dt>Communicator-guide</dt>
+        <dd>You book one in advance. The 07:42 won’t wait.</dd>
+      </div>
+    </dl>
+    <p class="credit" data-reveal data-reveal-delay="320">Guide Dogs · 2026</p>
+   </div>
+    <script type="text/plain" class="notes" data-for="3">
+SCREEN: four-row ledger — subject, hairline rule, disqualifier. Rows reveal in
+sequence. Not a bullet list: no markers, no discs, no leading dashes.
+
+[P1] A cane finds the kerb. It cannot read a bus.   [CUTTABLE if running long]
+[P1] A guide dog costs a hundred and two thousand pounds.
+[P2] A communicator-guide has to be booked. Not at 7:42.
+[P2] Apps predict arrivals. They don't confirm what actually pulled in.
+[P2] All good tools. None answers: which bus is this?
+
+NOTE: The handoff from P1 to P2 happens mid-slide, on the communicator-guide
+line. Rehearse it — it's the only mid-slide voice change in the deck.
+
+NOTE: £102,000 is Guide Dogs' own current figure — £77,000 to breed, raise and
+train, plus £25,000 to support the partnership for its working life. DO NOT say
+£55,000: that number circulates widely, is undated, and is less than the training
+cost alone. DO NOT say "£25,000 a year" — it covers the entire working life.
+
+NOTE: The row says COMMUNICATOR-GUIDE, not "interpreter", and carries no price.
+Both are deliberate. A BSL interpreter is the wrong role for a man with no useful
+sight — he cannot see BSL — and facts.md exists partly to stop that conflation:
+interpreter, communicator-guide and intervenor are three different jobs and must
+not be mixed. The role that matches acquired deafblindness has no national
+published rate (one provider, undated), so the row argues availability instead of
+cost. Availability is the real barrier at 7:42 anyway.
+
+NOTE: Tone check. These are NOT weaknesses of a cane or a dog. They are
+different tools solving different problems, and the script says so ("all good
+tools") before it pivots. Getting this wrong makes the team sound like it
+doesn't know the domain.
+    </script>
+  </section>
+
+
+  <!-- =====================================================================
+       4 · The device — CAD explode
+       90 frames, pin 5:1, holds 4 / 2. Port callouts only, per the script.
+       The mic callout carries no part number: the renders are AX22-0009, the
+       hardware in hand is AX22-0044, and either number on this slide would be
+       wrong. Handled by omission.
+       ================================================================== -->
+  <section id="slide-4" class="slide slide--seq" data-slide="4"
+           data-seq="explode" data-frames="90" data-pin="5"
+           data-hold-start="4" data-hold-end="2"
+           aria-label="The device">
+    <div class="seq-sticky">
+      <canvas class="seq-canvas"></canvas>
+      <div class="seq-overlay">
+        <div class="callouts">
+          <span class="hw-label" data-reveal data-reveal-delay="0">P1 BUZZER</span>
+          <span class="hw-label" data-reveal data-reveal-delay="80">P2 RANGE</span>
+          <span class="hw-label" data-reveal data-reveal-delay="160">P3 BUZZER</span>
+          <span class="hw-label" data-reveal data-reveal-delay="240">P4 PDM MICROPHONE</span>
+        </div>
+      </div>
+    </div>
+    <script type="text/plain" class="notes" data-for="4">
+SCREEN: CAD explode. 90 frames, pin 5:1. Port callouts only.
+
+[P2] So we built the thing that answers it.
+[P2] A board you wear. Four ports.
+[P2] A range sensor. A microphone. Two output channels.
+[P2] Those two channels are buzzers. They can be heard, not felt.
+[P2] It only ever calls out. Nothing can call in.
+
+NOTE: The "hear them, not feel them" line lives HERE, not only in the demo.
+It used to sit only in the demo script, which meant that if no tone ever
+sounded it was never said at all — and slides 4 to 8 run about eighty seconds
+implying a working signal to a DeafBlind user before slide 9 corrects it. The
+claim boundary cannot depend on the demo working. Say it again on the first
+tone if the demo runs; saying it twice costs nothing.
+
+NOTE: Last line is the outbound-only property (plan Global Constraint 9). It
+reads as a security answer, which is what a judge will hear, and it's true.
+
+NOTE: Do not name a part number for the microphone. The callout is
+PDM MICROPHONE and nothing more.
+    </script>
+  </section>
+
+
+  <!-- =====================================================================
+       5 · The system
+       Five nodes, four edges. Strokes are --muted throughout; the local
+       sensing path is the one accent element on the slide, and it runs the
+       full width beneath the network chain to arrive at the device without
+       touching any network node. That is the slide's argument, drawn.
+
+       .diagram-edge paths are left fully drawn in CSS. js/ sets the initial
+       stroke-dashoffset from getTotalLength() and animates it to zero, so a
+       dead script leaves a complete diagram rather than an empty frame.
+       ================================================================== -->
+  <section id="slide-5" class="slide" data-slide="5" aria-label="The system">
+    <div class="diagram-frame">
+      <svg class="deck-diagram" viewBox="0 0 1220 470" role="img"
+           aria-label="The phone sends frames to Modal, Modal to the relay, the relay to the wrist device. A separate local sensing path reaches the wrist device without touching the network.">
+
+        <!-- network chain -->
+        <g data-reveal data-reveal-delay="0">
+          <rect class="diagram-box" x="10" y="60" width="200" height="48"/>
+          <text class="diagram-label" x="110" y="91" text-anchor="middle">PHONE</text>
+        </g>
+        <g data-reveal data-reveal-delay="80">
+          <rect class="diagram-box" x="343" y="60" width="200" height="48"/>
+          <text class="diagram-label" x="443" y="91" text-anchor="middle">MODAL</text>
+        </g>
+        <g data-reveal data-reveal-delay="160">
+          <rect class="diagram-box" x="677" y="60" width="200" height="48"/>
+          <text class="diagram-label" x="777" y="91" text-anchor="middle">RELAY</text>
+        </g>
+        <g data-reveal data-reveal-delay="240">
+          <rect class="diagram-box" x="1010" y="60" width="200" height="48"/>
+          <text class="diagram-label" x="1110" y="91" text-anchor="middle">WRIST DEVICE</text>
+        </g>
+
+        <!-- the local sensing node -->
+        <g data-reveal data-reveal-delay="320">
+          <rect class="diagram-box diagram-box--local" x="10" y="350" width="200" height="48"/>
+          <text class="diagram-label" x="110" y="381" text-anchor="middle">LOCAL SENSING</text>
+        </g>
+
+        <!-- three network edges -->
+        <path class="diagram-edge" d="M 210 84 H 329"/>
+        <path class="diagram-arrow" data-reveal data-reveal-delay="400"
+              d="M 329 77 L 343 84 L 329 91 Z"/>
+
+        <path class="diagram-edge" d="M 543 84 H 663"/>
+        <path class="diagram-arrow" data-reveal data-reveal-delay="460"
+              d="M 663 77 L 677 84 L 663 91 Z"/>
+
+        <path class="diagram-edge" d="M 877 84 H 996"/>
+        <path class="diagram-arrow" data-reveal data-reveal-delay="520"
+              d="M 996 77 L 1010 84 L 996 91 Z"/>
+
+        <!-- the fourth edge: local sensing, bypassing the network entirely -->
+        <path class="diagram-edge diagram-edge--local" d="M 210 374 H 1110 V 122"/>
+        <path class="diagram-arrow diagram-arrow--local" data-reveal data-reveal-delay="580"
+              d="M 1103 122 L 1110 108 L 1117 122 Z"/>
+      </svg>
+    </div>
+    <script type="text/plain" class="notes" data-for="5">
+SCREEN: system diagram. Five nodes, four edges, drawn on.
+
+[P2] Your phone watches the road and sends frames to Modal.
+[P2] Modal decides when a bus has arrived.
+[P2] Claude reads the number off the front.
+[P2] That lands in a relay. The wrist device polls it, three times a second.
+[P2] Safety sensing never touches the network.
+[P2] Which matters in a moment.   [CUTTABLE: pure transition into the demo]
+
+NOTE: "Three times a second" = the 300 ms poll. Accurate.
+NOTE: Last line hands into the demo. Don't pause after it.
+
+-------------------------------------------------------------------------------
+DEMO · P2 · 90 s
+
+SCREEN: PUT THE DEBUG SCREEN UP. Do not hold this static diagram for 90 seconds.
+
+This is the single most important staging decision in the deck, and it is
+evidence-backed. Tsay (2021), 1,855 participants: judges shown SILENT video of
+a pitch picked the real winner 52.2% of the time, while judges given AUDIO ONLY
+scored 35.6% — statistically indistinguishable from chance. The visible channel
+is what a judgement actually runs on.
+
+Our demo is currently the wrong way round: ninety seconds of a motionless
+diagram while every piece of meaning rides on two buzzer tones that the plan's
+own discriminability analysis rates confusable. A room that cannot see anything
+change has to take the whole thing on faith.
+
+The project already built the answer. Contract D, /api/state, exists for exactly
+this — the plan says of it verbatim: "This is what makes the siren tier visible
+to an audience - without it the FFT is invisible and judges have to take the
+buzz on faith." Put that screen on the projector for the demo and return to the
+deck with 6 afterwards.
+
+Whatever is on screen, something must visibly change as each step fires: the ToF
+range falling, the FFT band lighting up, BUS then WAIT then NUMBER 88 landing.
+
+NARRATE THROUGH THE PERSON, and say the payload out loud. When route 88 comes
+through, say "that's the eighty-eight" — do not let the only statement of the
+result be a sound the audience cannot interpret.
+
+The diagram on this slide is a legend for what is happening, not the show.
+
+Locked order, plan Revision 2026-07-18e §5:
+1. Start in MOVING. Show the range sensor finding an obstacle — pulse cadence
+   slows as the path clears.
+2. Show the siren detection.
+3. Switch to STILL.
+4. Only then raise the bus prop. BUS, then WAIT, then NUMBER 88.
+
+The one line that must be said during the demo, the first time a tone sounds —
+not at the end:
+
+[P2-DEMO] Those tones stand in for vibration. Heard, not felt.
+
+NOTE: Say it on the first tone. If the audience hears an unexplained beep and
+forms their own theory, slide 9 arrives too late to correct it.
+
+RECORD THIS DEMO WORKING BEFORE YOU PRESENT. Non-negotiable, and it is the
+single highest-value twenty minutes of prep available.
+
+David S. Rose (chairman, New York Angels) on live demos inside a pitch: "You can
+deliver 200% of the value of a live demo in a CANNED demo... no chance that
+Murphy's Law will rear its ugly head." Geoff Ralston, who has coached over a
+thousand YC demo-day pitches: "demos seldom work in modern demo day
+presentations." Paul Graham publicly reversed his own long-standing advice to
+emphasise demos.
+
+We are keeping the demo live, because this is a hackathon and working hardware
+is the thing being judged — but that is a reason to have a recording, not a
+reason to go without one. A phone video of the locked sequence running
+end to end, on the presenting laptop, playable in two taps.
+
+If the live run fails, PLAY THE RECORDING. Do not skip to slide 6 with an
+apology, and do not troubleshoot on stage. A judge who has sat through eighty
+pitches will not remember which one you played; they will remember whether they
+saw the thing work.
+
+DEMO CONTINGENCY — if there is no recording, press 6 and use the line that
+matches WHAT failed. Do not
+blame the network by reflex: demo steps 1 and 2 are the range sensor and the
+on-board FFT, and neither touches the network. Slide 7 tells this same room
+"Both of those are local. No wifi in either path." Blaming wifi for a local
+failure hands them the counter-example.
+
+If the CAMERA / MODAL / RELAY leg failed (steps 3-4):
+[P2-ALT] That's a live network at a hackathon. The numbers are the same either way.
+
+If the LOCAL sensing failed (steps 1-2):
+[P2-ALT] That one's on us, not the network. It's local. Let me show you the rest.
+
+If you are not sure which failed:
+[P2-ALT] Live hardware. The rest of the deck stands without it.
+
+NOTE: Short, and none of them apologise, explain, or troubleshoot on stage.
+Slides 6 to 10 are written to stand without the demo having worked.
+    </script>
+  </section>
+
+
+  <!-- =====================================================================
+       6 · Why Modal
+       The argument is state — not cost, and not cropping. The plan concedes both
+       of those, so claiming either invites the question the team would lose.
+
+       Both lines sit in --ink at equal weight. Line one briefly carried --accent
+       to promote it, which inverted the slide's own hierarchy: --accent is DARKER
+       than --ink, so the promoted line rendered greyer than the line it supports,
+       and on a projector the distinction vanished entirely. They are a couplet;
+       the 160 ms reveal stagger carries the rhythm instead.
+       ================================================================== -->
+  <section id="slide-6" class="slide" data-slide="6" aria-label="Why Modal">
+    <div class="statement-block">
+      <p class="statement" data-reveal data-reveal-delay="0">Detection is when.</p>
+      <p class="statement" data-reveal data-reveal-delay="160">Tacta is what.</p>
+    </div>
+    <script type="text/plain" class="notes" data-for="6">
+SCREEN: Detection is when. / Tacta is what.
+
+[P3] Claude reads the number off the front. YOLO tells us when to ask.
+[P3] So why a detector?   [CUTTABLE: setup line; the next line stands alone]
+[P3] A bus arriving isn't one frame. It's two seconds of frames.
+[P3] That needs history, debounce, and a latch that fires exactly once.
+[P3] The Claude API is stateless. Modal isn't.
+[P3] Detection is when. Tacta is what.
+
+NOTE: Do NOT argue cost, and do NOT argue that a GPU was needed for throughput.
+The plan concedes both: at 2 fps neither is true, and a judge who has seen forty
+projects will take the opening. State is the only argument that survives, so it
+is the only one made.
+
+NOTE: This slide credits Modal by name, which the brief requires, and earns it.
+    </script>
+  </section>
+
+  <!-- =====================================================================
+       7 · What you just saw
+       Both figures are the mean of the plan's estimated latency budget:
+       0.76-2.09 s, mean 1.38 -> 1.4 s; and 2.4-6.2 s, mean 3.8 -> 3.8 s.
+       Do not quote the ranges on stage.
+       ================================================================== -->
+  <section id="slide-7" class="slide" data-slide="7" aria-label="What you just saw">
+    <div class="stat stat--latency-first" data-reveal data-reveal-delay="0">
+      <p class="eyebrow">Bus to first signal</p>
+      <p class="figure"><span class="figure-unit">~</span><span data-count-to="1.4" data-count-format="dec1">1.4</span> <span class="figure-unit">s</span></p>
+    </div>
+    <div class="stat stat--latency-second" data-reveal data-reveal-delay="160">
+      <p class="eyebrow">Bus to first digit</p>
+      <p class="figure"><span class="figure-unit">~</span><span data-count-to="3.8" data-count-format="dec1">3.8</span> <span class="figure-unit">s</span></p>
+      <p class="credit">Estimated · latency budget</p>
+    </div>
+    <script type="text/plain" class="notes" data-for="7">
+SCREEN: ~1.4 s and ~3.8 s, counting up, with the estimate credit beneath.
+
+[P2] About a second and a half from bus to first signal.
+[P2] About four to the first digit of the number.
+[P2] You learn a bus is here before you learn which one.
+[P2] That gap is deliberate. Knowing early is time to move.
+
+NOTE — READ BEFORE REHEARSAL. These are ESTIMATES from the plan's latency
+budget, whose tables are headed "Estimate". Audit T4 Open Risk 7 says verbatim:
+"Nothing in this architecture has been run. Every timing figure is arithmetic or
+citation, not measurement." Audit T2 says verbatim: "Do not put a latency number
+on a slide you have not measured."
+
+That is why the tilde and the credit line are on the slide, and why the spoken
+line says "about". Do not remove either. Do not say "we measured".
+
+TIME A REHEARSAL RUN. Then replace both figures with what you actually saw and
+change the credit to "Measured at rehearsal · <date>". A real number you can
+defend beats an estimate you have to hedge.
+
+NOTE: 3.8 s is to the FIRST DIGIT, not the finished number. P6 then takes 6.4 s
+to deliver "88" in full, so prop-raised to fully-delivered is 8.8-12.6 s. Saying
+"to the route number" would contradict the six seconds the audience just watched.
+
+NOTE: If the demo failed, keep these lines exactly as written — they are already
+phrased as what the system does, not as what just happened. Add nothing.
+    </script>
+  </section>
+
+
+  <!-- =====================================================================
+       8 · Sensing — CAD orbit
+       80 frames, pin 4:1, holds 8 / 4. The overlay is intentionally empty:
+       the outline's surface table gives this slide the canvas and nothing
+       else, and the sensor names are spoken, not shown.
+       ================================================================== -->
+  <section id="slide-8" class="slide slide--seq" data-slide="8"
+           data-seq="orbit" data-frames="80" data-pin="4"
+           data-hold-start="8" data-hold-end="4"
+           aria-label="Sensing">
+    <div class="seq-sticky">
+      <canvas class="seq-canvas"></canvas>
+      <div class="seq-overlay"><!-- no callouts: the canvas is the whole surface --></div>
+    </div>
+    <script type="text/plain" class="notes" data-for="8">
+SCREEN: CAD orbit of the range sensor. 80 frames, pin 4:1.
+
+[P3] Two sensors on the board, one reason each.   [CUTTABLE if running long]
+[P3] Range sensor: forward clearance while you're walking.
+[P3] Microphone: sirens, detected on the board itself with an FFT.
+[P3] Both of those are local. No wifi in either path.
+[P3] If the network dies mid-street, the safety sensing doesn't.
+[P3] That was not a nice-to-have.
+
+NOTE: "TWO sensors on the board", not three. The plan counts three sensor inputs
+because it includes the phone camera — but this slide is a CAD orbit of the
+board, the camera is not on it, and slide 4 already said "a range sensor, a
+microphone, two output channels". Saying three here names two and contradicts
+slide 4 in front of the same room.
+
+NOTE: Do NOT claim the range sensor chooses a direction. It is a single forward
+cone; it cannot tell left from right. "Forward clearance" is the honest phrase
+and it is the only one to use.
+
+NOTE: The cane remains the primary mobility aid. This is supplementary.
+    </script>
+  </section>
+
+
+
+  <!-- =====================================================================
+       9 · What failed
+       The mandatory sentence, verbatim, on the screen as well as in the
+       mouth. It pays off slide 1. Static and held — no accent, no device.
+       ================================================================== -->
+  <!-- HIDDEN for now (not deleted): restore by changing class back to "slide". -->
+  <section id="slide-9" class="is-hidden" data-slide="9" aria-label="What failed">
+    <div class="statement-block">
+      <p class="statement" data-reveal>We have not validated this with DeafBlind users.</p>
+    </div>
+    <script type="text/plain" class="notes" data-for="9">
+SCREEN: We have not validated this with DeafBlind users. Held, static, alone.
+
+[P3] The buzzers we were given can be heard. They cannot be felt.
+[P3] We drove them down to seventy hertz. Still nothing.
+[P3] So those two tones stand in for two vibration channels.
+[P3] We have not validated this with DeafBlind users.
+[P3] What this build proves is the sensing and the routing.
+[P3] Real motors and real users are the next one.
+
+NOTE — DO NOT MARK THE SEVENTY-HERTZ LINE CUTTABLE. It was, briefly, and that
+was the single most damaging edit made to this deck. It is nine words and it is
+the only EVIDENCE OF EFFORT in the block: it is what turns "the buzzers don't
+work" from an admission into a refuted disclosure. Cut it and slide 9 crosses
+from r = +.077 to r = -.049 — from the deck's strongest thirty seconds to worse
+than saying nothing. If you are over time, cut anywhere else.
+
+NOTE — WHY EACH LIMITATION IS ANSWERED, NOT JUST NAMED. O'Keefe's 1999
+meta-analysis (107 effect sizes, 20,111 respondents) found two-sided messages
+split sharply: REFUTATIONAL ones — name a weakness and answer it — gain
+persuasive ground (r = +.077), while NON-REFUTATIONAL ones, which name a
+weakness and leave it hanging, do WORSE than saying nothing at all (r = -.049).
+Credibility follows the same split.
+
+So neither disclosure here sits alone. "Heard, not felt" is answered by the
+proxy explanation; "not validated with DeafBlind users" is answered by scoping
+what the build does prove and naming what comes next. Delete either answer and
+this slide flips from an asset to a liability.
+
+Two things the same research rules out, so nobody re-adds them: the pratfall
+effect is not real evidence (Aronson 1966's headline result was NOT significant,
+t = 1.45, p &lt; .18), and message ORDER did not matter — so do not restructure
+the deck on a theory that disclosing early buys goodwill. It buys nothing; the
+answer is what buys.
+
+NOTE: Line 4 is the mandatory sentence, verbatim, and it is on the screen as
+well as in the mouth. It pays off slide 1.
+
+NOTE: "Can be heard, cannot be felt" is passive on purpose — it is the
+claim-boundary phrasing from the bench observation. The active alternative ("you
+can't feel them") asserts something about a specific body that was never tested.
+Leave it passive. Do not say "we measured" and do not quote a figure for it.
+
+NOTE: 70 Hz is from the labelled sweep (70/100/150/220 Hz), driven deliberately
+low to try to elicit a felt buzz. Do NOT quote 700 or 1400 Hz — superseded. The
+demo tones are 2350 Hz and 3050 Hz.
+
+NOTE: Deliver this without apology and without a rueful smile. It is the most
+credible thirty seconds in the deck.
+    </script>
+  </section>
+
+
+  <!-- =====================================================================
+       10 · The system, end to end
+       ================================================================== -->
+  <!-- HIDDEN for now (not deleted): restore by changing class back to "slide". -->
+  <section id="slide-10" class="is-hidden" data-slide="10" aria-label="The system, end to end">
+    <div class="diagram-frame" data-reveal>
+      <svg class="deck-diagram" viewBox="0 0 1400 420" role="img"
+           aria-label="The phone sends frames to Modal, where YOLO detects the bus and Claude reads the route. Modal passes to the relay, the relay to the wrist device, the wrist device to two buzzers. A separate local sensing path, microphone and time-of-flight, reaches the wrist device without the network.">
+        <!-- spine boxes -->
+        <rect class="diagram-box" x="20" y="65" width="200" height="50"/>
+        <text class="diagram-label" x="120" y="97" text-anchor="middle">PHONE</text>
+
+        <rect class="diagram-box" x="310" y="65" width="200" height="50"/>
+        <text class="diagram-label" x="410" y="97" text-anchor="middle">MODAL</text>
+        <text class="diagram-caption" x="410" y="150" text-anchor="middle">YOLO detects · Claude reads</text>
+
+        <rect class="diagram-box" x="600" y="65" width="200" height="50"/>
+        <text class="diagram-label" x="700" y="97" text-anchor="middle">RELAY</text>
+
+        <rect class="diagram-box" x="890" y="65" width="200" height="50"/>
+        <text class="diagram-label" x="990" y="97" text-anchor="middle">WRIST DEVICE</text>
+
+        <rect class="diagram-box" x="1180" y="65" width="200" height="50"/>
+        <text class="diagram-label" x="1280" y="97" text-anchor="middle">2 × BUZZER</text>
+
+        <!-- local sensing -->
+        <rect class="diagram-box diagram-box--local" x="890" y="280" width="200" height="50"/>
+        <text class="diagram-label" x="990" y="312" text-anchor="middle">LOCAL SENSING</text>
+        <text class="diagram-caption" x="990" y="365" text-anchor="middle">microphone · time-of-flight</text>
+
+        <!-- spine edges -->
+        <path class="diagram-edge" d="M 220 90 H 298"/>
+        <path class="diagram-arrow" d="M 298 83 L 310 90 L 298 97 Z"/>
+        <path class="diagram-edge" d="M 510 90 H 588"/>
+        <path class="diagram-arrow" d="M 588 83 L 600 90 L 588 97 Z"/>
+        <path class="diagram-edge" d="M 800 90 H 878"/>
+        <path class="diagram-arrow" d="M 878 83 L 890 90 L 878 97 Z"/>
+        <path class="diagram-edge" d="M 1090 90 H 1168"/>
+        <path class="diagram-arrow" d="M 1168 83 L 1180 90 L 1168 97 Z"/>
+
+        <!-- local edge: up into the wrist device, bypassing the network -->
+        <path class="diagram-edge diagram-edge--local" d="M 990 280 V 128"/>
+        <path class="diagram-arrow diagram-arrow--local" d="M 983 128 L 990 115 L 997 128 Z"/>
+      </svg>
+    </div>
+    <script type="text/plain" class="notes" data-for="10">
+SCREEN: the system, end to end. Phone to Modal (YOLO detects, Claude reads) to
+relay to the wrist device to the buzzers. Local sensing — mic and ToF — reaches
+the wrist without the network.
+    </script>
+  </section>
+
+  <!-- =====================================================================
+       11 · The device
+       ================================================================== -->
+  <section id="slide-11" class="slide" data-slide="11" aria-label="The device">
+    <div class="board-layout" data-reveal>
+      <div class="board-labels board-labels--left">
+        <div class="board-label">
+          <p class="board-name">Distance Sensor</p>
+          <p class="board-sku">AX22-0015</p>
+        </div>
+        <div class="board-label">
+          <p class="board-name">Passive Buzzer</p>
+          <p class="board-sku">AX22-0018</p>
+        </div>
+      </div>
+      <img class="board-img" src="assets/diagram.png" alt="Axiometa Genesis Mini with its four AX22 modules" />
+      <div class="board-labels board-labels--right">
+        <div class="board-label">
+          <p class="board-name">Analog Microphone</p>
+          <p class="board-sku">AX22-0009</p>
+        </div>
+        <div class="board-label">
+          <p class="board-name">Passive Buzzer</p>
+          <p class="board-sku">AX22-0018</p>
+        </div>
+      </div>
+    </div>
+    <script type="text/plain" class="notes" data-for="11">
+SCREEN: the device. Four AX22 modules on the Genesis Mini — distance sensor and
+analog microphone on top, two passive buzzers below.
+    </script>
+  </section>
+
+  <!-- =====================================================================
+       11 · The build
+       ================================================================== -->
+  <section id="slide-12" class="slide" data-slide="12" aria-label="The build">
+    <div class="spec-group spec-group--hardware" data-reveal>
+      <p class="spec-head">Hardware</p>
+      <table class="spec-table">
+        <tbody>
+          <tr><td class="k">Compute</td><td class="v">Axiometa Genesis Mini (ESP32-S3)</td></tr>
+          <tr><td class="k">Haptics</td><td class="v">2 × passive buzzer, P1 / P3</td></tr>
+          <tr><td class="k">Hearing</td><td class="v">PDM microphone, I2S0</td></tr>
+          <tr><td class="k">Ranging</td><td class="v">VL53L0CX time-of-flight</td></tr>
+          <tr><td class="k">I/O</td><td class="v">4 × AX22 snap-in ports</td></tr>
+          <tr><td class="k">Power</td><td class="v">USB-C, ≥ 1 A</td></tr>
+        </tbody>
+      </table>
+    </div>
+    <div class="spec-group spec-group--stack" data-reveal data-reveal-delay="120">
+      <p class="spec-head">Stack</p>
+      <table class="spec-table">
+        <tbody>
+          <tr><td class="k">Vision</td><td class="v">Modal · YOLO-World on T4</td></tr>
+          <tr><td class="k">Reading</td><td class="v">Claude · structured outputs</td></tr>
+          <tr><td class="k">Relay</td><td class="v">Vercel · Upstash Redis</td></tr>
+          <tr><td class="k">Web app</td><td class="v">Next.js 16 · getUserMedia</td></tr>
+          <tr><td class="k">Firmware</td><td class="v">Arduino-ESP32 · ESP-IDF 5 · FreeRTOS</td></tr>
+          <tr><td class="k">Enclosure</td><td class="v">build123d, parametric</td></tr>
+        </tbody>
+      </table>
+    </div>
+    <script type="text/plain" class="notes" data-for="12">
+SCREEN: the build. Hardware on the left, stack on the right. Horizontal rules only.
+
+Reference / backup slide — hold on it for questions about how it works. Not part
+of the timed run; reach it with the arrow keys, not a number.
+    </script>
+  </section>
+
+  <!-- =====================================================================
+       11 · Thank you
+       ================================================================== -->
+  <section id="slide-13" class="slide" data-slide="13" aria-label="Thank you">
+    <p class="thanks-braille" aria-hidden="true" data-reveal>⠹ ⠽</p>
+    <div class="statement-block" data-reveal>
+      <p class="statement">Thank you.</p>
+    </div>
+    <script type="text/plain" class="notes" data-for="13">
+SCREEN: Thank you.
+
+[P3] Thank you.
+    </script>
+  </section>
+
+  <!-- Demo CTA. Web deployment only, not part of the pitch narrative. Plain
+       section, outside the JS slide/reveal system, so it never affects the deck. -->
+  <section id="demo-cta" aria-label="Try Tacta">
+    <div class="cta-inner">
+      <p class="cta-head">Tacta is open source.</p>
+      <p class="cta-lead">A wearable that turns the world around you into touch, for people who are DeafBlind. This is a hackathon prototype, opened up so it can grow into the real thing. Take it further.</p>
+      <p class="cta-actions">
+        <a class="cta-btn" href="/capture">Try the live demo</a>
+        <a class="cta-btn cta-btn--ghost" href="https://github.com/haider-toha/axiometa-ant-hack">View the code</a>
+      </p>
+    </div>
+  </section>
+
+</main>
+
+<script src="js/lenis.min.js"></script>
+<script src="js/canvas-sequence.js"></script>
+<script src="js/main.js"></script>
+</body>
+</html>

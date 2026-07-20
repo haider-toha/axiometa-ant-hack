@@ -1,7 +1,9 @@
 # PDM Microphone Experiment
 
-This isolated runner proves that the AX22-0044/T3902 in P4 delivers healthy
-16-bit PCM before FFT or siren-classification code is connected.
+Tacta fuses cameras, microphones, and depth sensors into situational awareness
+delivered by touch. The microphone is the local sound sense. This isolated runner
+proves that the AX22-0044/T3902 in P4 delivers healthy 16-bit PCM before FFT or
+siren-classification code is connected.
 
 ## P4 Mapping
 
@@ -29,7 +31,7 @@ $HOME/.platformio/penv/bin/pio run -e pdm_mic_experiment -t upload --upload-port
 $HOME/.platformio/penv/bin/pio device monitor -e pdm_mic_experiment --port /dev/cu.usbmodem1101 --baud 115200
 ```
 
-The runner prints one aggregate line per second:
+The runner prints one aggregate line per second.
 
 ```text
 PDM frames=32 partial=0 errors=0 mean=... sigma=... peak_sigma=... min=... max=... clipping=0 health=HEALTHY
@@ -55,4 +57,4 @@ that sirens can be distinguished from other environmental sounds.
 The 2026-07-18 physical run passed. Quiet sigma was commonly 20-60 LSB; a
 nearby repeatable system sound raised one-second sigma above 100 LSB and peak
 frame sigma above 350 LSB, while capture held 32 frames per second with no read
-errors or clipping. See `audit/bus-stop-situational-awareness/08-pdm-microphone-bench-test.md`.
+errors or clipping. See `audit/situational-awareness/08-pdm-microphone-bench-test.md`.

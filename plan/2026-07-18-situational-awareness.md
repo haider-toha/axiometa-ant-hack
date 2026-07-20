@@ -1,0 +1,822 @@
+# Bus-Stop Movement Safety and Situational Awareness — Implementation Plan
+
+> **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
+
+**Goal:** Build a two-phase sensing, classification, relay, and output-pattern prototype for a wrist-worn DeafBlind navigation and situational-awareness product. The demo covers local obstacle/siren awareness and camera-guided person avoidance while moving, plus bus arrival, route identification, and guidance toward the bus while still. The intended product uses purpose-built vibration motors; the hack hardware uses two passive buzzers only as audible proxies for those future vibration channels.
+
+**Architecture:** Three sensor inputs and two simulated output channels. A PDM microphone feeds an on-device FFT that fires a shape-aware coarse local alert after about 0.5 s and a confirmed-siren classification after at least 1.02 s. A VL53L0CX ToF gives a purely local proximity reflex with no network in the path. A phone browser POSTs frames at 2 Hz to a Modal endpoint that runs YOLO26n, holds two seconds of detection history, latches exactly one `BUS_ARRIVED` event, and identifies person boxes. Claude reads the bus blind and, only while `MOVING`, judges the clear side around the selected person under strict JSON schemas. Camera submission remains active independently of activity state. The relay exposes `STILL`/`MOVING`; the ESP32 receives directional commands in both known states but renders bus-arrival and route-reading output only while `STILL`. P1 at 2350 Hz and P3 at 3050 Hz audibly simulate two future vibration channels. See the latest Revision note below.
+
+**Tech Stack:** ESP32-S3-MINI-1 (Arduino-ESP32 3.x / ESP-IDF v5.x, FreeRTOS, LEDC in **tone** mode, I2S0 PDM→PCM, `arduinoFFT<float>`, `Adafruit_VL53L0X`, `ArduinoJson` v7) · 2× AX22-0018 passive buzzer (MLT-8530) as audio proxies, not haptic actuators · Modal 1.5.2 + Ultralytics YOLO26n on T4 · `anthropic` 0.117.0 with `output_config.format` structured outputs · Next.js 16.2.10 on Vercel + Upstash Redis · in-browser `getUserMedia` capture on the phone (Python/OpenCV survives only inside Modal, not on a laptop) · build123d via `cad/tests/fake_adsk` for CAD.
+
+**Evidence legend.** Every measured claim below traces to one of four audit files. They are authoritative over anything else in the repository.
+
+| Tag | File |
+|---|---|
+| **T1** | `audit/situational-awareness/01-track-1-physical-cad-ground-truth.md` |
+| **T2** | `audit/situational-awareness/02-track-2-modal-claude-grounding-and-hardcoded-spec.md` |
+| **T3** | `audit/situational-awareness/03-track-3-transcript-and-gesture-vocabulary.md` |
+| **T4** | `audit/situational-awareness/04-track-4-system-firmware-architecture.md` |
+| **T5** | `audit/situational-awareness/05-buzzer-bench-test.md` |
+
+`plan/archive/` holds three superseded plans. **Do not build from them.** Their headers list claims that these four tracks disproved.
+
+---
+
+## Revision 2026-07-19g — Stop-to-direction arbitration
+
+This revision supersedes every older statement that all local proximity output always outranks every cloud direction. Post-demo evidence is recorded in `audit/situational-awareness/27-post-demo-navigation-arbitration.md`.
+
+**1. ToF warns first; camera guidance resolves the bypass.** While `MOVING`, active ToF proximity produces the repeated both-channel stop/obstacle cadence. A fresh camera-derived LEFT or RIGHT then suspends only the ToF output, inserts a 150 ms all-off clearing gap, plays the one-sided direction pattern, inserts another 150 ms clearing gap, and resumes proximity automatically if the obstacle remains in range. ToF sampling never stops.
+
+**2. AHEAD never contradicts local proximity.** AHEAD means the path or target is centered and clear enough to continue. It is accepted for bus guidance in either known activity phase, but it cannot interrupt an active ToF warning. Person avoidance while an obstacle is present produces LEFT or RIGHT, never AHEAD.
+
+**3. Siren remains absolute priority.** Any active siren output cancels a pending or playing cloud direction. Emergency stop, activity changes, and a relay `NONE` edge also cancel a pending direction cleanly.
+
+**4. The grammar is intentionally sequential.** The learnable sequence is `STOP -> silence -> LEFT/RIGHT -> silence -> STOP if still blocked`. Bus alignment while `STILL` remains `LEFT`, `RIGHT`, or `AHEAD` with ToF output suppressed by the activity rule.
+
+---
+
+## Revision 2026-07-19f — Learnable cue grammar and fail-closed person avoidance
+
+This revision supersedes Revision 2026-07-18e wherever that revision cuts camera-guided navigation, and supersedes older one-channel PROXIMITY, WAIT, ERROR, and AHEAD waveforms. The detailed approved contract is `docs/superpowers/specs/2026-07-19-accessible-cue-and-person-guidance-design.md`; implementation evidence is in `audit/situational-awareness/26-accessible-cue-and-person-guidance.md`.
+
+**1. One channel always means a movement direction.** P1-only means move LEFT. P3-only means move RIGHT. No status, hazard, waiting, or error cue may use exactly one channel. AHEAD is one sustained 600 ms pulse on both channels.
+
+**2. Person avoidance is MOVING-only and fail-closed.** With no bus target, the phone selects the highest-confidence person box and sends that normalized box with the frame to `/api/person-direction`. Claude may return only a high-confidence LEFT/RIGHT recommendation, a clear result, or unavailable. Invalid input, malformed output, low confidence, timeout, and model failure produce no direction; none may become AHEAD.
+
+**3. Async results cannot outlive their scene.** The phone aborts and clears person guidance on STILL, bus priority, person disappearance, camera stop, or a tracked-person change. A same-target refresh advances the generation and clears guidance if it fails. The first side applies immediately; reversing LEFT to RIGHT or RIGHT to LEFT requires two consecutive matching Claude results.
+
+**4. Bus direction remains available in both known activity states.** The user may scan for and approach the bus while STILL or MOVING. Existing bus-information precedence and the relay wire contract remain unchanged.
+
+**5. Non-directional cues use both channels.** PROXIMITY is a 120 ms both-channel pulse with the existing distance-mapped cadence. WAIT is `200 on / 600 off / 200 on` on both channels. ERROR is both-channel long-short-long. These changes improve semantic consistency; they do not establish tactile efficacy or DeafBlind-user validation.
+
+---
+
+## Revision 2026-07-18e — Two-phase demo and ESP-side camera-command gate
+
+> **Historical revision. Revision 2026-07-19f supersedes its navigation cut and cue-channel rules.** Its ESP-side bus-information gate and local-sensing phase rules remain current.
+
+This revision supersedes Revision 2026-07-18d's camera-guided LEFT/RIGHT/AHEAD scope and Revision 2026-07-18b's navigation experiment. The implemented experimental direction patterns may remain as dormant provenance, but they are not relay inputs, demo steps, or validated navigation.
+
+**1. The demo has two phases, not two kinds of navigation.** `MOVING` demonstrates supplementary local awareness on the way to the bus stop: ToF forward-clearance feedback plus local siren detection. The cane remains the primary mobility aid and the user chooses how to negotiate an obstacle. `STILL` demonstrates bus-stop situational awareness: BUS, WAIT, route NUMBER, UNKNOWN, and ERROR. The prototype does not guide the user toward the stop, around an obstacle, toward a detected bus, or toward a bus door.
+
+**2. Camera transport stays live.** The phone camera preview and the existing 2 Hz phone-to-Modal submission path may remain active while `MOVING`. Do not modify or pause that pipeline from the board workstream. The ESP32 continues polling, parsing, and advancing command sequence state in both phases.
+
+**3. The ESP32 gates output after reception.** While `MOVING`, camera-derived BUS, WAIT, NUMBER, and UNKNOWN commands are received and sequence-acknowledged but suppressed before output arbitration. While `STILL`, a fresh command may render. A command suppressed while moving is never replayed merely because activity later changes to still.
+
+**3a. Local sensing is state-aware without becoming network-dependent.** ToF sampling remains local and continuous for diagnostics, but its proximity output is permitted only in `MOVING`; entering `STILL` clears it so people and street furniture near a bus stop do not produce a nuisance alert. Siren detection and output remain local and active in both phases.
+
+**3b. Route 88 is guarded on the board.** The P6 waveform is hardcoded to mean route 88. A `NUMBER` command whose wire `route` is not exactly `"88"` or whose `conf` is not `"high"` is consumed without playing P6. This prevents a different or low-confidence reading from producing a confident false route-88 signal.
+
+**4. Activity and command edges are independent.** `/api/pull` exposes activity plus separate activity freshness/version fields. An activity heartbeat must not increment command `seq` or refresh a previous command's `ts`, because doing either could re-fire or make stale bus information appear fresh. Missing, invalid, or stale activity closes the bus-information output gate unless service Serial explicitly controls the bench test.
+
+**5. Demo order is locked.** Start in `MOVING`; demonstrate a ToF obstacle and then a siren. Switch to `STILL`; only then introduce the printed bus prop and deliver a fresh BUS → WAIT → NUMBER 88 sequence. The bus prop must not latch an arrival before the still transition unless the web producer explicitly resets/re-arms it.
+
+**6. Two output channels do not imply sensed directionality.** The single approximately 25-degree forward ToF zone cannot determine whether left or right is traversable. During the obstacle step, the user and cane choose the bypass; the ToF pulse cadence slows and stops as the forward zone clears. Existing P1/P3 LEFT/RIGHT service tones may be shown separately as a conceptual future-channel simulation, but they are not relay commands and must not be described as an automatic obstacle-avoidance decision. Automated bypass guidance requires at least two independently aimed spatial zones or a validated depth/free-space model, plus real actuators and representative-user testing.
+
+---
+
+## Revision 2026-07-18d — Navigation state and buttonless four-slot interaction
+
+> **Historical revision. Revision 2026-07-18e supersedes its LEFT/RIGHT/AHEAD and bus-approach guidance.** Its four-slot hardware and buttonless boot decisions remain current.
+
+This revision previously made navigation a first-class feature rather than an appendix to bus-stop awareness.
+
+**1. The interaction model has two explicit states.** `STILL` is the waiting state: bus-arrival, route-reading, WAIT, and UNKNOWN commands are accepted. `MOVING` is the approach state: LEFT, RIGHT, and AHEAD commands are accepted as coarse guidance toward the detected bus/door target. Local ToF proximity and siren processing stay active in both states and always outrank cloud commands.
+
+**2. The phone owns movement state.** For the hack, the capture UI exposes a manual `STILL`/`MOVING` control and may later derive the same field from phone motion sensors. The board does not have an IMU and must not guess movement from ToF. The relay contract carries the state with each command; missing state defaults to `STILL` for backward compatibility.
+
+**3. Do not spend a module slot on a button.** The locked port map remains P1/P3 outputs, P2 ToF, P4 PDM microphone. The full firmware boots operationally without arming. USB-C remains power, flashing, and service Serial for this hack; phone-originated runtime control uses the already-built HTTPS relay, avoiding a second transport. The onboard user button may become a physical fallback only after its GPIO and polarity are bench-verified; no core workflow may depend on it.
+
+**4. Keep the team boundary explicit.** Camera/Modal workers produce arrival, route, target direction, and phone activity state. Board workers implement local sensing, arbitration, output patterns, command parsing, staleness handling, and the interaction-state gate. Both sides meet at the contracts below.
+
+---
+
+## Revision 2026-07-18c — Buzzer tactile failure and audio-proxy demo
+
+This revision supersedes every downstream statement that describes the AX22-0018 modules as felt, tactile, haptic, or accessibility-validating output.
+
+**1. The tactile viability test failed.** The labelled 70/100/150/220 Hz sweep was audible but produced virtually no tactile movement [T5]. The AX22-0018 modules are rejected as haptic actuators for this prototype. Do not continue the blind tactile-discrimination test and do not describe the current output as haptic feedback.
+
+**2. The hack demo now uses an explicit audio simulation.** P1 plays 2350 Hz and P3 plays 3050 Hz. This preserves the original 700 Hz separation while moving both tones close to the MLT-8530's 2.7 kHz resonance for better audibility in a noisy room. Patterns designated BOTH play both channel frequencies; patterns designated A or B remain on their assigned channel; alternating patterns alternate them. This preserves output routing, count, rhythm, duration, and semantic integration for demonstration, but proves nothing about tactile perception or spatial localization.
+
+**3. Product direction still assumes real vibration hardware.** A future build would replace both buzzers with purpose-built ERM or LRA actuators and adapt the vocabulary to their actual amplitude and waveform controls. That is a documented product assumption, not a current result. It remains unvalidated until tested on real actuators with representative users.
+
+**Stage line:** *"These two tones simulate the two vibration channels the product would use. The supplied buzzers could be heard but not felt, so this prototype demonstrates sensing and pattern routing rather than tactile efficacy."*
+
+---
+
+## Revision 2026-07-18b — Actuator swap, mobile capture, L/R navigation attempt
+
+> **Historical revision. Revision 2026-07-18c supersedes its tactile and wear-test proposals; Revision 2026-07-18e supersedes its LEFT/RIGHT/AHEAD proposal.** Its camera-host and electrical facts remain current.
+
+This revision overrides earlier rulings where they conflict. Three changes, all landing after the first four audit tracks were written. Downstream mentions must now also be read through Revision 2026-07-18c and T5.
+
+**1. The two ERM motors are replaced by two AX22-0018 passive buzzers.** The ERMs could not be sourced in time; the buzzer ships in the Genesis Mini Starter Kit and is in hand. It is an **MLT-8530 electromagnetic** (magnetic, not piezo) transducer on a 22×22 mm module — 2.7 kHz resonant, 80 dB — driven by a **single Signal-pin PWM** (header `G / Vin / S`); there is no second drive channel and no amplitude-by-duty knob the way an ERM has [`parts/Axiometa Genesis Mini - Starter Kit/passive-buzzer/CONTENT.md`]. This flips the drive model from *duty-cycle amplitude* to *frequency (tone)* and flips the output physics from inertial vibration to acoustic diaphragm motion. **We drive the buzzer at a low frequency to elicit a felt buzz rather than an audible tone.** This is an experiment: a sealed magnetic buzzer is not a tactile actuator, so the felt output may be weak. A first-hour wear test (Task 13-adjacent) decides whether the tactile path is viable or whether the device falls back to audible-tone signalling for a hearing companion. The overdrive-kick / start-voltage analysis written for the ERM is **moot** — buzzers have no stiction and no inrush.
+
+**2. Camera capture moves from the laptop Python client to the mobile-ready `app/` app.** [T4 §Decision 1] locked `cv2.VideoCapture(0)` on the laptop and explicitly rejected a browser app; that ruling is **reversed by request.** George owns the Next.js app in `app/`; its capture page uses `getUserMedia({ video })` + a `<canvas>` grab at 2 Hz and is served over HTTPS on the Vercel deployment. `vision/bus_client.py` is **cut**; `vision/bus_vision.py` (Modal) and `vision/read_blind.py` remain. The trade [T4 §Decision 1] warned of — iOS Safari permission UX, a possible reload-and-re-grant on stage — is now **accepted, not avoided**; rehearse the grant flow before the demo.
+
+**3. Left/right navigation is back in scope as software and audio simulation.** [T3 D14/D20] cut LEFT/RIGHT/AHEAD and retired all spatial coding because the two ports are a fixed 33.941 mm apart — below the ~70 mm forearm two-point threshold. **That geometry is unchanged by the swap** and spatial localization stays unavailable. The current demo carries LEFT/RIGHT through a per-channel audio contrast: 2350 Hz on P1 and 3050 Hz on P3. P11–P13 validate navigation command routing only. Future motors require a new tactile vocabulary and wear test; no current result predicts their discriminability.
+
+---
+
+## Global Constraints
+
+Every task's requirements implicitly include this section.
+
+1. **Today is 2026-07-18. The hack ends 2026-07-19. Roughly 1.5 days remain.** Sequencing beats completeness. The Cut List near the end is binding when the clock runs out.
+2. **Hardcoding is sanctioned.** Route **88**, destination **Clapham Common**. No configuration knobs, no generality, no "make this pluggable".
+3. **No soldering. All modules are AX22 snap-in. No extension kit, no ribbon leads, no purchased extras.** All four ports are occupied and every part is in hand.
+4. **The two buzzers are audio proxies, not tactile actuators** [T5]. P1 uses 2350 Hz and P3 uses 3050 Hz to make the two conceptual channels audible. Their 33.941 mm physical separation carries no validated directional meaning in the current demo. Do not claim spatial or tactile left/right discrimination.
+5. **Buzzer Signal pins drive from Port 1 and Port 3.** The AX22-0018 header is `G / Vin / S` — a single Signal line per buzzer plus power and ground; there is no second drive channel. Working assumption: Signal → **GPIO3 (Port 1)** and **GPIO16 (Port 3)**, reusing the ERM diagonal. **Confirm the Signal-pin-to-IO mapping against `parts/Axiometa Genesis Mini - Starter Kit/passive-buzzer/files/SCH_AX22-0018.pdf` and the module silk before first drive** — it was derived for the ERM (AX22-0013), not this part. The committed `firmware/braille_wearable/src/pins.h:9-10` says GPIO4/GPIO9 and is **wrong** for either part; with those pins nothing sounds and it looks like dead hardware.
+6. **The microphone binds to `I2S_NUM_0`. Never `I2S_NUM_1`, never `I2S_NUM_AUTO`.** The PDM-to-PCM converter exists on I2S0 only, and binding I2S1 fails silently by yielding a raw bitstream [T3 §PDM capture, T4 §TRAP 1].
+7. **The ToF → output reflex and siren → output reflex are fully local.** No network in either path. ToF output is enabled only in `MOVING`, while siren output remains enabled in both phases. In the hack demo the output is an audible proxy; the product intent is local vibration output.
+8. **Power: a ≥1 A (≥5 W) USB-C source — kept for margin, but its old binding reason is gone.** That constraint was 2 × ERM inrush [T1 §Old Global Constraints row 3]. Two MLT-8530 buzzers draw on the order of ~30 mA each with no inertial inrush, so the rail is comfortable now; ESP32-S3 + Wi-Fi transients dominate. Keep ≥1 A anyway — headroom is free.
+9. **The ESP32 is outbound-only.** It polls `https://tacta.space/api/pull` every 300 ms and never accepts an inbound connection.
+10. **Serverless is stateless; all shared state lives in Upstash Redis.** The one exception is the Modal container's own arrival state machine, which is safe only because `max_containers=1` pins it to a single process.
+11. **Pin versions exactly for isolated hardware runners:** `adafruit/Adafruit_VL53L0X@1.2.5`. The integrated dependency set remains `modal==1.5.2`, `anthropic==0.117.0`, `kosme/arduinoFFT@^2.0.4`, `bblanchon/ArduinoJson@^7.4.3`, `next@16.2.10`, `@upstash/redis@^1.38.0` until its lockfiles are refreshed deliberately.
+12. **Use Anthropic's first-class structured outputs** (`output_config.format` + `json_schema`). Prompt-only JSON is the weakest available mechanism and **assistant prefill now returns 400** on Opus 4.8 [T2 §Claude Vision 3].
+13. **"We have not validated with DeafBlind users."** That sentence survives into every artefact, unchanged. The community norm is "nothing about us without us". The transcript's *"we've talked to them"* is genuinely ambiguous [T3 D15] and **no claim may be built on it**.
+14. **`parts/` is a catalogue mirror, not an inventory.** Absence of a folder is evidence about Axiometa's product listing and says nothing about what is on the bench [T1 §Inference trap].
+15. **The current buzzer output is audible demo feedback, not a DeafBlind-accessible output channel.** A companion/debug screen provides ground truth. Product accessibility depends on replacing the buzzers with validated vibration hardware.
+16. **No external button module.** All four ports are committed to two output channels, ToF, and PDM microphone. The phone is the primary interaction surface; the onboard button is an optional fallback only after bench verification.
+
+---
+
+## Do This First
+
+**Three things block everything else and all three are unattended waiting. Start them before you read another line.**
+
+### 1. The PlatformIO toolchain — the longest-lead item in the build
+
+`firmware/braille_wearable/platformio.ini:18` pins `default_envs = genesis_mini_offline`, which resolves to `espressif32@7.0.1` → Arduino-ESP32 **2.0.17** → ESP-IDF **v4.4.7**. **`driver/i2s_pdm.h` does not exist in v4.4.7** — the raw GitHub path 404s — so **the siren feature cannot compile at all** in the default environment [T4 §Build Mechanics]. The build must move to `env:genesis_mini` (Arduino 3.3.x → ESP-IDF v5.5.x), whose platform is **not cached on this machine** (`~/.platformio/platforms/` contains only `espressif32` and `native`). First build downloads platform + core + GCC-14, roughly **1 GB**.
+
+```bash
+cd /Users/haidertoha/Code/axiometa-ant-hack/firmware/braille_wearable
+pio run -e genesis_mini
+```
+
+Expected: a long download, then `SUCCESS` with a RAM/Flash summary. Run it **now, on good wifi**, in a background terminal. It does not need the board attached.
+
+| Arduino-ESP32 | ESP-IDF | `driver/i2s_pdm.h` | LEDC API |
+|---|---|---|---|
+| 2.0.17 (current `default_envs`) | v4.4.7 | ❌ legacy `driver/i2s.h` only | `ledcSetup` + `ledcAttachPin` |
+| 3.3.x (`env:genesis_mini`) | v5.5.x | ✅ | `ledcAttach(pin, freq, bits)` |
+
+**Contingency if the download fails at the venue:** build the siren tier against the legacy `driver/i2s.h` API (`I2S_MODE_PDM` + `i2s_set_pdm_rx_down_sample(I2S_NUM_0, I2S_PDM_DSR_8S)`), which does work on 2.0.17. That costs an afternoon of API translation. Downloading tonight costs twenty minutes of waiting.
+
+### 2. Modal billing — a two-minute task that can cost an hour at 3 a.m.
+
+Modal's own documentation states verbatim: *"Note that you must have a payment method on file in order to use Modal."* Third-party blogs claim Starter needs no card; **Modal's docs are the authority and they contradict them** [T2 §Modal 2].
+
+```bash
+pip install "modal==1.5.2"
+modal setup                     # browser auth
+modal secret create anthropic ANTHROPIC_API_KEY="$ANTHROPIC_API_KEY"
+```
+
+Then open https://modal.com/settings/billing and confirm a payment method is listed. Expected: a card on file, Starter plan, `$30 / month free credits`.
+
+### 3. Calipers on the microphone — 60 seconds, two answers, both load-bearing
+
+**AX22-0044 (marking T3902) is in hand.** It has no folder under `parts/` because it is a new product not yet on the Axiometa catalogue — uncatalogued, not absent [T1 §Inference trap]. There is no STEP file, so two dimensions cannot be measured from CAD and must be measured with calipers and eyes:
+
+- **Z height above its own module PCB top.** Available headroom is **4.64 mm** (deck inner face +16.25 minus module PCB top +11.61) [T1 §Derived mated stack]. The ERM uses 3.685 mm. **The tallest non-encoder module in the AX22 family, the DHT11, is 5.835 mm** — so a collision is plausible, not hypothetical. If the mic exceeds 4.64 mm, raise `Z_ROOF_INNER` and `Z_ROOF_OUTER` in `cad/braille_wearable_enclosure.py` by the difference and recompute the ToF aperture for the larger air gap.
+- **Whether the MEMS port is top- or bottom-firing.** All 10 measured AX22 modules place their functional component on the +Z face, so **top-firing is much more likely — but that is an inference from other modules, not a measurement of this one** [T1 §Microphone Acoustic Port]. Top-firing → a Ø3.0 hole through the deck at (−12, +12). Bottom-firing → that hole does nothing and the interior must be vented instead.
+
+Write both answers into this plan's Task 16 before the print starts.
+
+### 4. Start the print as soon as Task 16's STL exists
+
+37.01 cm³ measured, ~3–4.5 h estimated (not sliced). **Black or dark filament, 10–15 % infill.** Dark filament for bore-wall IR absorption at the ToF aperture; low infill matters even more now — a passive buzzer's felt output is already weak, so **the enclosure must not damp it**. Keep the P1 open-reveal well so buzzer A couples directly to the wrist, and treat the P3 louvre grille as the vent for the audible fallback. This is machine time, not person time — it runs while firmware is written. [T1 §Three caveats, amended by Revision §1]
+
+---
+
+## Asset Inventory
+
+### Hardware — **there are no GAP items**
+
+Earlier drafts assumed a missing microphone. That assumption was wrong, and its correction is what makes the four-port map complete.
+
+| Asset | Status | Notes |
+|---|---|---|
+| Axiometa Genesis Mini (ESP32-S3-MINI-1-N4R2) | **REUSE / IN-HAND** | 55.000 × 55.000 mm PCB, MEASURED-FROM-STEP [T1] |
+| VL53L0CX ToF, AX22-0015 | **REUSE / IN-HAND** | `parts/distance-sensor-vl53l0cx/files/AX22-0015.step` |
+| ~~ERM vibration motor ×2, AX22-0013~~ | **CUT — could not source in time** | Superseded by the buzzer below (Revision §1) |
+| **Passive buzzer ×2, AX22-0018 (MLT-8530)** | **REUSE / IN-HAND** | `parts/Axiometa Genesis Mini - Starter Kit/passive-buzzer/`. 22×22 mm module, single Signal-pin PWM. Bench-rejected as tactile actuators; retained as 2350/3050 Hz audio proxies [T5] |
+| **PDM microphone, AX22-0044, marking T3902** | **REUSE / IN-HAND** | **No `parts/` folder, no STEP, no public product page — new uncatalogued hardware.** Footprint is `ASSUMED-AX22-STANDARD`; Z height and port face need calipers (Do This First §3) |
+| USB-C source, ≥1 A | **REUSE / IN-HAND** | Constraint 8 |
+| 20 mm strap + Ø2.5 pins | **REUSE / IN-HAND** | Drives `LUG_GAP = 20.0`, not 22.0 |
+| FDM printer + dark filament | **REUSE / IN-HAND** | Task 16 |
+| **Phone with rear camera + modern browser** | **REUSE / IN-HAND** | The camera host (Revision §2). Runs the `getUserMedia` capture page over HTTPS; replaces the laptop webcam. Needs the venue Wi-Fi/hotspot, nothing installed |
+| A3 bus-front print **or** an 11–13″ tablet | **NET-NEW** | Task 17. Build the tablet version first — it needs no printer |
+| Calipers | **REUSE / IN-HAND** | 60 seconds of work, two load-bearing answers |
+
+**No GAP items in hardware.** Every port is populated, nothing needs sourcing, nothing needs soldering.
+
+### Firmware — `firmware/braille_wearable/`
+
+The directory keeps its legacy name to avoid churning PlatformIO paths. Nothing inside it will be about braille when Task 2 finishes.
+
+| Path | Verdict | Detail |
+|---|---|---|
+| `platformio.ini` | **REUSE (modify)** | `default_envs` → `genesis_mini`. Keep `-DARDUINO_USB_MODE=1` / `-DARDUINO_USB_CDC_ON_BOOT=1` (:33-34) — hard-won and still correct. Keep `[env:native]` (:75-78) unchanged; it is the TDD asset |
+| `src/net.cpp` · `src/net.h` | **REUSE (modify) — the most valuable software asset in the repo** | `wifiJoin()` (`net.cpp:14-31`) keep verbatim including `setInsecure()` (:27); keep the `seq` gate (:54-56) and the v7 `JsonDocument` (:50); `postReply()` (:67-84) is the template for `/api/event` |
+| `src/pins.h` | **REUSE (modify) — contains a bug** | `MOTOR_L 4` / `MOTOR_R 9` → `3` / `16` |
+| `src/secrets.h` | **REUSE unchanged** | Committed template; `.gitignore:5-6` already ignores the real one |
+| `src/braille_wearable.cpp` | **REUSE (~20 %)** | `setup()` ordering (:71-91) and `repeatPressed()` (:58-69, a correct active-high GPIO45 debounce) survive; everything else goes |
+| `src/braille.cpp` · `src/braille.h` | **DELETE** | **Not adaptable.** `beat()`/`buzzLetter()`/`buzzWord()` are a `delay()` chain that blocks the MCU for up to ~48 s. There is no state machine to adapt. **Only the five timing constants at `braille.cpp:12-16` survive** — 400 / 300 / 800 / 1500 / 100 ms |
+| `src/display.cpp` · `src/display.h` | **DELETE** | Out of BOM; Port 2 reallocated to the ToF |
+| `src/encoder.cpp` · `src/encoder.h` | **DELETE** | Out of BOM; Port 4 reallocated to the microphone |
+| `test/test_braille/` | **DELETE (content) / REUSE (technique)** | It proves `[env:native]` works and demonstrates re-deriving the table under test rather than copying it (`:33-48`). Mirror that technique |
+| `src/haptic_pure.h` | **NET-NEW** | Arduino-free sequencer + arbitration. Host-testable |
+| `src/haptic_route_pure.h` | **NET-NEW** | Quinary route encoder. Host-testable |
+| `src/patterns.h` | **REUSE** | The 11 demo pattern tables are current. The already-implemented P11–P13 direction experiments are dormant provenance and must not be exposed through the relay or demo controls. Each step is a `(freq, on/off)` pair, not a duty. Host-testable |
+| `src/siren_pure.h` | **NET-NEW** | Siren decision logic over a magnitude array. Host-testable |
+| `src/haptic.cpp` · `src/haptic.h` | **NET-NEW** | LEDC **tone** glue (`ledcAttach(pin, freq, res)` + `ledcWriteTone(pin, hz)`, or `ledcWrite` at 50 % duty for a given freq) + `hapticTask`. No duty-amplitude control — steps set a frequency or 0 |
+| `src/audio.cpp` · `src/audio.h` | **NET-NEW** | I2S0 PDM capture + FFT + `audioTask` |
+| `src/tof.cpp` · `src/tof.h` | **NET-NEW** | VL53L0X continuous ranging |
+| `src/main.cpp` | **NET-NEW** (from `braille_wearable.cpp`) | `setup()` + `loop()` = ToF and button only |
+
+### Web app — `app/` (George-owned; do not edit from the board workstream)
+
+| Path | Verdict | Detail |
+|---|---|---|
+| `app/src/lib/redis.ts` | **REUSE (implemented)** | Preserve the **MSET-before-INCR** ordering. It prevents readers from observing a new sequence with the previous payload |
+| `app/src/app/api/pull/route.ts` | **REUSE (implemented)** | Outbound board polling plus telemetry; preserve no-store/CORS behavior |
+| `app/src/app/api/event/route.ts` | **REUSE (implemented)** | Sanitises camera-derived bus commands and writes relay state; do not add direction commands |
+| `app/src/lib/contract.ts` | **REUSE (implemented)** | Independent `UserActivity`, `activitySeq`, and `activityTs` fields plus the nine-value cloud command vocabulary |
+| `app/src/app/page.tsx` | **REUSE (implemented)** | Device/relay monitor |
+| `app/src/app/capture/page.tsx` | **REUSE for capture/Modal submission** | Existing camera host remains active in both phases. A separate activity setter may be added, but do not gate frame submission or translate target bearing into device commands |
+| `app/package.json` · `app/pnpm-lock.yaml` | **REUSE** | Active Next.js 16 dependency surface |
+| Vercel project link + Upstash env | **REUSE unchanged** | `haider-projects/bus-stop-awareness`, production domain `tacta.space`, `UPSTASH_*` already set at Production scope |
+| `app/src/app/api/state/route.ts` · `api/detector/route.ts` | **REUSE (implemented)** | Debug-screen state surfaces |
+
+### Vision — `vision/` (net-new directory)
+
+| Path | Verdict |
+|---|---|
+| `vision/bus_vision.py` | **NET-NEW** — the Modal app |
+| ~~`vision/bus_client.py`~~ | **CUT (Revision §2)** — laptop capture replaced by `app/src/app/capture/page.tsx` |
+| `vision/read_blind.py` | **NET-NEW** — standalone Claude call, developed and timed before it is pasted into Modal |
+| `vision/requirements.txt` | **NET-NEW** |
+
+### CAD — `cad/`
+
+| Path | Verdict | Detail |
+|---|---|---|
+| `cad/braille_wearable_enclosure.py` | **REUSE (modify) — the chosen design** | Ten one-line deletions produce a closed body in 0.24 s. **Also reconcile `MOTOR_TOP = 15.25` (ERM body top) with the AX22-0018 buzzer height measured from `parts/.../passive-buzzer/files/AX22-0018.step`** — if the buzzer module is taller, raise `Z_ROOF_INNER`/`Z_ROOF_OUTER` by the difference; the 22×22 mm footprint is unchanged (Revision §1) |
+| `cad/tests/test_enclosure_build.py` | **REUSE (modify)** | Update two lug-bore probes and add two aperture probes |
+| `cad/tests/fake_adsk/` | **REUSE unchanged** | A real build123d engine, not a stub. **Fusion 360 is not required for anything in this plan** |
+| `cad/braille_wearable_exocage.py` | **LEAVE ALONE** | Not used. Do not edit it; its `POST_INNER = 22.0` is a trap (see Task 16) |
+
+---
+
+## Port Map
+
+Port centres are **MEASURED-FROM-STEP** (`parts/Axiometa Genesis Mini - Starter Kit/axiometa-genesis-mini/files/STP_MTX0013.step`, socket-pair centroids, max deviation 0.001 mm) [T1].
+
+| Port | Centre | Module | Signal |
+|---|---|---|---|
+| **P1** | (−12.000, −12.000) | **Buzzer A (left)** | Signal = **GPIO3** (verify vs SCH_AX22-0018) |
+| **P2** | (+12.000, −12.000) | **VL53L0CX ToF** | SDA = GPIO10, SCL = GPIO11 (shared bus) · XSHUT = IO1 = GPIO6 |
+| **P3** | (+12.000, +12.000) | **Buzzer B (right)** | Signal = **GPIO16** (verify vs SCH_AX22-0018) |
+| **P4** | (−12.000, +12.000) | **PDM microphone (AX22-0044)** | CLK = **GPIO18**, DT = **GPIO17**, SL = **GPIO1 high**. Bind to **I2S0**, `I2S_PDM_SLOT_RIGHT` |
+
+- Diagonals are **{1,3}** and **{2,4}**. P1↔P3 = **33.941 mm**; P1↔P2 = 24.000 mm (adjacent). Buzzers take the diagonal for maximum separation — which still falls short of spatial two-point discrimination, so L/R rides on the per-side frequency contrast, not this distance.
+- ToF I²C address is **0x29 (7-bit)** / 0x52 (8-bit write), fixed in silicon. One sensor, no collision. XSHUT is not required for single-sensor operation. `SCH_AX22-0015.pdf` labels XSHUT `IO1D`; on P2 that is GPIO6. This corrects the earlier IO0/GPIO7 inference.
+- **The PDM pin assignment was verified from the installed module silk on 2026-07-18.** The header order is `G / 3V3 / SL / DT / CLK`. Board connector pins 3/4/5 are IO0/IO1/IO2, giving SL GPIO1, DT GPIO17, and CLK GPIO18 on P4. The evidence is the user-provided bench photograph `IMG_0195.HEIC` plus `SCH_MTX0013.pdf`; no pin assignment is inferred from the missing catalogue folder.
+- Pin choice is otherwise free: ESP32-S3 routes I²S through the GPIO matrix, so any of GPIO1/17/18 can carry either signal. **The peripheral choice is not free — it must be I2S0.**
+
+---
+
+## Data Contracts
+
+Four contracts, all literal, all worked with route 88.
+
+### Contract A — phone → Modal
+
+```jsonc
+// POST https://<workspace>--bus-vision-ingest.modal.run
+{ "frame_b64": "/9j/4AAQSkZJRgABAQAAAQ…9k=",   // ~120 kB base64 of a 1280×720 q85 JPEG
+  "force": false }                              // true only for the disclosed SPACE key
+```
+
+```jsonc
+// 200 response
+{ "event": "BUS_ARRIVED",        // "NONE" | "BUS_ARRIVED" | "BUS_GONE"
+  "present": true,
+  "confidence": 0.83,            // best bus-box confidence this frame
+  "arrival_id": 1,               // increments once per arrival — the fire-once latch
+  "reading": null,               // null until Claude answers
+  "reading_ready": false,
+  "votes": [] }                  // Claude's raw route strings once it has answered
+```
+
+**The frame-by-frame walk, literally.**
+
+```jsonc
+// frame N   — nothing in view
+{"event":"NONE","present":false,"confidence":0.0,"arrival_id":0,
+ "reading":null,"reading_ready":false,"votes":[]}
+
+// frame N+1 — prop raised, first detection, NOT enough evidence yet
+{"event":"NONE","present":false,"confidence":0.71,"arrival_id":0,
+ "reading":null,"reading_ready":false,"votes":[]}
+
+// frame N+2 — second consecutive detection, LATCH FIRES
+{"event":"BUS_ARRIVED","present":true,"confidence":0.83,"arrival_id":1,
+ "reading":null,"reading_ready":false,"votes":[]}
+
+// frame N+7 — ~2.5 s later, three concurrent Claude votes have returned
+{"event":"NONE","present":true,"confidence":0.85,"arrival_id":1,
+ "reading":{"route":"88","destination":"Clapham Common","confidence":"high"},
+ "reading_ready":true,"votes":["88","88","88"]}
+```
+
+### Contract B — phone browser → Vercel
+
+The **browser capture page** is now the only component that understands both the detector's vocabulary and the device's (Revision §2 — it inherits this role from the cut laptop client). It translates Modal's detector response into a `CloudPattern`, and it POSTs to `/api/event` **only on change** — the relay is edge-triggered on `seq`, so re-posting an unchanged state would re-fire the haptic. (Alternatively Modal POSTs to `/api/event` directly; keep it in the browser so the one component that speaks both vocabularies also owns the edge-trigger.)
+
+```ts
+// app/src/lib/contract.ts — shared browser/API contract
+export type PatternId =
+  | "NONE"      // no active command
+  | "READY"     // P0  boot complete
+  | "DANGER"    // P1  confirmed siren, amplitude rising   (device-local; never sent)
+  | "SIREN"     // P2  confirmed siren, flat or falling    (device-local; never sent)
+  | "ATTENTION" // P3  Tier-2a band-energy alert           (device-local; never sent)
+  | "PROXIMITY" // P4  ToF advisory                        (device-local; never sent)
+  | "BUS"       // P5  bus arriving
+  | "NUMBER"    // P6  route number — uses `route`
+  | "WAIT"      // P7  request in flight
+  | "UNKNOWN"   // P8  could not read / low confidence
+  | "ACK"       // P9  button feedback                     (device-local; never sent)
+  | "ERROR";    // P10 degraded
+
+/** Cloud-originated commands only. Local safety patterns never cross the wire. */
+export type CloudPattern =
+  | "NONE" | "LEFT" | "RIGHT" | "AHEAD"
+  | "BUS" | "NUMBER" | "WAIT" | "UNKNOWN" | "ERROR";
+
+export type UserActivity = "STILL" | "MOVING";
+
+export interface EventRequest {
+  pattern:   CloudPattern;
+  route:     string;                 // "" unless pattern === "NUMBER"
+  dest:      string;                 // debug screen ONLY — the device ignores this field
+  conf:      "high" | "low" | "";
+  arrivalId: number;
+}
+
+export interface DeviceCommand {
+  seq:       number;                 // monotonic; the device's edge-trigger
+  pattern:   CloudPattern;
+  activity:  UserActivity;
+  activitySeq: number;               // advances on transitions and heartbeats
+  activityTs: number;                // independent freshness for the activity gate
+  route:     string;
+  dest:      string;
+  conf:      "high" | "low" | "";
+  arrivalId: number;
+  ts:        number;                 // ms epoch of the server write — staleness check
+}
+
+export interface Telemetry {
+  bandRms: number; peakHz: number; modIdx: number;
+  trend: "rising" | "flat";
+  playing: PatternId; tofMm: number; upMs: number; rssi: number;
+}
+
+export interface DetectorState {
+  event: string; present: boolean; confidence: number; arrivalId: number;
+  route: string; destination: string; readingConf: string; votes: string[];
+}
+
+export interface DebugState {
+  seq: number;
+  device: Omit<DeviceCommand, "seq">;
+  detector: DetectorState;
+  telemetry: Telemetry;
+}
+
+/** Route numbers longer than this cannot be delivered inside a bus dwell. */
+export const ROUTE_MAX_DIGITS = 3;
+/** Quinary encoding covers digits only. A route containing a letter is rejected server-side. */
+export const ROUTE_RE = /^[0-9]{1,3}$/;
+export const CLOUD_PATTERNS: readonly CloudPattern[] =
+  ["NONE", "LEFT", "RIGHT", "AHEAD", "BUS", "NUMBER", "WAIT", "UNKNOWN", "ERROR"] as const;
+```
+
+**The locked demo, in order, literally.**
+
+```jsonc
+// Before the prop enters frame, activity changes independently to STILL.
+// This updates activity/activitySeq/activityTs but does NOT change command seq or ts.
+
+// t = 0.00 s   browser → POST /api/event      (YOLO latched arrival_id 1)
+{ "pattern":"BUS", "route":"", "dest":"", "conf":"", "arrivalId":1 }
+// ← 200 {"seq":7}
+
+// t = 0.10 s   browser → POST /api/event      (Claude in flight)
+{ "pattern":"WAIT", "route":"", "dest":"", "conf":"", "arrivalId":1 }
+// ← 200 {"seq":8}
+
+// t = 2.60 s   browser → POST /api/event      (3 concurrent votes agreed on "88")
+{ "pattern":"NUMBER", "route":"88", "dest":"Clapham Common", "conf":"high", "arrivalId":1 }
+// ← 200 {"seq":9}
+```
+
+### Contract C — ESP32 ↔ Vercel
+
+```jsonc
+// ESP32 → POST /api/pull  every 300 ms.  Request body = telemetry for the debug screen.
+{ "bandRms":312.4, "peakHz":940, "modIdx":0.62, "trend":"rising",
+  "playing":"NUMBER", "tofMm":842, "upMs":93000, "rssi":-58 }
+
+// ← 200 response = command state plus independently-versioned activity state.
+{ "seq":9, "pattern":"NUMBER", "route":"88", "dest":"Clapham Common",
+  "conf":"high", "arrivalId":1, "ts":1784419200123,
+  "activity":"STILL", "activitySeq":4, "activityTs":1784419199000 }
+```
+
+`GET /api/pull` stays implemented (same handler, empty telemetry) purely so the endpoint remains `curl`-able — that is how the existing relay was smoke-tested and it is worth six extra lines.
+
+What the board actually holds:
+
+```c
+// src/net.h — REPLACES struct PullResult (net.h:10-15)
+enum : uint8_t { CONF_NONE = 0, CONF_LOW, CONF_HIGH };
+enum : uint8_t { ACT_UNKNOWN = 0, ACT_MOVING, ACT_STILL };
+
+struct DeviceCommand {
+    long    seq       = 0;
+    uint8_t pattern   = PAT_NONE;   // string → enum ONCE, at parse time
+    uint8_t activity  = ACT_UNKNOWN; // only fresh ACT_STILL opens bus output gate
+    long    activitySeq = 0;
+    char    route[8]  = {0};        // "88" · "205" · longest UK route "N550" is 4 chars
+    uint8_t conf      = CONF_NONE;
+    long    arrivalId = 0;
+};                                  // Fixed-size. No String. No vector. No heap.
+```
+
+Three deliberate RAM decisions [T4 §Contract C]:
+
+1. **`dest` is parsed and discarded.** It exists for the debug screen; the device has nothing to show it on. Never store it.
+2. **`pattern` becomes a `uint8_t` at parse time.** The old `PullResult` kept `String mode` and compared it with `pr.mode == "forward"` — a heap allocation and a `strcmp` three times a second, forever.
+3. **`route` is a fixed `char[8]`.** The old `std::vector<String> replies` allocated on every poll. Fixed arrays cannot fragment the heap.
+
+```c
+static const size_t PULL_BODY_MAX = 512;   // reject anything larger BEFORE parsing
+// Measured: the 108-byte response above deserialises into ~230 bytes of ArduinoJson v7 pool.
+```
+
+### Contract D — debug screen
+
+```jsonc
+// GET /api/state  — browser only, ~700 B, polled at 500 ms by the Next.js page
+{ "seq": 9,
+  "device":    { "pattern":"NUMBER","route":"88","dest":"Clapham Common",
+                 "conf":"high","arrivalId":1,"ts":1784419200123,
+                 "activity":"STILL","activitySeq":4,"activityTs":1784419199000 },
+  "detector":  { "event":"NONE","present":true,"confidence":0.85,"arrivalId":1,
+                 "route":"88","destination":"Clapham Common","readingConf":"high",
+                 "votes":["88","88","88"] },
+  "telemetry": { "bandRms":312.4,"peakHz":940,"modIdx":0.62,"trend":"rising",
+                 "playing":"NUMBER","tofMm":842,"upMs":93000,"rssi":-58 } }
+```
+
+`telemetry` is the ESP32's own state, written to Redis by `/api/pull` on each poll. **This is what makes the siren tier visible to an audience** — without it the FFT is invisible and judges have to take the buzz on faith.
+
+---
+
+## The Output Vocabulary — all patterns time-coded
+
+Two AX22-0018 passive buzzers now render the vocabulary as an **audible simulation** [T5]. P1 uses 2350 Hz and P3 uses 3050 Hz so the two conceptual future vibration channels remain explicit. Pattern semantics still use channel, simultaneity, count, rhythm, and duration, but no result from this hardware validates tactile perception.
+
+> **Post-bench-test interpretation.** These patterns were authored for future vibration motors. On the hack hardware, ignore duty/intensity and render channel A as 2350 Hz and channel B as 3050 Hz. Count, rhythm, duration, and channel routing remain demonstrable. Felt intensity, tactile pitch, and body localization do not.
+
+### Design rules
+
+1. **ONE channel is reserved for direction.** P1-only means LEFT and P3-only means RIGHT. Every non-direction cue uses both channels. P11–P13 are live relay inputs, but provide no evidence that future body-worn actuators will be spatially distinguishable.
+2. **BOTH channels mean a non-directional event or AHEAD.** Rhythm separates local hazard, information, waiting, error, and continue-forward meanings. This demonstrates software routing only. The future motor implementation must validate the entire vocabulary with representative users.
+3. **Frequency is the primary channel; loudness is not.** Usable design: a **buzz band ≈ 60–120 Hz** and an **alert band ≈ 180–250 Hz**, both felt as coarse "low" vs "high" texture, plus plain on/off gating. Do not design meaning onto fine amplitude steps — the buzzer cannot deliver them.
+4. **Proven timing primitives reused, not reinvented** (`firmware/braille_wearable/src/braille.cpp:12-16`): buzz 400 ms · beat gap 300 ms · letter gap 800 ms (reused as the inter-digit gap). The both-fire stagger is retained at 30 ms only for onset legibility, not electrical reasons (see rule 5).
+5. **No electrical stagger is needed for the audio proxy.** The buzzers have no ERM inrush, so both tones may start simultaneously. Future vibration hardware must make its own onset and power decision.
+6. **Every pattern is a step table** driven by a 10 ms tick. Arbitration is a pointer store; all timing stays off the main loop. Each step now carries a **(freq, on/off)** pair instead of a duty %.
+7. **No overdrive kick.** It existed to break ERM stiction on unknown start voltage — a problem buzzers do not have. Onsets are clean; drive straight to the target frequency.
+
+### Driving the passive buzzers as explicit audio proxies
+
+The AX22-0018 is built for audible output — MLT-8530, 2.7 kHz resonant, 80 dB [`passive-buzzer/CONTENT.md`]. The bench test confirmed that it could be heard but not practically felt [T5]. The demo therefore drives P1 at 2350 Hz and P3 at 3050 Hz. These tones preserve the original 700 Hz separation while sitting close to resonance, making channel selection more audible without pretending to reproduce the physics of ERM/LRA vibration.
+
+There is no buzzer datasheet risk of the ERM kind — the MLT-8530 part is named on the product page and the LCSC datasheet (C94599) is the real PDF, not an HTML scrape. The uncertainty here is **perceptual**, and only a wrist can resolve it.
+
+### The locked table
+
+Notation: `A` = Port 1 buzzer, `B` = Port 3 buzzer, `BOTH` = both (optional 30 ms B stagger only if it aids onset legibility — see rule 5). All durations in ms. Per the table note below, the Intensity column is a drive-frequency selector, not an amplitude.
+
+| # | Pattern | Motors | Intensity | Timing spec | Repeats | Total | Class | Queueable | Trigger |
+|---|---|---|---|---|---|---|---|---|---|
+| **P0** | **READY** | BOTH | 0→65 % | ramp `0→65` over 200, hold `65` for 200 | ×1 | **400** | STATUS | no | Boot complete: ToF init OK, motors OK, Wi-Fi joined or offline confirmed |
+| **P1** | **DANGER** | BOTH | 100 % | `(200 on / 150 off) ×5`, then `500` sustained tail | ×4, gap **750** | **2250/cycle · 11 250 total** | **SAFETY** | no | Tier-2b confirmed siren **AND** amplitude trend rising |
+| **P2** | **SIREN WARNING** | BOTH | 65 % | `(400 on / 300 off) ×2` | ×1 | **1400** | ALERT | no | Tier-2b confirmed siren, flat or falling trend. Rate-limited 1 per 10 s |
+| **P3** | **ATTENTION** | BOTH | 100 % | single `250` pulse | ×1 | **250** | **SAFETY** | no | Tier-2a: 16 consecutive tonal, +12 dB frames with a directional peak sweep of at least 2 bins (~0.5 s) |
+| **P4** | **PROXIMITY** | **BOTH** | 2350/3050 Hz audio proxy | `120 on / gap`, `gap = map(mm, 300→1200, 120→900)` — closer = faster | state refreshed on every valid range sample | continuous | HAZARD | no | ToF < 1200 mm on 3 consecutive samples (~150 ms in the isolated runner) |
+| **P5** | **BUS ARRIVING** | BOTH | 65 → 82 → 100 % | `(250 on / 250 off) ×3`, ascending | ×1 | **1500** | INFORMATION | no | `BUS_ARRIVED` edge from the relay |
+| **P6** | **ROUTE NUMBER** | BOTH | digits **buzz band ~100 Hz**, brackets **alert band ~200 Hz** | preamble `500 @ ~200 Hz` + `600` silence · digits: `LONG=500`, `SHORT=150`, intra-gap `250`, inter-digit gap **800** · terminator `600` silence + `500 @ ~200 Hz` | ×1 | **6400 for "88"** | INFORMATION | **yes** | Claude returned `confidence == "high"` and the 3-vote gate reached consensus |
+| **P7** | **WAIT** | BOTH | 2350/3050 Hz audio proxy | `200 on / 600 off / 200 on` | ×1 | **1000** | FEEDBACK | no | Vision request in flight, no result yet |
+| **P8** | **UNKNOWN** | BOTH | 100→0 % | single `900` pulse, linear fade-out across its full duration | ×1 | **900** | INFORMATION | **yes** | `confidence == "low"`, **or** the vote failed consensus, **or** the request timed out (>8 s), **or** the route contains a non-digit |
+| **P9** | **ACK** | **A only** | 100 % | single `150` pulse, within 20 ms of the press | ×1 | **150** | FEEDBACK | no | Onboard button press, debounced |
+| **P10** | **ERROR / OFFLINE** | **BOTH** | 2350/3050 Hz audio proxy | `600 on / 300 off / 150 on / 300 off / 600 on` (long-short-long) | ×1, re-fires every 60 s while degraded | **1950** | STATUS | no | Wi-Fi down >5 s, **or** 5 consecutive ToF I²C failures, **or** 3 consecutive relay failures |
+
+**Reading the table for buzzers:** the **Motors** column (A / B / BOTH) is unchanged in *routing* — A = Port 1 buzzer, B = Port 3 buzzer. The **Intensity** column is now a **drive-frequency** column: read "100 %" as *buzz band (~60–120 Hz)*, "65 %" as a quieter/shorter gate of the same band, and any ramp as a short frequency glide within the buzz band. No pattern depends on a precise amplitude level.
+
+**Directionality is active for camera-derived bus bearing and MOVING-only person avoidance.** **STOP, MOVE OVER, and TURN remain cut** and have no relay trigger or demo step.
+
+The original cut bundled two different claims together. The one that still holds is about **ToF**: a single forward ToF zone cannot choose a safe left/right bypass, so it must never emit a direction. That reasoning does not extend to the **camera**. A bus uses the detector target box's horizontal bearing. While `MOVING`, a selected person box may be sent to the fail-closed Claude endpoint to choose LEFT or RIGHT around the person; uncertainty emits no direction.
+
+P11–P13 are therefore live, not dormant: the phone maps a confirmed bus target bearing to LEFT/RIGHT/AHEAD and a high-confidence person-avoidance decision to LEFT/RIGHT, then posts it to `/api/event`; the board accepts all three direction commands **in both known phases** (`UNKNOWN` refuses). Person production is separately gated to `MOVING`. The user can scan for the bus while STILL, take the first direction before the first step, then keep receiving bus updates while walking. Precedence on the shared channel is owned by `chooseEvent` in `app/src/lib/contract.ts`: while STILL, BUS/NUMBER/UNKNOWN outrank the bearing so arrival and route-88 output still land; while MOVING, a direction wins because the board suppresses the bus-information half there.
+
+What this still does **not** claim: that the wearer can localise the two buzzers spatially (33.941 mm is far below the two-point threshold — the cue is the 2350/3050 Hz frequency contrast, not position), that this is verified navigation, or that the device can confirm the user moved correctly. It is an advisory nudge toward a *dwelling* bus, not turn-by-turn guidance, and low detector confidence must still fire P8 UNKNOWN rather than a guessed direction. The MOVING phase demonstrates obstacle awareness, siren awareness, **and** coarse camera-derived bus bearing.
+
+See `audit/situational-awareness/19-track-a-nav-contract.md`, `20-track-c-nav-firmware.md`, and `23-still-phase-bearing-delivery.md` (the 2026-07-19 both-phases amendment).
+
+### Discriminability analysis
+
+Assessed as felt through a sleeve on the volar wrist, where amplitude is attenuated and fine timing is smeared. Most-confusable first [T3 §Discriminability Analysis].
+
+| Pair | Risk | Separation | Verdict |
+|---|---|---|---|
+| **P3 ATTENTION vs P9 ACK** | **Highest** — both single short hits | Amplitude (2 motors vs 1, ~2× energy) and duration (250 vs 150 ms, ~1.7×, near the duration JND). **Waveform separation alone is marginal** | **Accepted — resolved by causation, not waveform.** P9 fires only within 20 ms of the user pressing the button. P3 arrives unbidden. Self-disambiguating in every real case |
+| **P2 SIREN vs P5 BUS ARRIVING** | **High** — both a few pulses on both channels | Pulse count 2 vs 3; beat 400 vs 250 ms; envelope flat vs ascending | Check semantic clarity in the audio demo; repeat the test from scratch on future vibration hardware |
+| **P1 DANGER vs P4 PROXIMITY at close range** | **High in principle** — as an object nears, P4 becomes a fast insistent buzz | Amplitude (both @100 % vs one @100 %); P1 has a 500 ms sustained tail and repeats, P4 never does | **Safe by arbitration, not by waveform.** P1 preempts P4 (SAFETY > HAZARD), so they never overlap, and the mandatory 150 ms clearing gap marks the transition |
+| **P1 DANGER vs P10 ERROR** | Medium | Motors (2 vs 1), intensity (100 vs 65 %), rhythm (fast even ×5 vs asymmetric long-short-long), persistence (every 3 s vs every 60 s) | **Safe — four independent margins.** An earlier fast-triplet ERROR was too close to DANGER and was replaced with the asymmetric figure |
+| **P6 preamble vs P6 LONG** | Medium — identical duration | Following gap and sequence context; do not infer a tactile pitch distinction from the audio proxy | Retune and re-test on future vibration hardware |
+| **P6 LONG (500) vs P6 SHORT (150)** | Low | 3.3× duration ratio, far above the ~20–25 % duration JND. Identical intensity and motor set, so duration is the only varying dimension | **Safe. The cleanest contrast in the vocabulary** — correctly so, because it carries the payload |
+| **P7 WAIT vs P4 PROXIMITY** | Low | Both single-motor and repeating, but P4's gap **changes as the user moves their arm** and P7's never does; P7 has 500 ms silent windows, P4 is continuous | **Safe — and the discriminator is embodied.** The user's own motion disambiguates within one arm movement |
+| **P8 UNKNOWN vs P0 READY** | Low | Opposite envelopes (900 ms fade-out vs 400 ms ramp-up), 2.25× duration, and P0 fires only at boot | **Safe** |
+| **P5's internal 65→82→100 % ramp** | — | Each step is ~15–20 %, right at the vibrotactile Weber fraction | **Do not rely on it.** P5's discriminating feature is **3 pulses**, not the ramp. Stated honestly so nobody builds a claim on it |
+
+**Structural safeguard.** The BOTH-vs-ONE rule means the user's first discrimination is always the easy one — strong vs weak — and it is an amplitude judgement, not a localisation judgement, so it holds at 33.9 mm. Within each half, patterns separate by count and rhythm, the most robust vibrotactile dimensions through fabric. **No pattern requires the user to judge duration and intensity simultaneously.**
+
+**Do not build meaning on apparent motion.** Tactile apparent motion between two actuators is real, but it needs a stimulus onset asynchrony of roughly half the burst duration (~80 ms for a 120 ms burst). Prior drafts specified a 400 ms crossfade, at which the effect does not occur — the user feels two successive buzzes. ERMs additionally have sloppy load-dependent rise and decay, so precise SOA control is poor. **No pattern's semantics may depend on direction** [T3 D18].
+
+### Severity arbitration
+
+**This is a NEW finding, absent from every prior draft, and firmware cannot be written without it** — two patterns sharing two motors produce noise, not a message [T3 §Severity Arbitration Rules].
+
+| Class | Value | Patterns | Rationale |
+|---|---|---|---|
+| **SAFETY** | 0 | P1 DANGER, P3 ATTENTION | Physical risk. Never lose, never queue, never mute |
+| **HAZARD** | 1 | P4 PROXIMITY | Physical risk, but continuous and low-stakes per event |
+| **ALERT** | 2 | P2 SIREN WARNING | Environmental, non-immediate |
+| **INFORMATION** | 3 | P5 BUS, P6 NUMBER, P8 UNKNOWN | The payload. Must arrive, but never before safety |
+| **FEEDBACK** | 4 | P9 ACK, P7 WAIT | Conversational glue. Worthless if late |
+| **STATUS** | 5 | P0 READY, P10 ERROR | About the device, not the world |
+
+**Lower number = higher priority.**
+
+1. **Higher class preempts lower, immediately, mid-sequence.** The running pattern aborts at the next 10 ms tick.
+2. **Every preemption inserts a mandatory 150 ms clearing gap** with both motors off. Without it the two patterns smear into an unparseable blur — this gap is what makes preemption *legible* rather than merely correct.
+3. **Equal or lower class never preempts.** It queues if queueable, else it is dropped. **Queue depth 2.**
+4. **Queueable = P6 ROUTE NUMBER and P8 UNKNOWN only.** P6 is the payload; P8 gives the user closure. Everything else is dropped when the channel is busy: P5, P9, P7, P0, P10 are all stale the moment they are late. **P4 PROXIMITY is never queued — it is a state, not a message.** `loop()` re-posts it every 100 ms while the range condition holds, so it resumes automatically with zero extra machinery.
+5. **A preempted queueable pattern restarts from step 0; it never resumes mid-sequence.** A half-delivered route number is worse than a delayed one — resuming mid-digit produces a **plausible wrong number**, which is the single worst output this device can make.
+6. **Queue TTL = 10 000 ms.** Anything older is discarded silently. A stale bus number is actively dangerous because the bus may have gone.
+7. **P1 DANGER is uninterruptible** except by a newer P1. It holds the channel for its full 2250 ms cycle, repeats up to 4× (11.25 s), and cannot be starved.
+8. **Button press during P1:** the ACK is suppressed, but the vision request still fires and its result queues behind DANGER under the 10 s TTL.
+9. **A bus arrives while a siren is active: DANGER wins.** BUS ARRIVING is **dropped**. ROUTE NUMBER is **queued with its 10 s TTL** — if the siren clears in time the user still learns which bus; if not, it expires silently and no misleading late signal is delivered. During a siren the user's decision is "do not step into the road", not "which bus is this".
+10. **Rate limits (anti-fatigue), enforced at the producer:** P2 max 1 per 10 s · P10 max 1 per 60 s · P5 edge-triggered, max 1 per 15 s · P4 unlimited but gated to <1200 mm with a 3-frame debounce. **A wrist that buzzes constantly gets taken off.** These are not optional polish.
+11. **Global mute:** long-press ≥1.5 s suspends classes HAZARD through STATUS for 60 s. **SAFETY is never mutable.**
+
+### Interaction map — no module button
+
+| Input/state | Board behavior | Output scope |
+|---|---|---|
+| Boot | Start local ToF and siren sensing; begin outbound relay polling with the bus-information gate closed | P0 once ready; no arming step |
+| Phone `STILL` | Accept fresh BUS, WAIT, NUMBER, UNKNOWN, and ERROR; continue ToF sampling but clear/suppress proximity output; keep siren active | Bus-stop awareness and route reading without nuisance proximity alerts from nearby people or street furniture |
+| Phone `MOVING` | Receive and sequence-acknowledge camera-derived bus commands, but suppress BUS, WAIT, NUMBER, and UNKNOWN before output arbitration; enable local ToF and siren output; cane remains primary | Supplementary forward-clearance and siren awareness while travelling toward the stop |
+| Phone mute | Suspend HAZARD through STATUS for 60 s | SAFETY remains active |
+| Service Serial `x` | Stop all output immediately during bench work | Test and emergency bring-up control |
+| Onboard user button | No required behavior until GPIO/polarity is verified | Optional later fallback; consumes no slot |
+
+The capture page remains the camera host and may keep previewing and submitting frames to Modal in both phases. Activity is an independent relay field. The ESP32 receives camera-derived command state in both phases, but only a fresh `STILL` activity opens the bus-information output gate. Missing, invalid, or stale activity keeps that gate closed. A bus command observed while `MOVING` is logged and sequence-acknowledged but never queued or replayed after a later mode change.
+
+---
+
+## Number Encoding — quinary long/short
+
+**Unary counting fails on four counts** [T3 §Number Encoding Decision]. Route "88" would be 16 pulses of undifferentiated buzzing. Human subitizing is reliable to about four items; counting to eight twice without error, tactile, through fabric, on a moving arm, from a user also managing a cane, is not a reasonable ask — and a miscount produces a **confident wrong answer**. It is spatially coded (*"on R"*), which is unavailable. And **unary has no symbol for zero**, so routes 10, 20, 205, 390 — a large fraction of real London routes — cannot be encoded at all. That is a hard bug, not a limitation.
+
+**LONG = 5, SHORT = 1.** Digit *d* = (*d* ÷ 5) LONGs followed by (*d* mod 5) SHORTs. Because *d* ÷ 5 ≤ 1 for every digit 0–9, **"two LONGs" is a free codepoint — assign it to zero.** That closes the zero gap with no extra machinery.
+
+| Digit | Encoding | Elements | Digit | Encoding | Elements |
+|---|---|---|---|---|---|
+| 0 | `LONG LONG` | 2 | 5 | `LONG` | 1 |
+| 1 | `SHORT` | 1 | 6 | `LONG SHORT` | 2 |
+| 2 | `SHORT SHORT` | 2 | 7 | `LONG SHORT SHORT` | 3 |
+| 3 | `SHORT ×3` | 3 | 8 | `LONG SHORT ×3` | 4 |
+| 4 | `SHORT ×4` | 4 | 9 | `LONG SHORT ×4` | 5 |
+
+**Parameters:** `SHORT = 150` · `LONG = 500` · intra-digit gap `250` · **inter-digit gap `800`** (the proven constant, reused) · both buzzers, **digit tones in the buzz band (~100 Hz)** throughout · preamble `500 @ ~200 Hz` (alert band) + `600` silence · terminator `600` silence + `500 @ ~200 Hz`. The digit/bracket contrast is now **pitch** (buzz vs alert band), a cleaner discriminator on this hardware than the ERM's amplitude ramp.
+
+**Per-digit block** (tone + intra-digit gaps only):
+
+| d | Encoding | Elements | Tone | Intra gaps | **Block** |
+|---|---|---|---|---|---|
+| 0 | `L L` | 2 | 1000 | 250 | **1250** |
+| 1 | `S` | 1 | 150 | 0 | **150** |
+| 2 | `S S` | 2 | 300 | 250 | **550** |
+| 3 | `S S S` | 3 | 450 | 500 | **950** |
+| 4 | `S S S S` | 4 | 600 | 750 | **1350** |
+| 5 | `L` | 1 | 500 | 0 | **500** |
+| 6 | `L S` | 2 | 650 | 250 | **900** |
+| 7 | `L S S` | 3 | 800 | 500 | **1300** |
+| 8 | `L S S S` | 4 | 950 | 750 | **1700** |
+| 9 | `L S S S S` | 5 | 1100 | 1000 | **2100** |
+
+`total = Σ blocks + (ndigits − 1) × 800 + 2200`
+
+| Route | Elements | Σ blocks | Inter gaps | Brackets | **Total** | Steps |
+|---|---|---|---|---|---|---|
+| "7" | 3 | 1300 | 0 | 2200 | **3.5 s** | 9 |
+| "10" | 3 | 1400 | 800 | 2200 | **4.4 s** | 9 |
+| **"88"** | **8** | 3400 | 800 | 2200 | **6.4 s** | **19** |
+| "205" | **5** | 2300 | 1600 | 2200 | **6.1 s** | 13 |
+| "999" | 15 | 6300 | 1600 | 2200 | **10.1 s** | 33 |
+
+**Use these numbers.** Earlier drafts stated 5.6 s for "88" and 7 elements for "205"; both are wrong. The encoding scheme is correct and unchanged — only the arithmetic moves [T4 §R6].
+
+**Why this is the right trade.** The headline win is not speed, it is error rate and coverage. Maximum identical adjacent elements drops from **9 to 4**, landing inside the reliable subitizing range — the failure mode being designed out is a confident wrong number. Zero becomes representable, taking the scheme from "works for some routes" to "works for all routes". Elements for "88" drop from 16 to 8 at the same wall-clock time, so the same duration carries far less counting load. And it is grounded in the project's own cited research: DeafBlind vibrotactile researchers chose Morse over Braille for exactly this time-efficiency reason, and long/short *is* that primitive.
+
+**Brackets remove digit-boundary ambiguity.** Without a preamble, a user who misses the leading LONG of "8" receives "3". The 500 ms bracket costs ~1.1 s per delivery and eliminates the highest-consequence error in the system. **If 6.4 s proves too long in rehearsal, drop the terminator bracket first (−1.1 s → 5.3 s) before touching digit timing.**
+
+**Routes containing letters are unencodable.** Claude's prompt explicitly allows `"N3"` and `"P5"`. `/api/event` rejects any route failing `ROUTE_RE` and stores `pattern: "UNKNOWN"` instead, so the failure is visible on the debug screen rather than invisible on the wrist. Route 88 is unaffected.
+
+---
+
+## The Siren Path — two tiers, because one is physically impossible
+
+Prior drafts specified *"< 200 ms siren classification"*. **That budget cannot be met, and no optimisation fixes it** [T3 D19].
+
+The defining features of a siren are slow temporal modulations. A yelp modulates at **2–4 Hz**, so one period is already 250–500 ms. A wail's modulation is **0.25–1 Hz**, so a full sweep cycle is **1–4 s**. You cannot observe a 400 ms period inside a 200 ms window. **This is a property of the signal, not a limit of the ESP32.**
+
+The fix is to split the tier, and the split produces a better story rather than an excuse:
+
+| Sub-tier | Budget | Test | Haptic |
+|---|---|---|---|
+| **2a — acoustic alert** | **~0.5 s** (16 frames = 512 ms, plus processing/tick) | Band energy in bins 16…58 exceeds the adaptive noise floor by +12 dB, at least 45% of that energy occupies the strongest bin, and the peak moves directionally by at least 2 bins over 16 consecutive frames | **P3 ATTENTION** |
+| **2b — siren confirmed** | **1–2 s** | ≥1.02 s of sustained band energy **AND** (2–4 Hz modulation index > 0.35 **OR** a monotonic peak sweep) | **P1 DANGER** if the amplitude trend is rising, else **P2 SIREN WARNING** |
+
+**This mirrors the two-stage bus haptic — coarse first, precise shortly after.** The original two-frame coarse gate was rejected at physical calibration: it emitted five false ATTENTION decisions in about 30 seconds of ordinary room noise. The 16-frame tonal-sweep gate emitted none during the subsequent 60-second ambient run and still detected the controlled siren sweep. This is bench evidence, not field validation against real emergency vehicles.
+
+**Tier 2a latency, shown:**
+
+```
+16 non-overlapped frames       512.0 ms
+FFT + feature processing       measured inside the capture cadence
+haptic tick quantisation      ≤ 10.0 ms
+                              ─────────
+TOTAL                         ≈ 0.52 s
+```
+
+### The bin arithmetic
+
+```
+N        = 512                                    FFT size
+f_s      = 16 000 Hz                              sample rate
+Δf       = f_s / N        = 16000 / 512  = 31.25 Hz per bin
+T_frame  = N / f_s        = 512 / 16000  = 32.0 ms per frame
+f_rate   = 1 / T_frame                   = 31.25 frames per second
+Nyquist  = f_s / 2        = 8000 Hz      → usable bins 0 … 255
+f(k)     = k × 31.25 Hz
+```
+
+```
+Siren band low   500 Hz  →  500 / 31.25 = 16.00  → bin 16   (500.00 Hz)  exact
+Siren band high 1800 Hz  → 1800 / 31.25 = 57.60  → bin 58  (1812.50 Hz)
+Wail sweep low   400 Hz  →  400 / 31.25 = 12.80  → bin 13   (406.25 Hz)
+Wail sweep high 1300 Hz  → 1300 / 31.25 = 41.60  → bin 42  (1312.50 Hz)
+```
+
+**Siren energy gate = bins 16…58 (43 bins). Peak tracking = bins 13…42 (30 bins).**
+
+**History = 64 frames = 2048 ms.** 64 is a power of two so the ring modulo is a mask, and it holds ≥2 full cycles of the slowest yelp (2 Hz → 500 ms period → 16 frames → 32 frames for two cycles, with margin).
+
+```
+Envelope is sampled at 31.25 Hz. A modulation of period P frames = 1000/(P × 32) Hz.
+  lag  8 frames → 1000 / 256 = 3.91 Hz
+  lag 16 frames → 1000 / 512 = 1.95 Hz
+⇒ search lags 8 … 16 inclusive to cover the verified 2–4 Hz yelp band.
+```
+
+**Why Hann, not Hamming.** We measure band *energy* and track a *peak bin*; we never need to resolve two close tones. Hann's far-sidelobe rolloff is −60 dB/decade against Hamming's −20 dB/decade, so a loud low-frequency component — traffic rumble, wind, HVAC — leaks far less into the 500–1800 Hz band. Sidelobe rejection is the property that matters.
+
+**Why no overlap.** 50 % overlap would halve detection latency at double the CPU, but it also doubles the envelope sample rate and complicates the lag table. Non-overlapped frames give an envelope sampled at exactly 31.25 Hz and the physically calibrated ~0.5 s coarse gate is adequate for this prototype.
+
+**No DC blocker is required, by construction.** The tunable high-pass fields (`hp_en`, `hp_cut_off_freq_hz`) are gated on `SOC_I2S_SUPPORTS_PDM_RX_HP_FILTER`, defined only for the ESP32-P4. That would normally force a software DC blocker — **it does not here, because every feature is computed from bins 13…58 and DC lands in bin 0.** Deriving the amplitude trend from FFT band energy rather than time-domain RMS makes the whole chain DC-immune for free.
+
+### Two silent-failure traps — design against both, do not discover them
+
+**TRAP 1 — the PDM-to-PCM converter exists on I2S0 only.** ESP-IDF, verbatim: *"PDM RX is only supported on I2S0, and it only supports 16-bit width sample data."* Binding the mic to I2S1 **does not error** — it yields the raw 1-bit bitstream, producing an FFT full of garbage with no diagnostic.
+
+**TRAP 2 — the mono slot default is LEFT.** `I2S_PDM_RX_SLOT_*_DEFAULT_CONFIG` sets `.slot_mask = (mono) ? I2S_PDM_SLOT_LEFT : I2S_PDM_SLOT_BOTH`. The T3902 datasheet calls SELECT=VDD its DATA2/left lane, while the installed ESP-IDF header names the PDM device with select pulled high `I2S_PDM_SLOT_RIGHT`. **For this module drive SL/GPIO1 high and override the mono default with `I2S_PDM_SLOT_RIGHT`, or capture reads pure silence** — again with no error.
+
+**One assertion at bring-up distinguishes both.** After `i2s_channel_enable()`, capture 512 samples and print the standard deviation:
+
+```
+Real 16-bit PCM in a quiet room:   sigma ≈  50 – 500 LSB      → healthy
+Raw PDM misread as PCM:            sigma > 5000, flat spectrum → TRAP 1
+Wrong slot:                        sigma == 0, every sample 0  → TRAP 2
+```
+
+This converts two afternoon-eating silent failures into two printed sentences. **It ships in the first hour of the build** (Task 13).
+
+---
+
+## The Vision Pipeline — why Modal hosts a real detector
+
+The transcript contains a direct challenge: *"I don't even think we need an image [model]… we can probably do the entire thing with Claude. But I know we have to use Modal somehow."*
+
+**The speaker is right on capability and wrong on architecture.** Claude can absolutely read a route number off a frame — better than YOLO could, since YOLO-COCO has no concept of text at all. If the question is *"can Claude do this task"*, the answer is yes and no detector is needed. But the sentence immediately after is the tell: a team that cannot finish *"and Modal is there because ___"* is decorating, and a judge who has seen forty hackathon projects will hear it.
+
+**Three arguments were available. Two of them do not survive the numbers, and the plan concedes both.**
+
+**Argument 1 — cost. Directionally true, practically irrelevant at demo scale.** Nothing here needs 30 fps; a bus pulling in is a multi-second event and the honest frame rate is **2 fps**. For a five-minute demo:
+
+| Approach | Arithmetic | Cost |
+|---|---|---|
+| Claude Haiku 4.5 on every frame, 640×480 (414 visual + ~200 prompt ≈ 614 in, 45 out) | 600 frames × $0.00083 | **$0.50** |
+| Warm Modal T4 + Claude only on the transition | $0.058 + 3 × $0.0041 | **$0.070** |
+
+The detector is ~7× cheaper **and both numbers are under a dollar.** It becomes real only at product scale — continuous monitoring, one user, one hour at 2 fps: **$5.98 vs $0.71**, an 8× gap that compounds per user. **Say that as a roadmap claim, not as today's reason.**
+
+**Argument 2 — cropping improves OCR. True, quantified, and not an argument for a detector.** A full 1280×720 frame costs `⌈1280/28⌉ × ⌈720/28⌉ = 46 × 26 = 1196` visual tokens; the 896×280 blind crop costs `32 × 10 = 320`. That is a 3.7× token reduction and, more importantly, it removes the search problem — Claude is handed the answer rather than asked to find it in a street scene. **But you can crop without a detector.** For a hardcoded demo with a prop at a known distance, a fixed centre-crop would do most of this. Supporting evidence, not necessity.
+
+**Argument 3 — state. This is the load-bearing one, and it is the only one Claude structurally cannot supply.**
+
+> **The detector's product is not a bounding box. It is a state transition.**
+
+"A bus is here" is a boolean over time. Turning noisy per-frame detections into one clean `BUS_ARRIVED` event needs three things: a fast per-frame signal, **debounce and hysteresis over ~1–2 seconds of history** so one flickery frame does not fire and one dropped frame does not un-fire, and **a fire-once latch** so Claude is called once per arrival rather than 600 times and the user is buzzed once rather than continuously.
+
+**The Claude API is stateless per request.** It cannot do the second or the third. *Something* must hold a few seconds of history. That something is a server, and Modal is an honest place for it.
+
+There is also a latency floor. A warm T4 running YOLO-nano returns a box in ~10 ms of compute; the round trip is network-dominated at ~100–300 ms. A Claude response requires network RTT **plus** time-to-first-token **plus** generation of ~45 output tokens. **There is no model configuration in which a complete Claude JSON response beats a warm YOLO bounding box** — that inequality holds regardless of the exact milliseconds, and it is what the two-stage haptic rests on. Human perception of "instant" for a haptic response is roughly <300 ms; a ~1 s round trip reads as lag, not feedback.
+
+**The verdict:** *Modal hosts the stateful arrival detector, because the arrival event is a temporal object and Claude is a stateless oracle. Modal also calls Claude server-side, so the crop is made and read in the same process it was detected in* — saving a ~100–200 ms round trip and keeping `ANTHROPIC_API_KEY` off the phone about to be handed to a judge.
+
+**Stage line: *"Detection is when. Claude is what."***
+
+**What we do not claim on stage.** We do not claim we needed a GPU for throughput — we do not, at 2 fps. We do not claim Claude cannot read the number — it can, better than YOLO. We do not claim cost forced our hand at demo scale — it did not. Claiming any of those invites the exact question the transcript already asked, and we would lose.
+
+**Does the two-stage haptic mask latency, or relocate it? It relocates it, and relocation is the point.** Total time from prop-raised to route-known is unchanged. What changes is that the user gets actionable information at ~1.4 s instead of ~3.8 s. "A bus is here" is itself useful — a London bus dwells 15–30 seconds, and knowing early is real time to start moving toward the door. **It stops working the moment stage one is slow:** if the arrival pulse lands late, the audience perceives two lags rather than coarse-then-precise. That is the whole reason the detector must be warm and must be a detector.
+
+### Camera and transport
+
+**Camera host: the `app/` mobile web app on the phone (Revision §2 — this reverses [T4 §Decision 1]).** `app/src/app/capture/page.tsx` already implements rear-camera `getUserMedia`, canvas JPEG capture, Modal ingestion, and edge-triggered `/api/event` delivery. George owns this surface. Keep capture and Modal submission unchanged in both activity phases; expose activity independently and let the ESP32 gate bus output. Do not translate target bearing into device commands. **Rehearse the permission grant on the actual demo phone/browser** — the one failure mode that still bites is a denied or reset camera permission mid-demo. The laptop `cv2.VideoCapture` client (`vision/bus_client.py`) is cut.
+
+**Transport: the existing Vercel + Upstash polling relay**, ESP32 outbound-only at 300 ms. It is already built, deployed and smoke-tested green end-to-end; `net.cpp` already implements TLS join, poll, `seq` gate and JSON POST; `/api/pull` already sets `Access-Control-Allow-Origin: *` so the debug screen reads the same state from the same place for free.
+
+**The rationale beyond reuse is the one that matters:** the Modal URL **changes between `modal serve` (a `-dev` suffix) and `modal deploy`**. If the board pointed at Modal directly, every redeploy would be a recompile-and-reflash cycle — at exactly the moment you are least able to afford one. With the relay, the URL reaches exactly one place:
+
+| Consumer | How it gets the URL | Cost to change |
+|---|---|---|
+| Phone capture page | `MODAL_URL` as a build-time env / query param on the page URL | redeploy or edit the URL — **seconds** |
+| **ESP32** | **never sees it.** The board only knows `VERCEL_HOST` | n/a |
+| Debug screen | never sees it. Reads Redis | n/a |
+
+**The one change that makes 300 ms polling viable: TLS keep-alive.** `net.cpp:41-48` constructs a fresh `HTTPClient` per poll and calls `http.end()`, tearing the TLS session down; every poll then pays a full handshake (ECDHE on a 240 MHz Xtensa ≈ 300–800 ms) — which is why the old firmware used a 700 ms cadence. Hoisting `HTTPClient` to a static and calling `setReuse(true)` collapses a poll to one TLS record exchange (~50–200 ms).
+
+### Latency budget
+
+**Stage 1 — prop raised → BUS ARRIVING on the wrist**
+
+| # | Hop | Estimate |
+|---|---|---|
+| 1 | Prop enters frame → next capture tick | 0–500 ms (mean **250**) |
+| 2 | `canvas.toDataURL` JPEG encode ~q85 | ~**10 ms** |
+| 3 | Phone → Modal POST, ~120 kB | 80–250 ms (mean **150**) |
+| 4 | YOLO26n forward pass, warm T4 | **10–30 ms** |
+| 5 | Debounce `HITS_TO_ARRIVE = 2` @ 2 Hz | +**500 ms** (deliberate) |
+| 6 | Modal → phone response, ~200 B | 30–80 ms (mean **50**) |
+| 7 | Phone → Vercel `POST /api/event` | 60–150 ms (mean **100**) |
+| 8 | Redis MSET + INCR | 20–60 ms (mean **40**) |
+| 9 | ESP32 poll wait | 0–300 ms (mean **150**) |
+| 10 | `POST /api/pull` round trip with keep-alive | 50–200 ms (mean **120**) |
+| 11 | ArduinoJson parse + enum map + `xQueueSend` | <**2 ms** |
+| 12 | Queue → first buzzer onset | 0–10 ms (mean **5**) |
+| | **TOTAL** | **0.76 – 2.09 s · mean ≈ 1.38 s** |
+
+**Stage 2 — … → first digit of ROUTE NUMBER**
+
+| # | Hop | Estimate |
+|---|---|---|
+| 13 | 3 × Claude vision calls, **run concurrently** | **1.5 – 3.0 s** (sequential would be 4.5–9.0 s) |
+| 14 | Vote + gate, in-process | <1 ms |
+| 15 | Phone notices `reading_ready` on its next 500 ms poll | 0–500 ms (mean **250**) |
+| 16 | `/api/event` → Redis → ESP32 poll → parse | 130–560 ms (mean **415**) |
+| | **prop raised → first digit** | **2.4 – 6.2 s · mean ≈ 3.8 s** |
+| 17 | P6 delivers route "88" | **6.4 s** |
+| | **prop raised → number fully delivered** | **8.8 – 12.6 s** |
+
+Against a 15–30 s dwell this is real but not generous. **The two levers, in order: make the three Claude votes concurrent (saves 3–6 s, it is four lines — ship the concurrent version), then drop the P6 terminator bracket (saves 1.1 s).**

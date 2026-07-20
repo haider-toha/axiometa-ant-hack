@@ -2,7 +2,9 @@
 
 This is the handoff spec for the Modal vision service (`vision/service.py`). It defines the one HTTP contract that the web app (`app/`) speaks to Modal. Get this shape right, and the front end needs no changes.
 
-The source of truth for the types is [`app/src/lib/contract.ts`](app/src/lib/contract.ts). It exports `ModalResponse`, `ModalReading`, and `detectorToEvent`. For full background, read [`plan/2026-07-18-bus-stop-situational-awareness.md`](plan/2026-07-18-bus-stop-situational-awareness.md). See the sections "Data Contracts, Contract A" and "The Vision Pipeline".
+Tacta gives situational awareness through touch. It fuses cameras, microphones, and depth sensors and delivers the result as vibration. This endpoint is the vision sense. The demo hardcodes one concrete scene, reading a specific bus at a stop, route `88` to `Clapham Common`. That scene is one hardcoded example, not the product. The web app that calls this endpoint ships on the live site tacta.space, which serves the pitch deck as its landing page and the demo tools at `/capture`, `/output`, and `/monitor`.
+
+The source of truth for the types is [`app/src/lib/contract.ts`](app/src/lib/contract.ts). It exports `ModalResponse`, `ModalReading`, and `detectorToEvent`. For full background, read [`plan/2026-07-18-situational-awareness.md`](plan/2026-07-18-situational-awareness.md). See the sections "Data Contracts, Contract A" and "The Vision Pipeline".
 
 ---
 
@@ -17,7 +19,7 @@ The source of truth for the types is [`app/src/lib/contract.ts`](app/src/lib/con
 
 ## The endpoint
 
-`POST https://<workspace>--bus-vision-ingest.modal.run` (name is up to you)
+`POST https://<workspace>--tacta-vision-ingest.modal.run` (name is up to you)
 
 ### Request body (what the phone sends)
 
@@ -36,8 +38,8 @@ The source of truth for the types is [`app/src/lib/contract.ts`](app/src/lib/con
 ```jsonc
 {
   "event": "NONE",          // "NONE" | "BUS_ARRIVED" | "BUS_GONE"
-  "present": true,          // is a bus in frame this instant
-  "confidence": 0.83,       // best bus-box confidence this frame (0..1)
+  "present": true,          // is the target vehicle in frame this instant
+  "confidence": 0.83,       // best detection-box confidence this frame (0..1)
   "arrival_id": 1,          // increments by 1 ONCE per arrival, the fire-once latch
   "reading": null,          // null until the route has been read; then the object below
   "reading_ready": false,   // true once `reading` is populated
@@ -91,13 +93,13 @@ Without these headers, the frames never leave the browser. You see nothing serve
 
 The endpoint delivers a **state transition**, not a per-frame detection. It must hold about 1 to 2 seconds of history. It does three things that the stateless model cannot do.
 
-1. **Detect** a bus in each frame with YOLO or equivalent. Set `present` and `confidence`.
-2. **Debounce and latch.** Require about 2 consecutive detections before you fire. One flickery frame then does not fire, and one dropped frame does not un-fire. On the rising edge, set `event: "BUS_ARRIVED"` and **increment `arrival_id` once**. Emit `BUS_GONE` when the bus leaves.
+1. **Detect** the target vehicle in each frame with YOLO or equivalent. Set `present` and `confidence`.
+2. **Debounce and latch.** Require about 2 consecutive detections before you fire. One flickery frame then does not fire, and one dropped frame does not un-fire. On the rising edge, set `event: "BUS_ARRIVED"` and **increment `arrival_id` once**. Emit `BUS_GONE` when the target leaves.
 3. **Read once per arrival.** After the latch, crop the destination blind and ask Claude to read the route and destination with structured output. Run a few concurrent reads and vote. When they agree, set `reading`, `reading_ready: true`, and `votes`. Do this **once per `arrival_id`**, not every frame.
 
 State must persist across frames. The shipped `vision/service.py` keeps the arrival state machine **and** the Claude reading in Upstash Redis. An atomic Lua script mutates that state. It stays correct even when consecutive polls land on different containers, so it needs no `max_containers` cap. If you skip Redis, a simpler alternative pins **`max_containers=1`** and holds the arrival state in process.
 
-Latency matters. Keep the container **warm**. The "a bus is here" signal (stage 1) must land fast. The whole two-stage haptic (coarse then precise) depends on a quick arrival pulse. The route follows a couple of seconds later.
+Latency matters. Keep the container **warm**. The arrival signal (stage 1) must land fast. The whole two-stage haptic (coarse then precise) depends on a quick arrival pulse. The route follows a couple of seconds later.
 
 ---
 
@@ -107,7 +109,7 @@ The capture page maps your response to a device command with `detectorToEvent()`
 
 | Your response | Device command the app fires |
 | --- | --- |
-| `event: "BUS_ARRIVED"`, no reading yet | `BUS`, meaning "a bus is here" |
+| `event: "BUS_ARRIVED"`, no reading yet | `BUS`, meaning "arrival detected" |
 | `arrival_id > 0`, `present`, reading pending | `WAIT`, meaning "reading it" |
 | `reading_ready`, `reading.confidence: "high"`, digit route | `NUMBER` (route), buzzes "88" |
 | `reading_ready`, low confidence or non-digit route | `UNKNOWN` |
@@ -132,7 +134,7 @@ The app posts a fresh command to its own relay **only when the meaning changes**
 ```python
 import modal
 
-app = modal.App("bus-vision")
+app = modal.App("tacta-vision")
 image = modal.Image.debian_slim().pip_install("ultralytics", "anthropic==0.117.0")
 
 @app.cls(gpu="T4", image=image,

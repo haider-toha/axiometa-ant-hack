@@ -5,18 +5,24 @@ Commands and the independent `STILL` and `MOVING` activity channel are deployed.
 Haider owns the phone motion classifier and the activity producer. Service
 Serial remains available for deterministic board testing.
 
+Tacta gives situational awareness through touch, delivered as vibration. The
+demo hardcodes one concrete scene, reading a specific bus at a stop, route `88`
+to `Clapham Common`. That scene is one hardcoded example. The command vocabulary
+below is the real product surface.
+
 The source of truth for the types is
 [`app/src/lib/contract.ts`](app/src/lib/contract.ts). It exports `DeviceCommand`,
 `Telemetry`, and `CloudPattern`. For background, read
-[`plan/2026-07-18-bus-stop-situational-awareness.md`](plan/2026-07-18-bus-stop-situational-awareness.md).
+[`plan/2026-07-18-situational-awareness.md`](plan/2026-07-18-situational-awareness.md).
 See "Data Contracts, Contract C".
 
 ---
 
 ## Summary
 
-- The host is `tacta.space`, tracked in `network_config.h`. The file `secrets.h`
-  contains only hotspot credentials.
+- The host is `tacta.space`, tracked in `network_config.h`. That site serves the
+  pitch deck as its landing page and the demo tools at `/capture`, `/output`, and
+  `/monitor`. The file `secrets.h` contains only hotspot credentials.
 - The board **POSTs to `/api/pull` about every 300 ms**. The request body is
   telemetry. The response is the current command.
 - The response is `{ seq, pattern, route, dest, conf, arrivalId, ts, activity, activitySeq, activityTs }`,
@@ -65,7 +71,7 @@ curl -fsS https://tacta.space/api/pull
   "route": "88",        // always a JSON string, 1 to 3 digits; "" unless pattern==NUMBER
   "dest": "Clapham Common", // debug-screen only, parse and DISCARD on device
   "conf": "high",       // "high" | "low" | ""
-  "arrivalId": 1,       // increments once per bus arrival
+  "arrivalId": 1,       // increments once per arrival
   "ts": 1784398000652,  // ms epoch of the server write, command timestamp
   "activity": "STILL", // "MOVING" | "STILL"
   "activitySeq": 4,     // increments on transitions and 30 s heartbeats
@@ -119,7 +125,7 @@ The relay sends these nine values. Map each one to the corresponding firmware en
 | `LEFT` | camera target is left of frame | P1 proxy pattern |
 | `RIGHT` | camera target is right of frame | P3 proxy pattern |
 | `AHEAD` | camera target is centred | both-channel proxy pattern |
-| `BUS` | a bus is arriving | P5 BUS ARRIVING |
+| `BUS` | arrival detected | P5 BUS ARRIVING |
 | `NUMBER` | route is in `route` | P6 ROUTE NUMBER |
 | `WAIT` | reading the route now | P7 WAIT |
 | `UNKNOWN` | could not read or low confidence | P8 UNKNOWN |
@@ -134,9 +140,9 @@ bypass direction.
 
 | Effective activity | Relay output | ToF | Siren |
 |---|---|---|---|
-| `MOVING` | Consume but suppress bus-information patterns. Accept `ERROR`. | Sample and allow local proximity output. The cane remains primary. | Sample and allow local output. |
-| `STILL` | Accept fresh bus-information patterns and `ERROR`. | Continue to sample for health and telemetry. Clear and suppress proximity output. | Sample and allow local output. |
-| missing or stale | Bus-information gate closed. Fallback behavior is `MOVING`. | Sample and allow local proximity output. | Sample and allow local output. |
+| `MOVING` | Consume but suppress arrival-information patterns. Accept `ERROR`. | Sample and allow local proximity output. The cane remains primary. | Sample and allow local output. |
+| `STILL` | Accept fresh arrival-information patterns and `ERROR`. | Continue to sample for health and telemetry. Clear and suppress proximity output. | Sample and allow local output. |
+| missing or stale | Arrival-information gate closed. Fallback behavior is `MOVING`. | Sample and allow local proximity output. | Sample and allow local output. |
 
 A command suppressed while moving advances `lastSeq` immediately. It can never
 replay simply because activity later changes to still.

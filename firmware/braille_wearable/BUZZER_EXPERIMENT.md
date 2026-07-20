@@ -1,6 +1,6 @@
 # Two-Buzzer Audio Proxy
 
-The first-hour tactile test failed: both AX22-0018 modules were audible but produced virtually no felt movement. They remain in the hack demo only as audible proxies for two future vibration-motor channels. This setup validates software routing and pattern timing, not tactile efficacy or accessibility.
+Tacta delivers situational awareness through touch. Two vibration channels are how the wearable speaks to the wearer. The first-hour tactile test failed. Both AX22-0018 modules were audible but produced virtually no felt movement. They remain in the hack demo only as audible proxies for two future vibration-motor channels. This setup validates software routing and pattern timing, not tactile efficacy or accessibility.
 
 ## Configure The Board
 
@@ -18,7 +18,7 @@ P2 is used only by this isolated experiment. The full prototype later needs P2 f
 
 ## Build, Upload, And Monitor
 
-From the repository root:
+Run these commands from the repository root.
 
 ```bash
 cd firmware/braille_wearable
@@ -55,9 +55,9 @@ Press the P2 button to arm, then enter `v`. The firmware plays P1 / LEFT at 2350
 
 Press the P2 button to arm, then enter `n` for 12 balanced, shuffled audio trials.
 
-- Perceived LEFT: operator enters `l`.
-- Perceived RIGHT: operator enters `r`.
-- Replay without revealing the answer: `p`.
+- For a perceived LEFT, the operator enters `l`.
+- For a perceived RIGHT, the operator enters `r`.
+- To replay without revealing the answer, the operator enters `p`.
 
 LEFT is P1 at 2350 Hz. RIGHT is P3 at 3050 Hz. The score checks whether the audio labels and software path are clear; it is not a tactile navigation result.
 
@@ -65,9 +65,9 @@ LEFT is P1 at 2350 Hz. RIGHT is P3 at 3050 Hz. The score checks whether the audi
 
 Press the P2 button to arm, then enter `s` for 12 balanced, shuffled audio trials.
 
-- Perceived EVENT / bus arriving: operator enters `e`.
-- Perceived WAIT: operator enters `w`.
-- Replay without revealing the answer: `p`.
+- For a perceived EVENT or arrival, the operator enters `e`.
+- For a perceived WAIT, the operator enters `w`.
+- To replay without revealing the answer, the operator enters `p`.
 
 EVENT is three simultaneous two-tone pulses. WAIT alternates the 2350 Hz and 3050 Hz channels twice. The score checks semantic and timing clarity only.
 
@@ -83,4 +83,4 @@ Replays used:
 Routing or timing problems:
 ```
 
-The binding tactile result is already recorded in `audit/bus-stop-situational-awareness/05-buzzer-bench-test.md`: these buzzer modules are not viable haptic actuators.
+The binding tactile result is already recorded in `audit/situational-awareness/05-buzzer-bench-test.md`. These buzzer modules are not viable haptic actuators.

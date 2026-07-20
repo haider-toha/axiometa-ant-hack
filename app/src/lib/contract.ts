@@ -1,7 +1,7 @@
 // Shared source of truth for the device relay. The firmware `DeviceCommand`
 // struct mirrors this file; keep them in lockstep.
 //
-// See plan/2026-07-18-bus-stop-situational-awareness.md → "Data Contracts".
+// See plan/2026-07-18-situational-awareness.md → "Data Contracts".
 
 /** Every haptic pattern the device knows (P0–P13). */
 export type PatternId =

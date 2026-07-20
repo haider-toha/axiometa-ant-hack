@@ -85,7 +85,7 @@ const PERSON_MIN_CONFIDENCE = 0.1;
  * The board refreshes its activity lease ONLY when activitySeq advances, so a
  * steady STILL that is never re-posted silently decays to MOVING after two
  * minutes — reopening ToF proximity output and closing the bus gate on a user
- * standing at a bus stop. Four beats per lease survives three consecutive failed
+ * standing still. Four beats per lease survives three consecutive failed
  * posts. It also bounds post-reboot recovery: a board that reboots mid-demo
  * takes the next value it sees as a non-rendering baseline and needs one more
  * advance, so 30 s is the worst-case blind window. [14 §Remaining delta]
@@ -432,8 +432,8 @@ export default function CapturePage() {
    * no POST, no heartbeat, and a board that is never told anything at all.
    * Meanwhile the on-screen state would sit on this component's initial
    * `MOVING`, which is the wire contract's fail-safe default for a MISSING
-   * value and not something anything measured. The page would read WALKING at
-   * a bus stop.
+   * value and not something anything measured. The page would read WALKING
+   * while the user is standing still.
    *
    * Asserting STILL on entry is the honest claim: it is what the classifier
    * concluded, it starts the 30 s lease heartbeat, and a real walk overrides it

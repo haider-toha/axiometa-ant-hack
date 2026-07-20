@@ -13,7 +13,7 @@
 // under Node or jsdom does nothing.
 //
 // Design note [10 §6]: the dominant false positive here is the user PANNING the
-// camera while standing at a bus stop, and panning can be large. No amplitude
+// camera while standing still, and panning can be large. No amplitude
 // threshold separates panning from walking — only PERIODICITY does. That is why
 // the gate is a cadence window with an inter-peak interval consistency test
 // rather than a variance threshold, and why a bare peak COUNT is not enough:

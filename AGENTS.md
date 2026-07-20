@@ -7,30 +7,32 @@ The checked-in `.claude/skills/` directory contains optional Claude Code helpers
 This repo has pivoted. Start every implementation pass from:
 
 - `README.md`
-- `plan/2026-07-18-bus-stop-situational-awareness.md`
-- `audit/bus-stop-situational-awareness/`
+- `plan/2026-07-18-situational-awareness.md`
+- `audit/situational-awareness/`
 
-The plan is the authoritative build target. If current code, archived plans, or older audit files disagree with it, the current plan wins. If a bus-stop audit file records a measurement and the plan records a number, the audit measurement wins and the plan should be corrected.
+The plan is the authoritative build target. If current code, archived plans, or older audit files disagree with it, the current plan wins. If an audit file records a measurement and the plan records a number, the audit measurement wins and the plan should be corrected.
 
 ## Current Target
 
-Build the bus-stop movement-safety and situational-awareness prototype:
+Build the Tacta situational-awareness wearable. Tacta is an open project toward one wearable that gives DeafBlind people situational awareness through touch. It fuses vision from cameras, sound from microphones, and depth from distance sensors, then delivers those events as vibration. This hackathon build hardcodes one concrete demo scene, reading a specific bus at a stop, so the whole pipeline runs end to end. That scene is one example, not the product. The end product is a purpose-built device: a custom PCB that integrates the sensors, real haptic actuators, and a form factor that fits the wearer such as a wrist unit, a chest harness, or a necklace. It is open source so people with more resources can build it.
+
+This prototype runs on off-the-shelf parts:
 
 - ESP32-S3 Genesis Mini device.
 - Two AX22-0018 passive buzzers on the P1/P3 diagonal, used only as audible proxies for future vibration channels.
 - PDM microphone on I2S0 for local siren detection.
 - VL53L0CX ToF for local proximity reflex.
 - Phone browser camera capture through the Next.js app (`app/`).
-- Modal YOLO/Claude endpoint for bus arrival and route reading.
+- Modal YOLO/Claude endpoint for arrival and route reading.
 - Vercel + Upstash relay for outbound-only ESP32 polling.
 
 Hardcoded route `88` / destination `Clapham Common` is intentional. Do not add generality unless the plan is changed first.
 
 The first-hour experiment is complete. The buzzers were audible but produced virtually no tactile movement, so tactile viability failed. Preserve P1 at 2350 Hz and P3 at 3050 Hz only as audible proxies for two conceptual future vibration channels. This is not directional, haptic, or accessibility validation. The intended product assumes purpose-built ERM/LRA actuators and requires later retuning and representative-user testing.
 
-The demo has two activity phases. `MOVING` demonstrates supplementary ToF forward-clearance feedback and siren detection while travelling toward the bus stop; the cane remains the primary mobility aid. `STILL` enables camera-derived bus arrival and route-88 output. The phone camera and Modal submission may remain active in both phases; the ESP32 still receives and sequence-acknowledges relay commands while moving but suppresses BUS/WAIT/NUMBER/UNKNOWN before output arbitration. ToF continues sampling in both phases but may produce proximity output only in `MOVING`; entering `STILL` clears it. Siren detection and output remain active in both phases.
+The demo has two activity phases. `MOVING` demonstrates supplementary ToF forward-clearance feedback and siren detection while the wearer is on the move; the cane remains the primary mobility aid. `STILL` enables camera-derived arrival reading and route-88 output. The phone camera and Modal submission may remain active in both phases; the ESP32 still receives and sequence-acknowledges relay commands while moving but suppresses BUS/WAIT/NUMBER/UNKNOWN before output arbitration. ToF continues sampling in both phases but may produce proximity output only in `MOVING`; entering `STILL` clears it. Siren detection and output remain active in both phases.
 
-The single forward ToF zone cannot choose a safe left/right bypass, so ToF must never derive `LEFT`, `RIGHT`, or `AHEAD`, and no local sensor output may be described as navigation. Camera-derived bus bearing is a separate thing. The phone can see which side of frame the bus is on, so `LEFT`, `RIGHT`, and `AHEAD` are advisory relay commands accepted in **both** `MOVING` and `STILL` (audit 23, the user scans for the bus while standing still and needs the first direction before the first step; only `UNKNOWN` activity refuses bearings). While `STILL`, the phone yields the shared command channel to `BUS`/`NUMBER`/`UNKNOWN` so arrival and route-88 output still land; bearings fill the `WAIT`/`NONE` gaps (`chooseEvent` in `app/src/lib/contract.ts`). They are not obstacle avoidance, not automatic navigation, and never outrank the local ToF and siren paths. Existing service-Serial tones may demonstrate two conceptual future channels only when they are explicitly labelled as a simulation.
+The single forward ToF zone cannot choose a safe left/right bypass, so ToF must never derive `LEFT`, `RIGHT`, or `AHEAD`, and no local sensor output may be described as navigation. Camera-derived bearing is a separate thing. The phone can see which side of frame the target is on, so `LEFT`, `RIGHT`, and `AHEAD` are advisory relay commands accepted in **both** `MOVING` and `STILL` (audit 23, the user scans for the target while standing still and needs the first direction before the first step; only `UNKNOWN` activity refuses bearings). While `STILL`, the phone yields the shared command channel to `BUS`/`NUMBER`/`UNKNOWN` so arrival and route-88 output still land; bearings fill the `WAIT`/`NONE` gaps (`chooseEvent` in `app/src/lib/contract.ts`). They are not obstacle avoidance, not automatic navigation, and never outrank the local ToF and siren paths. Existing service-Serial tones may demonstrate two conceptual future channels only when they are explicitly labelled as a simulation.
 
 Activity freshness is independent from command delivery. An activity heartbeat must not increment command `seq` or refresh an old command timestamp. A command suppressed while moving must never replay solely because activity later changes to still.
 
@@ -94,7 +96,7 @@ pio run -e board_firmware
 CAD:
 
 ```bash
-python3 -m py_compile cad/bus_stop_enclosure.py
+python3 -m py_compile cad/enclosure.py
 .venv/bin/python -m pytest cad/tests -q
 ```
 

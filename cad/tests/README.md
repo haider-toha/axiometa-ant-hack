@@ -1,6 +1,6 @@
-# Offline test suite for bus_stop_enclosure.py
+# Offline test suite for enclosure.py
 
-`cad/bus_stop_enclosure.py` is a Fusion 360 Python add-in. Fusion has no headless
+`cad/enclosure.py` is a Fusion 360 Python add-in. Fusion has no headless
 mode. The script normally runs only inside the Fusion GUI against a live `adsk`
 API. This suite runs the script offline. It uses a fake `adsk` package that a real
 build123d geometry engine backs. The enclosure builds and gets measured in CI
@@ -17,12 +17,12 @@ Fusion. If the venv is absent, the CAD suite cannot run. Report that plainly.
 
 ## What the suite checks
 
-`test_bus_stop_build.py` is a smoke suite. It guards the current part.
+`test_enclosure_build.py` is a smoke suite. It guards the current part.
 
-* `test_bus_stop_enclosure_builds`. `run(None)` runs end to end under the fake
+* `test_enclosure_builds`. `run(None)` runs end to end under the fake
   engine and reports no `Failed:` message. A `Failed:` message means a boolean miss
   or an unhandled exception.
-* `test_bus_stop_enclosure_two_named_bodies`. The build yields exactly two bodies,
+* `test_enclosure_two_named_bodies`. The build yields exactly two bodies,
   `cage` and `skin_plate`.
 
 ## How it works
@@ -49,7 +49,7 @@ Fusion. If the venv is absent, the CAD suite cannot run. Report that plainly.
 The harness came from the earlier enclosure in this project. It carries more
 capability than the current smoke suite uses. It can run point-in-solid material
 probes, orientation-invariance checks, and dimension-registry invariants. A
-contributor who tightens the bus-stop enclosure fit can add those deeper assertions
+contributor who tightens the enclosure fit can add those deeper assertions
 here through the same `run_build` API.
 
 ## What it cannot catch
@@ -82,6 +82,6 @@ cad/tests/
     fusion.py         # Design, Component, Sketch, features, and the build123d engine
     cam.py            # stub, imported but unused
   conftest.py         # sys.modules aliasing, fresh script import, run_build
-  test_bus_stop_build.py
+  test_enclosure_build.py
   README.md
 ```

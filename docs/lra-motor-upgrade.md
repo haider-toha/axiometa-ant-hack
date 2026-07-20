@@ -2,8 +2,9 @@
 
 ## Status
 
-This is the migration path from the current AX22-0018 passive-buzzer proxies to
-two AX22-0039 LRA motor modules. It assumes the modules physically fit the same
+Tacta delivers situational awareness through touch. Purpose-built vibration
+motors are how the wearable will reach that goal. This is the migration path from
+the current AX22-0018 passive-buzzer proxies to two AX22-0039 LRA motor modules. It assumes the modules physically fit the same
 P1 and P3 sockets. It does **not** assume that the current direct-GPIO firmware
 can drive them. It does **not** assume that left and right tactile discrimination
 is already validated.
@@ -53,13 +54,13 @@ Confirm the following before you install two modules.
    the motor's moving mass or let the PCB resonate loosely.
 4. Confirm the P1 and P3 control topology. DA7280 has a fixed 7-bit I2C address
    of `0x4A`. You cannot control two devices at that address independently on one
-   shared bus.
+   shared I2C line.
 
 The preferred dual-module options, in priority order, are the following.
 
 1. Use separate I2C controllers or buses if P1 and P3 route `SDA` and `SCL`
    separately.
-2. Add an I2C multiplexer or switch if both sockets share one bus.
+2. Add an I2C multiplexer or switch if both sockets share one line.
 3. Investigate preconfigured DA7280 waveform sequences. Trigger them through each
    socket's independent `GPIO0` and `GPIO1` lines. This still needs a way to
    configure each same-address device independently at startup. So it is not
@@ -95,7 +96,7 @@ The recommended target behavior is the following.
 
 Add native tests for the pattern to channel and level mapping. Add hardware tests
 for left-only, right-only, both, off, stop latency, initialization failure, and
-bus failure. The ESP32 target build remains a required check.
+I2C failure. The ESP32 target build remains a required check.
 
 ## Serial protocol migration
 
@@ -130,7 +131,9 @@ keeps the laptop useful during a mixed buzzer and LRA transition.
 ## Laptop UI migration
 
 The `/output` route remains the correct crowd display. Its physical layout and
-serial lifecycle do not need to change.
+serial lifecycle do not need to change. This route is one of the demo tools on
+the live site tacta.space, next to `/capture` and `/monitor`. That site serves
+the pitch deck as its landing page.
 
 - Keep `LEFT / P1` and `RIGHT / P3` in fixed positions.
 - Keep active motion, color-independent state, pulse history, stale detection,
@@ -169,7 +172,7 @@ The upgrade is ready only after all of these pass on the assembled device.
 
 ## Recommended implementation order
 
-1. Confirm the actual driver IC and the P1 and P3 bus and pin topology.
+1. Confirm the actual driver IC and the P1 and P3 I2C and pin topology.
 2. Bring up one LRA module and verify start, level control, stop, and fault
    state.
 3. Prove independent control of two modules before you change the pattern engine.

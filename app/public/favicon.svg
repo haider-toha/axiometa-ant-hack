@@ -1,0 +1,16 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100">
+  <rect width="100" height="100" rx="18" fill="#0a0b0c"/>
+  <!-- "tacta" in braille, drawn as dots so it stays crisp at any size -->
+  <g fill="#ffffff">
+    <!-- t -->
+    <circle cx="12" cy="50" r="3"/><circle cx="12" cy="59" r="3"/><circle cx="21" cy="41" r="3"/><circle cx="21" cy="50" r="3"/>
+    <!-- a -->
+    <circle cx="31" cy="41" r="3"/>
+    <!-- c -->
+    <circle cx="50" cy="41" r="3"/><circle cx="59" cy="41" r="3"/>
+    <!-- t -->
+    <circle cx="69" cy="50" r="3"/><circle cx="69" cy="59" r="3"/><circle cx="78" cy="41" r="3"/><circle cx="78" cy="50" r="3"/>
+    <!-- a -->
+    <circle cx="88" cy="41" r="3"/>
+  </g>
+</svg>

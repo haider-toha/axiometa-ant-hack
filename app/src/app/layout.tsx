@@ -17,11 +17,10 @@ const geistMono = Geist_Mono({
 });
 
 export const metadata: Metadata = {
-  title: "TACTA",
-  description: "Camera capture + device relay for the wrist-worn situational-awareness device.",
+  title: "Tacta",
+  description: "Situational awareness through touch, for people who are DeafBlind.",
   icons: {
-    icon: [{ url: "/logo.png", type: "image/png" }],
-    apple: "/logo.png",
+    icon: [{ url: "/favicon.svg", type: "image/svg+xml" }],
   },
 };
 

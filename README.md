@@ -9,7 +9,7 @@ feel the space around the wearer. Tacta turns all three into touch. The project
 is open source so more people, more money, and better engineering can build the
 real thing.
 
-![Tacta device, exploded view](renders/device-exploded.png)
+![The Tacta prototype device](renders/device.png)
 
 This repository holds a hackathon prototype. The team built it at the Axiometa
 and Anthropic hardware hack in London, from 17 to 19 July 2026. The prototype

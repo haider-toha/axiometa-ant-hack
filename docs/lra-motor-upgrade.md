@@ -132,7 +132,7 @@ keeps the laptop useful during a mixed buzzer and LRA transition.
 
 The `/output` route remains the correct crowd display. Its physical layout and
 serial lifecycle do not need to change. This route is one of the demo tools on
-the live site tacta.space, next to `/capture` and `/monitor`. That site serves
+the live site tacta.space, next to `/capture`. That site serves
 the pitch deck as its landing page.
 
 - Keep `LEFT / P1` and `RIGHT / P3` in fixed positions.

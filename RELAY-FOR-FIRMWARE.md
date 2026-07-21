@@ -21,8 +21,7 @@ See "Data Contracts, Contract C".
 ## Summary
 
 - The host is `tacta.space`, tracked in `network_config.h`. That site serves the
-  pitch deck as its landing page and the demo tools at `/capture`, `/output`, and
-  `/monitor`. The file `secrets.h` contains only hotspot credentials.
+  pitch deck as its landing page and the demo tools at `/capture` and `/output`. The file `secrets.h` contains only hotspot credentials.
 - The board **POSTs to `/api/pull` about every 300 ms**. The request body is
   telemetry. The response is the current command.
 - The response is `{ seq, pattern, route, dest, conf, arrivalId, ts, activity, activitySeq, activityTs }`,

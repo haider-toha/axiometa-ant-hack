@@ -14,7 +14,7 @@ failed, so treat them as proxies only. Nothing here is validated with DeafBlind
 users.
 
 The live site tacta.space serves the pitch deck as the landing page. The demo
-tools live at `/capture`, `/output`, and `/monitor`.
+tools live at `/capture` and `/output`.
 
 ## Readiness Gate
 

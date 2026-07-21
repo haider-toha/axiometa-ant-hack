@@ -951,14 +951,9 @@ export default function CapturePage() {
       <div className="mx-auto flex w-full max-w-xl flex-col gap-4">
         <header className="flex items-center justify-between gap-4">
           <h1 className="text-xl font-medium tracking-tight">Capture</h1>
-          <div className="flex items-center gap-2">
-            <Button variant="outline" size="sm" nativeButton={false} render={<Link href="/output" />}>
-              Output
-            </Button>
-            <Button variant="outline" size="sm" nativeButton={false} render={<Link href="/monitor" />}>
-              Monitor
-            </Button>
-          </div>
+          <Button variant="outline" size="sm" nativeButton={false} render={<Link href="/output" />}>
+            Output
+          </Button>
         </header>
 
         {/* 1. ACTIVITY — first on the page and OUTSIDE the detector guard.

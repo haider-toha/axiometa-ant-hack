@@ -26,7 +26,6 @@ action links to `/capture`.
 | `/` | `public/deck/index.html` (rewrite) | The pitch deck. A static scrollytelling site served at the site root |
 | `/capture` | `src/app/capture/page.tsx` | The capture page. It opens the rear camera with `getUserMedia`. It grabs a `<canvas>` JPEG at 2 Hz (`CAPTURE_MS = 500`). It POSTs the base64 frame to the Modal detector (`NEXT_PUBLIC_MODAL_URL`, or `?modal=<url>`). It maps the detector response to a relay command and posts it on change. It also owns the `STILL` and `MOVING` activity control and the person-direction path |
 | `/output` | `src/app/output/page.tsx` | The output monitor. It reads `TACTA_OUTPUT` telemetry from the ESP32 over Web Serial. It shows the P1 and P3 output channels and the pulse history. Desktop Chrome only |
-| `/monitor` | `src/app/monitor/page.tsx` | The relay monitor. It polls `/api/state`. It shows the current device command, the raw detector state, and the device telemetry |
 
 ## API routes
 
@@ -41,7 +40,7 @@ in Upstash Redis. The app writes the payload with `mset` before it increments
 | `/api/activity` | POST | The `STILL` and `MOVING` activity channel and its heartbeat. It advances `activitySeq` and `activityTs` independently of the command `seq` and `ts` |
 | `/api/person-direction` | POST | Person and obstacle handling in `MOVING`. It takes a normalized box and asks Claude which side has clear pavement. It fails closed. It uses `ANTHROPIC_API_KEY` at request time |
 | `/api/detector` | POST | It records the raw Modal detector state for the debug screen |
-| `/api/state` | GET | An aggregate debug snapshot of command, detector, and telemetry. The `/monitor` page polls it |
+| `/api/state` | GET | An aggregate debug snapshot of command, detector, and telemetry |
 
 ## Local development
 

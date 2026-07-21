@@ -2,7 +2,7 @@
 
 This is the handoff spec for the Modal vision service (`vision/service.py`). It defines the one HTTP contract that the web app (`app/`) speaks to Modal. Get this shape right, and the front end needs no changes.
 
-Tacta gives situational awareness through touch. It fuses cameras, microphones, and depth sensors and delivers the result as vibration. This endpoint is the vision sense. The demo hardcodes one concrete scene, reading a specific bus at a stop, route `88` to `Clapham Common`. That scene is one hardcoded example, not the product. The web app that calls this endpoint ships on the live site tacta.space, which serves the pitch deck as its landing page and the demo tools at `/capture`, `/output`, and `/monitor`.
+Tacta gives situational awareness through touch. It fuses cameras, microphones, and depth sensors and delivers the result as vibration. This endpoint is the vision sense. The demo hardcodes one concrete scene, reading a specific bus at a stop, route `88` to `Clapham Common`. That scene is one hardcoded example, not the product. The web app that calls this endpoint ships on the live site tacta.space, which serves the pitch deck as its landing page and the demo tools at `/capture` and `/output`.
 
 The source of truth for the types is [`app/src/lib/contract.ts`](app/src/lib/contract.ts). It exports `ModalResponse`, `ModalReading`, and `detectorToEvent`. For full background, read [`plan/2026-07-18-situational-awareness.md`](plan/2026-07-18-situational-awareness.md). See the sections "Data Contracts, Contract A" and "The Vision Pipeline".
 
